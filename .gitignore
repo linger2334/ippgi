@@ -25,6 +25,7 @@ wp-config.php
 
 # Example plugin
 /wp-content/plugins/hello.php
+/wp-content/plugins/akismet
 
 # Uploads
 /wp-content/uploads/
