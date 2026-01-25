@@ -1,0 +1,355 @@
+/**
+ * Responsive Styles
+ * Mobile-first breakpoints
+ *
+ * Breakpoints:
+ * - Mobile: < 768px (default)
+ * - Tablet: 768px - 1024px
+ * - Desktop: > 1024px
+ *
+ * @package IPPGI
+ */
+
+/* ==========================================================================
+   Tablet (768px and up)
+   ========================================================================== */
+
+@media (min-width: 768px) {
+    /* Container */
+    :root {
+        --container-padding: var(--spacing-lg);
+    }
+
+    /* Typography */
+    h1 {
+        font-size: var(--font-size-3xl);
+    }
+
+    h2 {
+        font-size: var(--font-size-2xl);
+    }
+
+    /* Grid */
+    .grid--2-tablet {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .grid--3-tablet {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Posts list */
+    .posts-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Footer */
+    .site-footer__top {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .site-footer__bottom {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* Two column layout */
+    .layout-two-column {
+        grid-template-columns: 2fr 1fr;
+    }
+
+    .layout-two-column__sidebar {
+        display: block;
+    }
+
+    /* Section */
+    .section {
+        padding: var(--spacing-2xl) 0;
+    }
+}
+
+/* ==========================================================================
+   Desktop (1024px and up)
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+    /* Header */
+    :root {
+        --header-height-mobile: var(--header-height-desktop);
+    }
+
+    .site-header__inner {
+        height: var(--header-height-desktop);
+    }
+
+    /* Show desktop nav, hide mobile menu button */
+    .header-nav {
+        display: block;
+    }
+
+    .header-menu-btn {
+        display: none;
+    }
+
+    .header-login-btn {
+        display: inline-flex;
+        padding: var(--spacing-sm) var(--spacing-lg);
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: var(--radius-md);
+        color: var(--color-text-white);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+    }
+
+    .header-login-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        color: var(--color-text-white);
+    }
+
+    /* Logo */
+    .site-logo__image {
+        height: 44px;
+    }
+
+    /* Grid */
+    .grid--3-desktop {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .grid--4-desktop {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    /* Posts list */
+    .posts-list {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Footer */
+    .site-footer__top {
+        grid-template-columns: 2fr repeat(3, 1fr);
+    }
+
+    /* Main content */
+    .site-main {
+        min-height: calc(100vh - var(--header-height-desktop) - 300px);
+        padding: var(--spacing-xl) 0;
+    }
+}
+
+/* ==========================================================================
+   Large Desktop (1200px and up)
+   ========================================================================== */
+
+@media (min-width: 1200px) {
+    /* Container */
+    :root {
+        --container-padding: var(--spacing-xl);
+    }
+
+    /* Spacing adjustments */
+    .section {
+        padding: var(--spacing-3xl) 0;
+    }
+}
+
+/* ==========================================================================
+   Utility Classes for Responsive Visibility
+   ========================================================================== */
+
+/* Hide on mobile, show on tablet+ */
+.hide-mobile {
+    display: none !important;
+}
+
+@media (min-width: 768px) {
+    .hide-mobile {
+        display: block !important;
+    }
+
+    .hide-tablet {
+        display: none !important;
+    }
+}
+
+/* Hide on desktop */
+@media (min-width: 1024px) {
+    .hide-desktop {
+        display: none !important;
+    }
+
+    .hide-tablet {
+        display: block !important;
+    }
+
+    .show-desktop {
+        display: block !important;
+    }
+}
+
+/* Show only on mobile */
+.show-mobile {
+    display: block !important;
+}
+
+@media (min-width: 768px) {
+    .show-mobile {
+        display: none !important;
+    }
+}
+
+/* ==========================================================================
+   Responsive Tables
+   ========================================================================== */
+
+@media (max-width: 767px) {
+    .table--responsive thead {
+        display: none;
+    }
+
+    .table--responsive tbody tr {
+        display: block;
+        margin-bottom: var(--spacing-md);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+    }
+
+    .table--responsive tbody td {
+        display: flex;
+        justify-content: space-between;
+        padding: var(--spacing-sm) var(--spacing-md);
+        border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .table--responsive tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .table--responsive tbody td::before {
+        content: attr(data-label);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
+    }
+}
+
+/* ==========================================================================
+   Price Table Responsive
+   ========================================================================== */
+
+@media (max-width: 767px) {
+    .price-table-wrapper {
+        margin: 0 calc(var(--spacing-md) * -1);
+    }
+
+    .price-table {
+        font-size: var(--font-size-xs);
+    }
+
+    .price-table th,
+    .price-table td {
+        padding: var(--spacing-sm);
+    }
+
+    .price-table th:first-child,
+    .price-table td:first-child {
+        position: sticky;
+        left: 0;
+        background-color: var(--color-bg-light);
+        z-index: 1;
+    }
+
+    .price-table th:first-child {
+        background-color: var(--color-table-header);
+    }
+}
+
+/* ==========================================================================
+   Article Cards Responsive
+   ========================================================================== */
+
+@media (max-width: 767px) {
+    /* Mobile uses default styles from components.css */
+}
+
+/* Desktop: larger image and font sizes */
+@media (min-width: 768px) {
+    .article-card__image-link {
+        width: 140px;
+        height: 100px;
+    }
+
+    .article-card__title {
+        font-size: var(--font-size-base);
+    }
+
+    .article-card__excerpt {
+        font-size: var(--font-size-sm);
+    }
+}
+
+/* ==========================================================================
+   Form Responsive
+   ========================================================================== */
+
+@media (min-width: 768px) {
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-md);
+    }
+
+    .form-row .form-group {
+        margin-bottom: 0;
+    }
+}
+
+/* ==========================================================================
+   Modal Responsive
+   ========================================================================== */
+
+@media (max-width: 767px) {
+    .modal {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        border-radius: 0;
+        transform: translate(-50%, -50%) translateY(100%);
+    }
+
+    .modal.is-active {
+        transform: translate(-50%, -50%) translateY(0);
+    }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+    .site-header,
+    .site-footer,
+    .mobile-menu,
+    .mobile-menu-backdrop,
+    .header-actions,
+    .nav-links {
+        display: none !important;
+    }
+
+    body {
+        font-size: 12pt;
+        color: #000;
+        background: #fff;
+    }
+
+    a {
+        color: #000;
+        text-decoration: underline;
+    }
+
+    .container {
+        max-width: none;
+        padding: 0;
+    }
+}

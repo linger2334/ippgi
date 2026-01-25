@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="45px" height="45px" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask fill="white" id="Clip323">
+      <path d="M 1920.5 1057  C 1908.0125 1057  1898 1046.9875  1898 1034.5  L 1898 1034.5  C 1898 1022.0125  1908.0125 1012  1920.5 1012  L 1920.5 1012  C 1932.9875 1012  1943 1022.0125  1943 1034.5  L 1943 1034.5  C 1943 1046.9875  1932.9875 1057  1920.5 1057  " fill-rule="evenodd" />
+    </mask>
+  </defs>
+  <g transform="matrix(1 0 0 1 -1898 -1012 )">
+    <path d="M 1898 1012  L 1943 1012  L 1943 1057  L 1898 1057  L 1898 1012  " fill-rule="nonzero" fill="rgba(204, 204, 204, 1)" stroke="none" class="fill" mask="url(#Clip323)" />
+    <path d="M 1901 1015  L 1940 1015  L 1940 1054  L 1901 1054  L 1901 1015  " fill-rule="nonzero" fill="rgba(255, 255, 255, 1)" stroke="none" class="fill" mask="url(#Clip323)" />
+    <path d="M 1924.775 1025.5  C 1922.885 1025.5  1921.4 1024.015  1921.4 1022.125  C 1921.4 1020.235  1922.885 1018.75  1924.775 1018.75  C 1926.6650000000002 1018.75  1928.15 1020.235  1928.15 1022.125  C 1928.15 1024.015  1926.6650000000002 1025.5  1924.775 1025.5  " fill-rule="nonzero" fill="rgba(204, 204, 204, 1)" stroke="none" class="fill" mask="url(#Clip323)" />
+    <path d="M 1902 1053  L 1902 1032.65  L 1911.25 1023.4  L 1924.2 1030.8  L 1931.6 1028.95  L 1939 1030.8  L 1939 1053  L 1902 1053  " fill-rule="nonzero" fill="rgba(22, 155, 213, 1)" stroke="none" class="fill" mask="url(#Clip323)" />
+  </g>
+</svg>

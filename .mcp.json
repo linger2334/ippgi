@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "figma": {
+      "type": "sse",
+      "url": "http://127.0.0.1:3845/sse"
+    },
+    "html.to.design": {
+      "command": "uvx",
+      "args": [
+        "mcp-proxy",
+        "--transport",
+        "streamablehttp",
+        "https://h2d-mcp.divriots.com/78bcbb54-3e5c-4f9c-83f7-c918bf015134/mcp"
+      ]
+    }
+  }
+}

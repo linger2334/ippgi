@@ -1,0 +1,5 @@
+Google OAuth
+Client ID
+1066386896205-uoflidujsq6ejge2q9i5upr7nhchfd38.apps.googleusercontent.com
+Client Secret
+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
