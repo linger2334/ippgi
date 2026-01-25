@@ -104,18 +104,15 @@ function ippgi_get_register_url() {
  * Get profile URL
  */
 function ippgi_get_profile_url() {
+    // First check theme customizer setting
     $profile_page = get_theme_mod('ippgi_profile_page', 0);
 
     if ($profile_page) {
         return get_permalink($profile_page);
     }
 
-    // Check if Simple Membership plugin is active
-    if (class_exists('SwpmSettings')) {
-        return SwpmSettings::get_instance()->get_value('profile-page-url');
-    }
-
-    return admin_url('profile.php');
+    // Default to custom profile page
+    return home_url('/profile/');
 }
 
 /**
