@@ -71,35 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ippgi_edit_profile_no
 
 <main id="main-content" class="site-main">
     <div class="container">
-        <div class="profile-page">
-            <!-- Profile Header -->
-            <div class="profile-page__header">
-                <h1 class="profile-page__title"><?php esc_html_e('Edit Profile', 'ippgi'); ?></h1>
-            </div>
-
-            <!-- Logo and Back Row -->
-            <div class="profile-page__actions">
-                <div class="profile-page__logo">
-                    <?php if (has_custom_logo()) : ?>
-                        <a href="<?php echo esc_url(home_url('/')); ?>">
-                            <?php
-                            $custom_logo_id = get_theme_mod('custom_logo');
-                            $logo = wp_get_attachment_image_src($custom_logo_id, 'full');
-                            if ($logo) {
-                                echo '<img src="' . esc_url($logo[0]) . '" alt="' . get_bloginfo('name') . '">';
-                            }
-                            ?>
-                        </a>
-                    <?php else : ?>
-                        <a href="<?php echo esc_url(home_url('/')); ?>" class="profile-page__logo-text">
-                            <?php bloginfo('name'); ?>
-                        </a>
-                    <?php endif; ?>
-                </div>
-                <a href="<?php echo esc_url(ippgi_get_profile_url()); ?>" class="profile-page__back">
-                    <?php esc_html_e('Back', 'ippgi'); ?>
-                </a>
-            </div>
+        <div class="edit-profile-page">
+            <!-- Page Title -->
+            <h1 class="edit-profile-page__title"><?php esc_html_e('Edit Member Profile', 'ippgi'); ?></h1>
 
             <?php if ($message) : ?>
                 <div class="profile-message profile-message--<?php echo esc_attr($message_type); ?>">
@@ -111,122 +85,181 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ippgi_edit_profile_no
             <form method="post" class="edit-profile-form">
                 <?php wp_nonce_field('ippgi_edit_profile', 'ippgi_edit_profile_nonce'); ?>
 
-                <div class="profile-section">
-                    <div class="profile-section__header">
-                        <?php esc_html_e('Member information', 'ippgi'); ?>
+                <!-- Name Field -->
+                <div class="edit-profile-field">
+                    <label class="edit-profile-field__label" for="display_name">
+                        <?php esc_html_e('Name:', 'ippgi'); ?>
+                    </label>
+                    <input type="text" id="display_name" name="display_name"
+                           class="edit-profile-field__input"
+                           value="<?php echo esc_attr($current_user->display_name); ?>">
+                </div>
+
+                <!-- Country/Region Field -->
+                <div class="edit-profile-field">
+                    <label class="edit-profile-field__label">
+                        <?php esc_html_e('Country/Region:', 'ippgi'); ?>
+                    </label>
+                    <input type="hidden" id="country" name="country" value="<?php echo esc_attr($user_country); ?>">
+                    <div class="country-selector" id="country-selector">
+                        <span class="country-selector__value" id="country-display">
+                            <?php echo $user_country ? esc_html($user_country) : ''; ?>
+                        </span>
+                        <span class="country-selector__arrow">v</span>
                     </div>
-                    <div class="profile-section__body">
-                        <div class="edit-profile-field">
-                            <label class="edit-profile-field__label" for="display_name">
-                                <?php esc_html_e('Name:', 'ippgi'); ?>
-                            </label>
-                            <input type="text" id="display_name" name="display_name"
-                                   class="edit-profile-field__input"
-                                   value="<?php echo esc_attr($current_user->display_name); ?>">
-                        </div>
+                </div>
 
-                        <div class="edit-profile-field">
-                            <label class="edit-profile-field__label" for="country">
-                                <?php esc_html_e('Country/Region:', 'ippgi'); ?>
-                            </label>
-                            <input type="text" id="country" name="country"
-                                   class="edit-profile-field__input"
-                                   value="<?php echo esc_attr($user_country); ?>">
-                        </div>
+                <!-- Company Name Field -->
+                <div class="edit-profile-field">
+                    <label class="edit-profile-field__label" for="company_name">
+                        <?php esc_html_e('Company Name:', 'ippgi'); ?>
+                    </label>
+                    <input type="text" id="company_name" name="company_name"
+                           class="edit-profile-field__input"
+                           value="<?php echo esc_attr($user_company); ?>">
+                </div>
 
-                        <div class="edit-profile-field">
-                            <label class="edit-profile-field__label" for="company_name">
-                                <?php esc_html_e('Company Name:', 'ippgi'); ?>
-                            </label>
-                            <input type="text" id="company_name" name="company_name"
-                                   class="edit-profile-field__input"
-                                   value="<?php echo esc_attr($user_company); ?>">
-                        </div>
-
-                        <div class="edit-profile-field">
-                            <label class="edit-profile-field__label" for="email">
-                                <?php esc_html_e('Email:', 'ippgi'); ?>
-                            </label>
-                            <input type="email" id="email" name="email"
-                                   class="edit-profile-field__input edit-profile-field__input--disabled"
-                                   value="<?php echo esc_attr($current_user->user_email); ?>"
-                                   disabled>
-                            <span class="edit-profile-field__hint">
-                                <?php esc_html_e('Email cannot be changed', 'ippgi'); ?>
-                            </span>
-                        </div>
-
-                        <div class="edit-profile-field">
-                            <label class="edit-profile-field__label" for="phone">
-                                <?php esc_html_e('Mobile Number:', 'ippgi'); ?>
-                            </label>
-                            <input type="tel" id="phone" name="phone"
-                                   class="edit-profile-field__input"
-                                   value="<?php echo esc_attr($user_phone); ?>">
-                        </div>
-
-                        <div class="edit-profile-form__actions">
-                            <button type="submit" class="profile-btn profile-btn--primary">
-                                <?php esc_html_e('Save Changes', 'ippgi'); ?>
-                            </button>
-                        </div>
+                <!-- Email Field (Read-only) -->
+                <div class="edit-profile-field">
+                    <label class="edit-profile-field__label" for="email">
+                        <?php esc_html_e('Email:', 'ippgi'); ?>
+                    </label>
+                    <div class="edit-profile-field__value">
+                        <?php echo esc_html($current_user->user_email); ?>
                     </div>
+                </div>
+
+                <!-- Mobile Number Field -->
+                <div class="edit-profile-field">
+                    <label class="edit-profile-field__label" for="phone">
+                        <?php esc_html_e('Mobile Number:', 'ippgi'); ?>
+                    </label>
+                    <input type="tel" id="phone" name="phone"
+                           class="edit-profile-field__input"
+                           value="<?php echo esc_attr($user_phone); ?>">
+                </div>
+
+                <!-- Submit Button -->
+                <div class="edit-profile-form__submit">
+                    <button type="submit" class="edit-profile-submit-btn">
+                        <?php esc_html_e('Submit', 'ippgi'); ?>
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </main>
 
-<!-- Simple Footer for Edit Profile Page -->
-<footer class="site-footer site-footer--simple" role="contentinfo">
-    <div class="container">
-        <!-- Footer Bottom -->
-        <div class="site-footer__bottom">
-            <div class="site-footer__legal">
-                <a href="<?php echo esc_url(home_url('/terms')); ?>" class="site-footer__legal-link"><?php esc_html_e('Terms&Conditions', 'ippgi'); ?></a>
-                <a href="<?php echo esc_url(home_url('/privacy')); ?>" class="site-footer__legal-link"><?php esc_html_e('Privacy Policy', 'ippgi'); ?></a>
-                <a href="<?php echo esc_url(home_url('/contact')); ?>" class="site-footer__legal-link"><?php esc_html_e('Contact Us', 'ippgi'); ?></a>
-            </div>
-            <p class="site-footer__copyright">
-                &copy; <?php echo esc_html(date('Y')); ?> <?php esc_html_e('AFO Group Pty Ltd, all rights reserved.', 'ippgi'); ?>
-            </p>
+<!-- Country Selector Modal -->
+<div class="country-modal" id="country-modal" style="display: none;">
+    <div class="country-modal__content">
+        <div class="country-modal__search">
+            <input type="text" id="country-search" class="country-modal__search-input" placeholder="<?php esc_attr_e('Please enter the keywords', 'ippgi'); ?>">
+            <svg class="country-modal__search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
         </div>
-
-        <!-- Social Icons -->
-        <div class="site-footer__social">
-            <a href="#" class="social-icon" aria-label="Facebook">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-            </a>
-            <a href="#" class="social-icon" aria-label="LinkedIn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                </svg>
-            </a>
-            <a href="#" class="social-icon" aria-label="Twitter">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                </svg>
-            </a>
-            <a href="#" class="social-icon" aria-label="Telegram">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                </svg>
-            </a>
-            <a href="#" class="social-icon" aria-label="YouTube">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                </svg>
-            </a>
-            <a href="#" class="social-icon" aria-label="WhatsApp">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                </svg>
-            </a>
+        <div class="country-modal__list" id="country-list">
+            <!-- Countries will be populated by JavaScript -->
         </div>
     </div>
-</footer>
+</div>
+
+<script>
+(function() {
+    // Complete list of countries
+    const countries = [
+        "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
+        "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain",
+        "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan",
+        "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria",
+        "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
+        "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros",
+        "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic",
+        "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt",
+        "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+        "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana",
+        "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti",
+        "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland",
+        "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati",
+        "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya",
+        "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia",
+        "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico",
+        "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique",
+        "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua",
+        "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan",
+        "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines",
+        "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis",
+        "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino",
+        "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles",
+        "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia",
+        "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan",
+        "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania",
+        "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia",
+        "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates",
+        "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City",
+        "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+    ];
+
+    const countrySelector = document.getElementById('country-selector');
+    const countryModal = document.getElementById('country-modal');
+    const countrySearch = document.getElementById('country-search');
+    const countryList = document.getElementById('country-list');
+    const countryInput = document.getElementById('country');
+    const countryDisplay = document.getElementById('country-display');
+
+    // Render country list
+    function renderCountries(filter = '') {
+        const filtered = filter
+            ? countries.filter(c => c.toLowerCase().includes(filter.toLowerCase()))
+            : countries;
+
+        countryList.innerHTML = filtered.map(country =>
+            `<div class="country-modal__item" data-country="${country}">${country}</div>`
+        ).join('');
+
+        // Add click handlers
+        countryList.querySelectorAll('.country-modal__item').forEach(item => {
+            item.addEventListener('click', function() {
+                const selected = this.dataset.country;
+                countryInput.value = selected;
+                countryDisplay.textContent = selected;
+                closeModal();
+            });
+        });
+    }
+
+    // Open modal
+    function openModal() {
+        countryModal.style.display = 'flex';
+        countrySearch.value = '';
+        renderCountries();
+        countrySearch.focus();
+    }
+
+    // Close modal
+    function closeModal() {
+        countryModal.style.display = 'none';
+    }
+
+    // Event listeners
+    countrySelector.addEventListener('click', openModal);
+
+    countryModal.addEventListener('click', function(e) {
+        if (e.target === countryModal) {
+            closeModal();
+        }
+    });
+
+    countrySearch.addEventListener('input', function() {
+        renderCountries(this.value);
+    });
+
+    // Initial render
+    renderCountries();
+})();
+</script>
 
 <?php wp_footer(); ?>
 </body>

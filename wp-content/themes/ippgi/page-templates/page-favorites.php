@@ -12,62 +12,200 @@ if (!is_user_logged_in()) {
     exit;
 }
 
+// Get user's favorite materials
+$favorites = ippgi_get_user_favorites();
+
+// Material types for filter
+$material_types = [
+    'ppgi' => 'PPGI',
+    'gi' => 'GI',
+    'gl' => 'GL',
+    'al' => __('Aluminum Sheet', 'ippgi'),
+    'crc_hard' => 'CRC Hard',
+    'hrc' => 'HRC',
+];
+
 get_header();
 ?>
 
 <main id="main-content" class="site-main">
     <div class="container">
-        <header class="page-header">
-            <h1 class="page-title"><?php esc_html_e('My Favorites', 'ippgi'); ?></h1>
-            <p class="page-subtitle"><?php esc_html_e('Track your favorite materials in one place.', 'ippgi'); ?></p>
-        </header>
-
-        <?php
-        // Get user's favorite materials (placeholder - will be implemented with database)
-        $favorites = ippgi_get_user_favorites();
-
-        if (!empty($favorites)) :
-        ?>
-            <div class="favorites-grid">
-                <?php foreach ($favorites as $favorite) : ?>
-                    <div class="favorite-card">
-                        <div class="favorite-card__header">
-                            <span class="favorite-card__code"><?php echo esc_html($favorite['code']); ?></span>
-                            <button type="button" class="favorite-btn is-active" data-price-id="<?php echo esc_attr($favorite['id']); ?>" aria-label="<?php esc_attr_e('Remove from favorites', 'ippgi'); ?>">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        <h3 class="favorite-card__name"><?php echo esc_html($favorite['name']); ?></h3>
-                        <div class="favorite-card__price">
-                            <span class="favorite-card__value"><?php echo esc_html(number_format($favorite['price'])); ?></span>
-                            <span class="favorite-card__unit">CNY/ton</span>
-                        </div>
-                        <div class="favorite-card__change <?php echo $favorite['change'] >= 0 ? 'favorite-card__change--up' : 'favorite-card__change--down'; ?>">
-                            <?php echo $favorite['change'] >= 0 ? '&#9650;' : '&#9660;'; ?>
-                            <?php echo esc_html(abs($favorite['change'])); ?>
-                        </div>
-                        <a href="<?php echo esc_url(home_url('/price-detail?material=' . $favorite['id'])); ?>" class="favorite-card__link">
-                            <?php esc_html_e('View Details', 'ippgi'); ?> &rarr;
-                        </a>
-                    </div>
-                <?php endforeach; ?>
+        <div class="favorites-page">
+            <!-- Header Section -->
+            <div class="favorites-header">
+                <h1 class="favorites-header__title">
+                    <?php esc_html_e('My Favorites selection of China steel and commodities.', 'ippgi'); ?>
+                </h1>
+                <p class="favorites-header__subtitle">
+                    <?php esc_html_e('Shortlist your favorite price curve, indices, daily prices.', 'ippgi'); ?>
+                </p>
             </div>
-        <?php else : ?>
-            <div class="empty-state">
-                <svg class="empty-state__icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </svg>
-                <h2 class="empty-state__title"><?php esc_html_e('No favorites yet', 'ippgi'); ?></h2>
-                <p class="empty-state__text"><?php esc_html_e('Start adding materials to your favorites to track them here.', 'ippgi'); ?></p>
-                <a href="<?php echo esc_url(home_url('/prices')); ?>" class="btn btn--primary">
-                    <?php esc_html_e('Browse Prices', 'ippgi'); ?>
-                </a>
+
+            <!-- Product Filter Section -->
+            <div class="favorites-product">
+                <button type="button" class="favorites-filter" id="favorites-filter-btn" aria-expanded="false">
+                    <span class="favorites-filter__label" id="filter-label"><?php esc_html_e('Product', 'ippgi'); ?></span>
+                    <svg class="favorites-filter__arrow" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="3">
+                        <polyline points="6 4 12 16 18 4"></polyline>
+                    </svg>
+                </button>
+
+                <div class="favorites-list" id="favorites-list">
+                    <?php if (!empty($favorites)) : ?>
+                        <?php foreach ($favorites as $favorite) : ?>
+                            <div class="favorites-item" data-type="<?php echo esc_attr($favorite['type'] ?? ''); ?>">
+                                <span class="favorites-item__name"><?php echo esc_html($favorite['name']); ?></span>
+                                <span class="favorites-item__spec"><?php echo esc_html($favorite['spec'] ?? ''); ?></span>
+                                <button type="button" class="favorites-item__heart" data-price-id="<?php echo esc_attr($favorite['id']); ?>" aria-label="<?php esc_attr_e('Remove from favorites', 'ippgi'); ?>">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#333" stroke="#333" stroke-width="1">
+                                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <div class="favorites-empty">
+                            <p><?php esc_html_e('No favorites yet. Start adding materials to your favorites to track them here.', 'ippgi'); ?></p>
+                            <a href="<?php echo esc_url(home_url('/')); ?>" class="btn btn--primary">
+                                <?php esc_html_e('Browse Prices', 'ippgi'); ?>
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
-        <?php endif; ?>
+        </div>
     </div>
 </main>
+
+<!-- Material Type Selector (Bottom Sheet) -->
+<div class="material-selector-backdrop" id="material-selector-backdrop"></div>
+<div class="material-selector" id="material-selector" aria-hidden="true">
+    <div class="material-selector__header">
+        <h3 class="material-selector__title"><?php esc_html_e('Product', 'ippgi'); ?></h3>
+    </div>
+    <div class="material-selector__list">
+        <?php foreach ($material_types as $type => $label) : ?>
+            <button type="button" class="material-selector__item" data-type="<?php echo esc_attr($type); ?>">
+                <span><?php echo esc_html($label); ?></span>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="3">
+                    <polyline points="7 4 16 12 7 20"></polyline>
+                </svg>
+            </button>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<script>
+(function() {
+    const filterBtn = document.getElementById('favorites-filter-btn');
+    const filterLabel = document.getElementById('filter-label');
+    const selector = document.getElementById('material-selector');
+    const backdrop = document.getElementById('material-selector-backdrop');
+    const favoritesList = document.getElementById('favorites-list');
+    const items = selector.querySelectorAll('.material-selector__item');
+
+    let currentFilter = null; // Track current filter state
+
+    function openSelector() {
+        selector.classList.add('is-active');
+        backdrop.classList.add('is-active');
+        filterBtn.setAttribute('aria-expanded', 'true');
+        selector.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeSelector() {
+        selector.classList.remove('is-active');
+        backdrop.classList.remove('is-active');
+        filterBtn.setAttribute('aria-expanded', 'false');
+        selector.setAttribute('aria-hidden', 'true');
+    }
+
+    function filterFavorites(type) {
+        const favoriteItems = favoritesList.querySelectorAll('.favorites-item');
+        favoriteItems.forEach(item => {
+            if (type === null || item.dataset.type === type) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    function resetToDefault() {
+        currentFilter = null;
+        filterLabel.textContent = '<?php esc_html_e('Product', 'ippgi'); ?>';
+        items.forEach(i => i.classList.remove('is-active'));
+        filterFavorites(null);
+    }
+
+    filterBtn?.addEventListener('click', openSelector);
+    backdrop?.addEventListener('click', closeSelector);
+
+    items.forEach(item => {
+        item.addEventListener('click', function() {
+            const type = this.dataset.type;
+            const label = this.querySelector('span').textContent.trim();
+            const isCurrentlyActive = this.classList.contains('is-active');
+
+            if (isCurrentlyActive) {
+                // Deselect - reset to default
+                resetToDefault();
+            } else {
+                // Select this item
+                items.forEach(i => i.classList.remove('is-active'));
+                this.classList.add('is-active');
+                currentFilter = type;
+                filterLabel.textContent = label;
+                filterFavorites(type);
+            }
+
+            // Close selector
+            closeSelector();
+        });
+    });
+
+    // Heart button click - toggle favorite
+    favoritesList?.addEventListener('click', function(e) {
+        const heartBtn = e.target.closest('.favorites-item__heart');
+        if (!heartBtn) return;
+
+        const priceId = heartBtn.dataset.priceId;
+        const favoriteItem = heartBtn.closest('.favorites-item');
+
+        // Send AJAX request to toggle favorite
+        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                action: 'ippgi_toggle_favorite',
+                price_id: priceId,
+                nonce: '<?php echo wp_create_nonce('ippgi_nonce'); ?>'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove item from list with animation
+                favoriteItem.style.opacity = '0';
+                favoriteItem.style.transform = 'translateX(100%)';
+                favoriteItem.style.transition = 'all 0.3s ease';
+                setTimeout(() => {
+                    favoriteItem.remove();
+                    // Check if list is empty
+                    if (!favoritesList.querySelector('.favorites-item')) {
+                        location.reload();
+                    }
+                }, 300);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    });
+})();
+</script>
 
 <?php
 get_footer();

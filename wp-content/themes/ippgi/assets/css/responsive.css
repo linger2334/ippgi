@@ -134,7 +134,8 @@
     /* Main content */
     .site-main {
         min-height: calc(100vh - var(--header-height-desktop) - 300px);
-        padding: var(--spacing-xl) 0;
+        padding-top: calc(40px + var(--header-height-desktop) + var(--spacing-sm)) !important;
+        padding-bottom: var(--spacing-xl);
     }
 }
 

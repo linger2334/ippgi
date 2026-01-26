@@ -448,6 +448,69 @@ function ippgi_get_user_total_bonus_days($user_id = null) {
 }
 
 /**
+ * Get user's invitation history (list of referred users)
+ *
+ * @param int $user_id User ID
+ * @return array Array of referred users with timestamp and masked email
+ */
+function ippgi_get_invitation_history($user_id = null) {
+    global $wpdb;
+
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    if (!$user_id) {
+        return [];
+    }
+
+    // Get users who were referred by this user
+    $referred_users = $wpdb->get_results($wpdb->prepare(
+        "SELECT u.ID, u.user_email, u.user_registered
+         FROM {$wpdb->users} u
+         INNER JOIN {$wpdb->usermeta} um ON u.ID = um.user_id
+         WHERE um.meta_key = 'ippgi_referred_by' AND um.meta_value = %d
+         ORDER BY u.user_registered DESC",
+        $user_id
+    ));
+
+    $history = [];
+    foreach ($referred_users as $user) {
+        $history[] = [
+            'timestamp' => date('M d, Y', strtotime($user->user_registered)),
+            'email' => ippgi_mask_email($user->user_email),
+        ];
+    }
+
+    return $history;
+}
+
+/**
+ * Mask email address for privacy
+ *
+ * @param string $email Email address
+ * @return string Masked email (e.g., "jo***@example.com")
+ */
+function ippgi_mask_email($email) {
+    $parts = explode('@', $email);
+    if (count($parts) !== 2) {
+        return '***@***.***';
+    }
+
+    $name = $parts[0];
+    $domain = $parts[1];
+
+    // Show first 2 characters, mask the rest
+    if (strlen($name) <= 2) {
+        $masked_name = $name . '***';
+    } else {
+        $masked_name = substr($name, 0, 2) . '***';
+    }
+
+    return $masked_name . '@' . $domain;
+}
+
+/**
  * Get user's subscription status
  * Returns one of: 'trial', 'active', 'cancelled', 'terminated'
  *

@@ -210,27 +210,38 @@ function ippgi_get_user_favorites($user_id = null) {
 
     $favorites = get_user_meta($user_id, 'ippgi_favorites', true);
 
-    if (empty($favorites)) {
+    if (empty($favorites) || !is_array($favorites)) {
         return [];
     }
 
-    // Return sample data for now - will be replaced with real data in Phase 2
-    return [
-        [
-            'id'     => 'gi',
-            'code'   => 'GI',
-            'name'   => __('Galvanized Steel', 'ippgi'),
-            'price'  => 4850,
-            'change' => 25,
-        ],
-        [
-            'id'     => 'ppgi',
-            'code'   => 'PPGI',
-            'name'   => __('Pre-painted', 'ippgi'),
-            'price'  => 5680,
-            'change' => -15,
-        ],
+    // Material type mapping
+    $material_types = [
+        'gi' => ['name' => __('GI', 'ippgi'), 'type' => 'gi'],
+        'gl' => ['name' => __('GL', 'ippgi'), 'type' => 'gl'],
+        'ppgi' => ['name' => __('PPGI', 'ippgi'), 'type' => 'ppgi'],
+        'hrc' => ['name' => __('HRC', 'ippgi'), 'type' => 'hrc'],
+        'crc_hard' => ['name' => __('CRC Hard', 'ippgi'), 'type' => 'crc_hard'],
+        'al' => ['name' => __('Aluminum Sheet', 'ippgi'), 'type' => 'al'],
     ];
+
+    $result = [];
+    foreach ($favorites as $favorite_id) {
+        // Parse favorite_id format: type-spec (e.g., "ppgi-0.09*1000")
+        $parts = explode('-', $favorite_id, 2);
+        $type = $parts[0] ?? '';
+        $spec = $parts[1] ?? '';
+
+        if (isset($material_types[$type])) {
+            $result[] = [
+                'id' => $favorite_id,
+                'name' => $material_types[$type]['name'],
+                'spec' => $spec,
+                'type' => $material_types[$type]['type'],
+            ];
+        }
+    }
+
+    return $result;
 }
 
 /**

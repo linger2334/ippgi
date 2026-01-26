@@ -78,7 +78,7 @@
     align-items: center;
     justify-content: space-between;
     height: 40px;
-    padding: 0 var(--spacing-md);
+    padding: 0;
 }
 
 .top-bar__support {
@@ -193,7 +193,8 @@
     align-items: center;
     justify-content: space-between;
     height: var(--header-height-mobile);
-    padding: 0 var(--spacing-sm);
+    padding-top: 0;
+    padding-bottom: 0;
     border-top: 1px solid #e0e0e0;
     border-bottom: 1px solid #e0e0e0;
 }

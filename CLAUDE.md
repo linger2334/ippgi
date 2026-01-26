@@ -155,6 +155,76 @@
 - `ippgi_award_referral_bonus()` - 奖励 Plus 会员时间
 - `ippgi_get_user_referral_count()` - 获取推荐人数
 - `ippgi_get_user_total_bonus_days()` - 获取累计奖励天数
+- `ippgi_get_invitation_history()` - 获取邀请历史记录
+- `ippgi_mask_email()` - 邮箱脱敏显示（如 `john***@gmail.com`）
+
+### 邀请页面 UI 实现
+**模板文件**：`/page-templates/page-invite.php`
+
+**页面结构**：
+1. **标题区域**
+   - 主标题：`Earn rewards for each friend you invite.`
+   - 副标题：`Share with your friends and get rewards.`
+   - 下方有分割线
+
+2. **邀请链接区域**
+   - 标题：`Get Your Exclusive Referral Link! Share it with friends and earn rewards!`（24px 粗体）
+   - 邀请链接输入框（只读，宽度自适应内容，带阴影效果）
+   - Copy 按钮（点击后显示 Toast 提示 "Copy Success!"）
+   - 说明文字 + Contact us 链接（带下划线）
+   - 下方有分割线
+
+3. **邀请历史表格**
+   - 标题：`Invitation History`
+   - 表头：Number | Timestamp | Referred User
+   - 表头四周圆角（8px）
+   - 内容居中对齐
+   - **日期格式**：`M d, Y`（如 `Jan 20, 2026`）
+
+**CSS 样式**：位于 `/assets/css/components.css`
+- `.invite-page` - 页面容器
+- `.invite-link-section` - 邀请链接区域
+- `.invite-link-box` - 链接输入框和按钮容器（垂直布局，居中）
+- `.invite-link-box__input` - 输入框（带阴影：`box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4)`）
+- `.invite-history` - 历史记录区域
+- `.invite-history__table` - 表格样式（`border-collapse: separate`）
+
+### 收藏页面 UI 实现
+**模板文件**：`/page-templates/page-favorites.php`
+
+**页面结构**：
+1. **标题区域**
+   - 主标题：`My Favorites selection of China steel and commodities.`
+   - 副标题：`Shortlist your favorite price curve, indices, daily prices.`
+   - 下方有分割线
+
+2. **材料类型过滤器**
+   - 默认显示 "Product" + 向下箭头
+   - 点击弹出底部选择器（白色背景，圆角顶部）
+   - 选择器顶部居中显示 "Product" 标题
+   - 材料类型列表：PPGI、GI、GL、Aluminum Sheet、CRC Hard、HRC
+   - 每项右侧有向右箭头
+   - 支持切换选中/取消选中（再次点击同一项恢复默认状态）
+
+3. **收藏列表**
+   - 三等分布局：产品名称 | 规格 | 心形按钮
+   - 内容居中显示，文字太长自动换行
+   - 心形按钮点击可取消收藏（AJAX 请求）
+   - 取消收藏后条目滑出动画移除
+
+**收藏数据格式**：
+- 存储在 user meta `ippgi_favorites`
+- ID 格式：`type-spec`（如 `ppgi-0.09*1000`）
+- `ippgi_get_user_favorites()` 解析并返回结构化数据
+
+**CSS 样式**：位于 `/assets/css/components.css`
+- `.favorites-page` - 页面容器
+- `.favorites-header` - 标题区域
+- `.favorites-filter` - 过滤器按钮
+- `.favorites-item` - 收藏条目（flex 三等分）
+- `.favorites-item__heart` - 心形按钮
+- `.material-selector` - 底部弹出选择器
+- `.material-selector-backdrop` - 遮罩层
 
 ---
 
