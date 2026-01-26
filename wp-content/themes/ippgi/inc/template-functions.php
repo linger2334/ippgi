@@ -116,6 +116,48 @@ function ippgi_get_profile_url() {
 }
 
 /**
+ * Get edit profile URL
+ */
+function ippgi_get_edit_profile_url() {
+    // First check theme customizer setting
+    $edit_profile_page = get_theme_mod('ippgi_edit_profile_page', 0);
+
+    if ($edit_profile_page) {
+        return get_permalink($edit_profile_page);
+    }
+
+    // Default to custom edit profile page
+    return home_url('/edit-profile/');
+}
+
+/**
+ * Get subscription end date for user
+ */
+function ippgi_get_subscription_end_date($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    // Check if Simple Membership plugin is active
+    if (class_exists('SwpmMemberUtils')) {
+        $wp_user = get_user_by('id', $user_id);
+        if ($wp_user) {
+            $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
+            if ($swpm_member && !empty($swpm_member->subscription_starts)) {
+                // Calculate end date based on membership level duration
+                $start_date = $swpm_member->subscription_starts;
+                // Default to 1 year subscription
+                $end_date = date('F j, Y', strtotime($start_date . ' +1 year'));
+                return $end_date;
+            }
+        }
+    }
+
+    // Fallback
+    return __('N/A', 'ippgi');
+}
+
+/**
  * Calculate reading time for a post
  */
 function ippgi_reading_time($post_id = null) {

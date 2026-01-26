@@ -448,6 +448,115 @@ function ippgi_get_user_total_bonus_days($user_id = null) {
 }
 
 /**
+ * Get user's subscription status
+ * Returns one of: 'trial', 'active', 'cancelled', 'terminated'
+ *
+ * @param int $user_id User ID
+ * @return string Subscription status
+ */
+function ippgi_get_subscription_status($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    if (!$user_id) {
+        return 'terminated';
+    }
+
+    // Development mode
+    if (defined('IPPGI_DEV_MODE') && IPPGI_DEV_MODE) {
+        $dev_level = defined('IPPGI_DEV_MEMBERSHIP_LEVEL') ? IPPGI_DEV_MEMBERSHIP_LEVEL : 'plus';
+        if ($dev_level === 'trial') {
+            return 'trial';
+        } elseif ($dev_level === 'plus') {
+            return 'active';
+        } elseif ($dev_level === 'cancelled') {
+            return 'cancelled';
+        }
+        return 'terminated';
+    }
+
+    // Check Trial status (Level 3)
+    if (ippgi_user_has_trial($user_id)) {
+        return 'trial';
+    }
+
+    // Check Plus status (Level 4)
+    if (ippgi_user_has_plus($user_id)) {
+        // Check if subscription is cancelled
+        $is_cancelled = ippgi_is_subscription_cancelled($user_id);
+        return $is_cancelled ? 'cancelled' : 'active';
+    }
+
+    // No active subscription
+    return 'terminated';
+}
+
+/**
+ * Check if user's subscription is cancelled (but not yet expired)
+ *
+ * @param int $user_id User ID
+ * @return bool True if cancelled
+ */
+function ippgi_is_subscription_cancelled($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    // Check user meta for cancellation flag
+    $is_cancelled = get_user_meta($user_id, 'ippgi_subscription_cancelled', true);
+
+    // Also check SWPM if available
+    if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
+        $wp_user = get_user_by('id', $user_id);
+        if ($wp_user) {
+            $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
+            if ($swpm_member && isset($swpm_member->account_state)) {
+                // Check if account state indicates cancellation
+                if ($swpm_member->account_state === 'inactive' || $swpm_member->account_state === 'pending') {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return (bool) $is_cancelled;
+}
+
+/**
+ * Get subscription end date formatted
+ *
+ * @param int $user_id User ID
+ * @return string Formatted date or empty string
+ */
+function ippgi_get_formatted_subscription_end_date($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    // Development mode - return a sample date
+    if (defined('IPPGI_DEV_MODE') && IPPGI_DEV_MODE) {
+        return date('F j, Y', strtotime('+30 days'));
+    }
+
+    if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
+        $wp_user = get_user_by('id', $user_id);
+        if ($wp_user) {
+            $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
+            if ($swpm_member && !empty($swpm_member->subscription_starts)) {
+                // Calculate end date based on membership level duration
+                $start_date = $swpm_member->subscription_starts;
+                // Default to 1 year subscription for Plus, 7 days for Trial
+                $duration = ippgi_user_has_trial($user_id) ? '+7 days' : '+1 year';
+                return date('F j, Y', strtotime($start_date . ' ' . $duration));
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
  * Add membership info to admin user list
  */
 function ippgi_add_user_membership_column($columns) {
@@ -513,6 +622,31 @@ function ippgi_ajax_toggle_favorite() {
     ]);
 }
 add_action('wp_ajax_ippgi_toggle_favorite', 'ippgi_ajax_toggle_favorite');
+
+/**
+ * AJAX handler for cancelling subscription
+ */
+function ippgi_ajax_cancel_subscription() {
+    check_ajax_referer('ippgi_cancel_subscription', 'nonce');
+
+    if (!is_user_logged_in()) {
+        wp_send_json_error(['message' => __('Please log in to cancel subscription.', 'ippgi')]);
+    }
+
+    $user_id = get_current_user_id();
+
+    // Set cancellation flag
+    update_user_meta($user_id, 'ippgi_subscription_cancelled', true);
+    update_user_meta($user_id, 'ippgi_subscription_cancelled_date', current_time('mysql'));
+
+    // Log the cancellation
+    error_log(sprintf('IPPGI: User %d cancelled their subscription', $user_id));
+
+    wp_send_json_success([
+        'message' => __('Your subscription has been cancelled.', 'ippgi'),
+    ]);
+}
+add_action('wp_ajax_ippgi_cancel_subscription', 'ippgi_ajax_cancel_subscription');
 
 /**
  * Add Simple Membership settings notice

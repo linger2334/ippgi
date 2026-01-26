@@ -11,7 +11,15 @@ if (!defined('ABSPATH')) {
 }
 
 // Theme version - increment to bust cache
-define('IPPGI_VERSION', '1.7.2');
+// Development: use file modification time for auto cache busting
+// Production: use fixed version number
+if (defined('WP_DEBUG') && WP_DEBUG) {
+    // Auto version based on CSS file modification time
+    $css_file = get_template_directory() . '/assets/css/components.css';
+    define('IPPGI_VERSION', file_exists($css_file) ? filemtime($css_file) : '1.7.3');
+} else {
+    define('IPPGI_VERSION', '1.7.3');
+}
 define('IPPGI_THEME_DIR', get_template_directory());
 define('IPPGI_THEME_URI', get_template_directory_uri());
 
@@ -21,7 +29,7 @@ define('IPPGI_THEME_URI', get_template_directory_uri());
  * IMPORTANT: Set to false in production!
  */
 define('IPPGI_DEV_MODE', false);
-define('IPPGI_DEV_MEMBERSHIP_LEVEL', 'plus'); // Options: 'guest', 'basic', 'trial', 'plus'
+define('IPPGI_DEV_MEMBERSHIP_LEVEL', 'plus'); // Options: 'guest', 'basic', 'trial', 'plus', 'cancelled'
 
 /**
  * Theme Setup
