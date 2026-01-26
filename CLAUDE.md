@@ -226,6 +226,64 @@
 - `.material-selector` - 底部弹出选择器
 - `.material-selector-backdrop` - 遮罩层
 
+### 编辑个人资料页面 UI 实现
+**模板文件**：`/page-templates/page-edit-profile.php`
+
+**页面结构**：
+1. **标题**：`Edit Member Profile`
+2. **表单字段**：
+   - Name（文本输入）
+   - Country/Region（点击弹出国家选择器）
+   - Company Name（文本输入）
+   - Email（只读显示）
+   - Mobile Number（电话输入，带验证）
+3. **提交按钮**：
+   - 默认禁用（灰色），表单有变化时启用（蓝色）
+   - 通过 JavaScript 检测表单变化
+
+**手机号验证**：
+- 支持国际格式（+86、+1 等）
+- 允许数字、空格、连字符、括号
+- 最少 6 位数字，最多 15 位
+- 输入时自动过滤非法字符
+- 失焦时验证，无效显示红色错误提示
+
+**国家选择器**：
+- 点击 Country/Region 字段弹出模态框
+- 支持搜索过滤
+- 包含完整国家列表
+
+### Toast 提示组件
+**通用提示组件**，固定在屏幕中央，不占用文档流。
+
+**HTML 结构**：
+```php
+<div class="toast-message toast-message--success" id="toast-message">
+    <span class="toast-message__text">提示内容</span>
+    <span class="toast-message__icon toast-message__icon--success">
+        <svg><!-- 打钩图标 --></svg>
+    </span>
+</div>
+```
+
+**样式特点**：
+- 固定定位在屏幕正中央
+- 宽度 60%，最大宽度 300px
+- 淡绿色背景（成功）/ 淡红色背景（错误）
+- 黑色边框（1px）
+- 绿色/红色文字（18px，font-weight: 600）
+- 右侧圆形图标（绿色打钩/红色叉号）
+- 3 秒后自动淡出消失
+
+**CSS 类**：
+- `.toast-message` - 基础样式
+- `.toast-message--success` - 成功状态（淡绿色背景 #e8f5e9）
+- `.toast-message--error` - 错误状态（淡红色背景 #ffebee）
+- `.toast-message__text` - 文字内容
+- `.toast-message__icon` - 图标容器
+- `.toast-message__icon--success` - 绿色圆形打钩
+- `.toast-message__icon--error` - 红色圆形叉号
+
 ---
 
 ## REST API 接口

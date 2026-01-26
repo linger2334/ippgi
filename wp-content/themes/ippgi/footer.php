@@ -88,6 +88,11 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
 }
 ?>
 
+<?php
+// Include global toast component
+get_template_part('template-parts/toast');
+?>
+
 <?php wp_footer(); ?>
 </body>
 </html>

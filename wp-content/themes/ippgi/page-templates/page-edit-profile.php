@@ -75,12 +75,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ippgi_edit_profile_no
             <!-- Page Title -->
             <h1 class="edit-profile-page__title"><?php esc_html_e('Edit Member Profile', 'ippgi'); ?></h1>
 
-            <?php if ($message) : ?>
-                <div class="profile-message profile-message--<?php echo esc_attr($message_type); ?>">
-                    <?php echo esc_html($message); ?>
-                </div>
-            <?php endif; ?>
-
             <!-- Edit Profile Form -->
             <form method="post" class="edit-profile-form">
                 <?php wp_nonce_field('ippgi_edit_profile', 'ippgi_edit_profile_nonce'); ?>
@@ -136,12 +130,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ippgi_edit_profile_no
                     </label>
                     <input type="tel" id="phone" name="phone"
                            class="edit-profile-field__input"
-                           value="<?php echo esc_attr($user_phone); ?>">
+                           value="<?php echo esc_attr($user_phone); ?>"
+                           pattern="^\+?[0-9\s\-]{6,20}$"
+                           title="<?php esc_attr_e('Please enter a valid phone number (e.g., +86 13812345678 or 13812345678)', 'ippgi'); ?>">
+                    <span class="edit-profile-field__error" id="phone-error" style="display: none; color: #e53935; font-size: 12px; margin-top: 4px;">
+                        <?php esc_html_e('Please enter a valid phone number', 'ippgi'); ?>
+                    </span>
                 </div>
 
                 <!-- Submit Button -->
                 <div class="edit-profile-form__submit">
-                    <button type="submit" class="edit-profile-submit-btn">
+                    <button type="submit" class="edit-profile-submit-btn" id="submit-btn" disabled>
                         <?php esc_html_e('Submit', 'ippgi'); ?>
                     </button>
                 </div>
@@ -258,9 +257,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ippgi_edit_profile_no
 
     // Initial render
     renderCountries();
+
+    // ========== Form Change Detection ==========
+    const form = document.querySelector('.edit-profile-form');
+    const submitBtn = document.getElementById('submit-btn');
+
+    // Store initial values
+    const initialValues = {
+        display_name: document.getElementById('display_name')?.value || '',
+        country: document.getElementById('country')?.value || '',
+        company_name: document.getElementById('company_name')?.value || '',
+        phone: document.getElementById('phone')?.value || ''
+    };
+
+    // Check if form has changes
+    function checkFormChanges() {
+        const currentValues = {
+            display_name: document.getElementById('display_name')?.value || '',
+            country: document.getElementById('country')?.value || '',
+            company_name: document.getElementById('company_name')?.value || '',
+            phone: document.getElementById('phone')?.value || ''
+        };
+
+        const hasChanges = Object.keys(initialValues).some(key =>
+            initialValues[key] !== currentValues[key]
+        );
+
+        // Also check if phone is valid (if not empty)
+        const isPhoneValid = validatePhone(currentValues.phone);
+
+        submitBtn.disabled = !hasChanges || !isPhoneValid;
+    }
+
+    // Phone validation function - supports international formats
+    function validatePhone(phone) {
+        if (!phone || phone.trim() === '') {
+            return true; // Empty is allowed
+        }
+        // Allow: +, digits, spaces, hyphens, parentheses
+        // Minimum 6 digits, maximum 20 characters
+        const phoneRegex = /^\+?[\d\s\-()]{6,20}$/;
+        // Also check that there are at least 6 actual digits
+        const digitsOnly = phone.replace(/\D/g, '');
+        return phoneRegex.test(phone) && digitsOnly.length >= 6 && digitsOnly.length <= 15;
+    }
+
+    // Show/hide phone error
+    const phoneInput = document.getElementById('phone');
+    const phoneError = document.getElementById('phone-error');
+
+    phoneInput?.addEventListener('blur', function() {
+        const isValid = validatePhone(this.value);
+        if (this.value && !isValid) {
+            phoneError.style.display = 'block';
+            this.classList.add('is-invalid');
+        } else {
+            phoneError.style.display = 'none';
+            this.classList.remove('is-invalid');
+        }
+    });
+
+    phoneInput?.addEventListener('input', function() {
+        // Only allow valid characters while typing
+        this.value = this.value.replace(/[^\d\s\-+()]/g, '');
+        checkFormChanges();
+    });
+
+    // Add event listeners to form fields
+    document.getElementById('display_name')?.addEventListener('input', checkFormChanges);
+    document.getElementById('company_name')?.addEventListener('input', checkFormChanges);
+
+    // Watch for country changes (since it's updated via modal)
+    const countryObserver = new MutationObserver(checkFormChanges);
+    if (countryInput) {
+        countryObserver.observe(countryInput, { attributes: true, attributeFilter: ['value'] });
+    }
+
+    // Also check when country is selected from modal
+    const originalCloseModal = closeModal;
+    closeModal = function() {
+        originalCloseModal();
+        checkFormChanges();
+    };
 })();
 </script>
 
 <?php wp_footer(); ?>
+
+<?php get_template_part('template-parts/toast'); ?>
+
+<?php if ($message) : ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof ippgiToast !== 'undefined') {
+        ippgiToast.show('<?php echo esc_js($message); ?>', '<?php echo esc_js($message_type); ?>');
+    }
+});
+</script>
+<?php endif; ?>
+
 </body>
 </html>
