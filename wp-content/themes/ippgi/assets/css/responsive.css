@@ -108,8 +108,9 @@
     }
 
     /* Logo */
-    .site-logo__image {
-        height: 44px;
+    .site-logo__image,
+    .site-logo .custom-logo {
+        max-height: 44px;
     }
 
     /* Grid */

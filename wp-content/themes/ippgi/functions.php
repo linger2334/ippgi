@@ -14,9 +14,16 @@ if (!defined('ABSPATH')) {
 // Development: use file modification time for auto cache busting
 // Production: use fixed version number
 if (defined('WP_DEBUG') && WP_DEBUG) {
-    // Auto version based on CSS file modification time
-    $css_file = get_template_directory() . '/assets/css/components.css';
-    define('IPPGI_VERSION', file_exists($css_file) ? filemtime($css_file) : '1.7.3');
+    // Auto version based on latest CSS file modification time
+    $css_files = glob(get_template_directory() . '/assets/css/*.css');
+    $latest_time = 0;
+    foreach ($css_files as $file) {
+        $mtime = filemtime($file);
+        if ($mtime > $latest_time) {
+            $latest_time = $mtime;
+        }
+    }
+    define('IPPGI_VERSION', $latest_time ?: '1.7.3');
 } else {
     define('IPPGI_VERSION', '1.7.3');
 }

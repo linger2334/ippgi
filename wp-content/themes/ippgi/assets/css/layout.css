@@ -204,9 +204,16 @@
     align-items: center;
 }
 
-.site-logo__image {
-    height: 36px;
+.site-logo__image,
+.site-logo .custom-logo {
+    max-height: 36px;
     width: auto;
+    height: auto;
+}
+
+.site-logo .custom-logo-link {
+    display: flex;
+    align-items: center;
 }
 
 .site-logo__text {

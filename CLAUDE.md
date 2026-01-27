@@ -464,8 +464,56 @@ mysql -u username -p database_name < ippgi_full_backup.sql
 ## 开发注意事项
 - 价格数据展示是核心功能，需要考虑表格在移动端的展示方式
 - 内容权限控制需要精细到部分内容级别（同一页面部分可见）
-- 缓存策略：价格列表缓存 1 小时，工作时间自动清除
+- **缓存策略**：缓存永不过期，由定时任务在固定时间清除（00:00 和 09:00-17:00）
 - 生产环境务必关闭 `IPPGI_DEV_MODE`
+- **CSS 版本号**：开发模式下自动使用所有 CSS 文件中最新的修改时间作为版本号
+
+---
+
+## 运维工具
+
+### 历史数据导入工具
+**文件**：`/import-missing-days.php`
+
+用于补充缺失的价格数据，支持指定日期范围。
+
+**使用方法**：
+```bash
+# 查看帮助
+php import-missing-days.php --help
+
+# 导入指定日期范围
+php import-missing-days.php 2026-01-24 2026-01-27
+
+# 导入单天数据
+php import-missing-days.php 2026-01-24
+
+# 导入昨天数据（默认）
+php import-missing-days.php
+```
+
+**功能**：
+- 从外部 API 获取历史价格数据
+- 自动获取对应日期的历史汇率
+- 将数据保存到数据库
+
+---
+
+## 自定义 Logo 支持
+
+主题支持通过 WordPress Customizer 上传自定义 logo。
+
+**Logo 尺寸**：
+- 移动端：最大高度 36px
+- 桌面端：最大高度 44px
+- 宽度自动按比例缩放
+
+**CSS 选择器**：
+- `.site-logo .custom-logo` - WordPress 自定义 logo 图片
+- `.site-logo .custom-logo-link` - logo 链接容器
+- `.site-logo__text` - 文本 logo（无图片时显示）
+
+**注意**：WordPress 输出的 logo 图片带有内联 `width` 和 `height` 属性，CSS 中使用 `height: auto` 覆盖以确保 `max-height` 生效。
 
 ---
 

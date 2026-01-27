@@ -270,17 +270,3 @@ function ippgi_customizer_css() {
     }
 }
 add_action('wp_head', 'ippgi_customizer_css');
-
-/**
- * Enqueue customizer preview script
- */
-function ippgi_customize_preview_js() {
-    wp_enqueue_script(
-        'ippgi-customizer',
-        IPPGI_THEME_URI . '/assets/js/customizer.js',
-        ['customize-preview'],
-        IPPGI_VERSION,
-        true
-    );
-}
-add_action('customize_preview_init', 'ippgi_customize_preview_js');
