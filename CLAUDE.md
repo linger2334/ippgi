@@ -254,14 +254,32 @@
 - 包含完整国家列表
 
 ### Toast 提示组件
-**通用提示组件**，固定在屏幕中央，不占用文档流。
+**模板文件**：`/template-parts/toast.php`
+
+**通用提示组件**，固定在屏幕中央，不占用文档流。全局可用，任何页面都可以调用。
+
+**使用方法**：
+```javascript
+// 显示成功提示
+ippgiToast.success('操作成功');
+
+// 显示错误提示
+ippgiToast.error('操作失败');
+
+// 自定义类型和持续时间（毫秒）
+ippgiToast.show('消息内容', 'success', 5000);
+```
+
+**加载方式**：
+- 使用 `get_footer()` 的页面：自动加载（在 footer.php 中引入）
+- 不使用 `get_footer()` 的页面：需手动引入 `get_template_part('template-parts/toast')`
 
 **HTML 结构**：
-```php
-<div class="toast-message toast-message--success" id="toast-message">
+```html
+<div class="toast-message toast-message--success" id="ippgi-toast">
     <span class="toast-message__text">提示内容</span>
     <span class="toast-message__icon toast-message__icon--success">
-        <svg><!-- 打钩图标 --></svg>
+        <svg><!-- 打钩/叉号图标 --></svg>
     </span>
 </div>
 ```
@@ -269,20 +287,26 @@
 **样式特点**：
 - 固定定位在屏幕正中央
 - 宽度 60%，最大宽度 300px
-- 淡绿色背景（成功）/ 淡红色背景（错误）
-- 黑色边框（1px）
+- 淡绿色背景（成功 #e8f5e9）/ 淡红色背景（错误 #ffebee）
+- 黑色边框（1px #333）
 - 绿色/红色文字（18px，font-weight: 600）
 - 右侧圆形图标（绿色打钩/红色叉号）
-- 3 秒后自动淡出消失
+- 默认 3 秒后自动淡出消失
 
 **CSS 类**：
 - `.toast-message` - 基础样式
-- `.toast-message--success` - 成功状态（淡绿色背景 #e8f5e9）
-- `.toast-message--error` - 错误状态（淡红色背景 #ffebee）
+- `.toast-message--success` - 成功状态
+- `.toast-message--error` - 错误状态
 - `.toast-message__text` - 文字内容
 - `.toast-message__icon` - 图标容器
 - `.toast-message__icon--success` - 绿色圆形打钩
 - `.toast-message__icon--error` - 红色圆形叉号
+
+**JavaScript API**：
+- `ippgiToast.show(message, type, duration)` - 显示提示
+- `ippgiToast.success(message, duration)` - 显示成功提示
+- `ippgiToast.error(message, duration)` - 显示错误提示
+- `ippgiToast.hide()` - 手动隐藏提示
 
 ---
 
