@@ -19,9 +19,10 @@ class IPPGI_Prices_Cache_Manager {
     const CACHE_PREFIX = 'ippgi_prices_';
 
     /**
-     * Cache expiration time (1 hour in seconds)
+     * Cache expiration time (0 = never expires)
+     * Cache is cleared by scheduled tasks at 00:00 and 09:00-17:00
      */
-    const CACHE_EXPIRATION = 3600;
+    const CACHE_EXPIRATION = 0;
 
     /**
      * Price list cache key
