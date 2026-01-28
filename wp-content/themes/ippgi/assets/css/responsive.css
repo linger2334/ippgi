@@ -253,25 +253,25 @@
         padding: var(--spacing-xs) 4px;
     }
 
-    /* 列宽分配：Products 较窄，其他列均分剩余空间 */
+    /* 列宽分配：Products、Dimensions 较宽，Latest、Change 较窄 */
     .price-table th:nth-child(1),
     .price-table td:nth-child(1) {
-        width: 18%;
+        width: 22%;
     }
 
     .price-table th:nth-child(2),
     .price-table td:nth-child(2) {
-        width: 30%;
+        width: 34%;
     }
 
     .price-table th:nth-child(3),
     .price-table td:nth-child(3) {
-        width: 26%;
+        width: 22%;
     }
 
     .price-table th:nth-child(4),
     .price-table td:nth-child(4) {
-        width: 26%;
+        width: 22%;
     }
 
     /* 允许表头换行 */
