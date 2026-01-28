@@ -84,32 +84,38 @@ class IPPGI_Prices_Scheduler {
     }
 
     /**
-     * Schedule all events (9:00 - 17:00 + midnight)
+     * Schedule all events (9:00 - 17:00 + midnight) in Beijing time (Asia/Shanghai)
      */
     public function schedule_events() {
         // Clear any existing schedules first
         $this->unschedule_events();
 
-        // Get current time
-        $current_time = current_time('timestamp');
-        $today = date('Y-m-d', $current_time);
+        // Use WordPress timezone (should be set to Asia/Shanghai or UTC+8)
+        $timezone = wp_timezone();
+        $now = new DateTime('now', $timezone);
+        $today = $now->format('Y-m-d');
+        $current_timestamp = time(); // Real Unix timestamp
 
-        // Schedule midnight task (00:00) for price collection
-        $midnight_time = strtotime("{$today} 00:00:00");
-        if ($midnight_time < $current_time) {
-            $midnight_time = strtotime("+1 day", $midnight_time);
+        // Schedule midnight task (00:00 Beijing time) for price collection
+        $midnight = new DateTime("{$today} 00:00:00", $timezone);
+        $midnight_time = $midnight->getTimestamp();
+        if ($midnight_time < $current_timestamp) {
+            $midnight->modify('+1 day');
+            $midnight_time = $midnight->getTimestamp();
         }
         wp_schedule_event($midnight_time, 'daily', self::CRON_HOOK_MIDNIGHT);
-        error_log('IPPGI Prices: Scheduled midnight price collection at ' . date('Y-m-d H:i:s', $midnight_time));
+        error_log('IPPGI Prices: Scheduled midnight price collection at ' . $midnight->format('Y-m-d H:i:s T') . ' (timestamp: ' . $midnight_time . ')');
 
-        // Schedule events for each hour (9:00 - 17:00)
+        // Schedule events for each hour (9:00 - 17:00 Beijing time)
         foreach ($this->schedule_hours as $hour) {
-            // Calculate timestamp for this hour today
-            $schedule_time = strtotime("{$today} {$hour}:00:00");
+            // Calculate timestamp for this hour today in Beijing time
+            $schedule_dt = new DateTime("{$today} {$hour}:00:00", $timezone);
+            $schedule_time = $schedule_dt->getTimestamp();
 
             // If the time has already passed today, schedule for tomorrow
-            if ($schedule_time < $current_time) {
-                $schedule_time = strtotime("+1 day", $schedule_time);
+            if ($schedule_time < $current_timestamp) {
+                $schedule_dt->modify('+1 day');
+                $schedule_time = $schedule_dt->getTimestamp();
             }
 
             // Schedule the event
@@ -117,7 +123,7 @@ class IPPGI_Prices_Scheduler {
         }
 
         // Log scheduling
-        error_log('IPPGI Prices: Scheduled ' . count($this->schedule_hours) . ' daily events (9:00-17:00)');
+        error_log('IPPGI Prices: Scheduled ' . count($this->schedule_hours) . ' daily events (9:00-17:00 Beijing time)');
     }
 
     /**
