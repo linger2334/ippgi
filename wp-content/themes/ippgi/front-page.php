@@ -36,12 +36,17 @@ get_header();
                     ?>
                 </p>
 
-                <!-- Dynamic Price Table -->
-                <div class="price-table-wrapper" id="price-table-container" role="button" tabindex="0" aria-label="<?php esc_attr_e('View price details', 'ippgi'); ?>">
-                    <div class="price-table-loading">
-                        <div class="spinner"></div>
-                        <span><?php esc_html_e('Loading prices...', 'ippgi'); ?></span>
+                <!-- Dynamic Price Table Carousel -->
+                <div class="price-carousel">
+                    <div class="price-carousel__viewport" id="price-table-container" role="button" tabindex="0" aria-label="<?php esc_attr_e('View price details', 'ippgi'); ?>">
+                        <div class="price-carousel__track">
+                            <div class="price-table-loading">
+                                <div class="spinner"></div>
+                                <span><?php esc_html_e('Loading prices...', 'ippgi'); ?></span>
+                            </div>
+                        </div>
                     </div>
+                    <div class="price-carousel__dots" id="price-carousel-dots"></div>
                 </div>
 
                 <div class="my-prices__footer">

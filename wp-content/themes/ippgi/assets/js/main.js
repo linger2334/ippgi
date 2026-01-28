@@ -888,7 +888,7 @@
 
     /**
      * Initialize price carousel for homepage
-     * Fetches all 6 categories and rotates PPGI, GI, GL every 5 seconds
+     * Fetches all 6 categories and displays PPGI, GI, GL in an infinite loop carousel
      */
     function initPriceCarousel() {
         // Only run on front page
@@ -899,6 +899,7 @@
         const container = document.getElementById('price-table-container');
         const categoryLabel = document.getElementById('current-category');
         const updatedLabel = document.getElementById('prices-updated');
+        const dotsContainer = document.getElementById('price-carousel-dots');
 
         if (!container) return;
 
@@ -907,8 +908,12 @@
         // Categories to display in carousel
         const displayCategories = ['PPGI', 'GI', 'GL'];
         let pricesData = {};
+        // currentIndex is for the actual slides (0, 1, 2), trackIndex includes clones
         let currentIndex = 0;
+        let trackIndex = 1; // Start at 1 because index 0 is the clone of last slide
         let carouselInterval = null;
+        let track = null;
+        let isTransitioning = false;
 
         /**
          * Fetch prices for all categories
@@ -937,9 +942,11 @@
                 // Store in global for price detail page
                 window.ippgiPricesData = pricesData;
 
-                // Render first category
+                // Render all slides
                 if (Object.keys(pricesData).length > 0) {
-                    renderPriceTable(displayCategories[0]);
+                    renderAllSlides();
+                    renderDots();
+                    updateLabels();
                     startCarousel();
                 } else {
                     showError('No price data available');
@@ -951,25 +958,12 @@
         }
 
         /**
-         * Render price table for a category
+         * Build price table HTML for a category
          */
-        function renderPriceTable(category) {
+        function buildPriceTableHTML(category) {
             const categoryData = pricesData[category];
             if (!categoryData || !categoryData.data || !categoryData.data.result) {
-                return;
-            }
-
-            // Update global current category
-            currentPriceCategory = category;
-
-            // Update category label
-            if (categoryLabel) {
-                categoryLabel.textContent = category;
-            }
-
-            // Update timestamp
-            if (updatedLabel && categoryData.fetchedAt) {
-                updatedLabel.textContent = 'Updated: ' + categoryData.fetchedAt + ' (UTC+8)';
+                return '';
             }
 
             // Build table HTML
@@ -984,7 +978,6 @@
                 items.forEach(item => {
                     const thickness = item.thickness || '';
                     const dimensions = thickness + '*' + width;
-                    // API returns lastprice (converted to USD), riseAndFall for daily change
                     const priceUsd = item.lastprice || item.lastprice_usd || item.price_usd || item.price || 0;
                     const change = item.riseAndFall || item.riseAndFall_usd || item.change || 0;
 
@@ -1022,29 +1015,191 @@
             });
 
             html += '</tbody></table>';
-
-            container.innerHTML = html;
+            return html;
         }
 
         /**
-         * Start carousel rotation
+         * Create a slide element
+         */
+        function createSlide(category) {
+            const slide = document.createElement('div');
+            slide.className = 'price-carousel__slide';
+            slide.dataset.category = category;
+            slide.innerHTML = buildPriceTableHTML(category);
+            return slide;
+        }
+
+        /**
+         * Render all slides with clones for infinite loop
+         * Structure: [clone-last, slide-0, slide-1, slide-2, clone-first]
+         */
+        function renderAllSlides() {
+            // Create track
+            track = document.createElement('div');
+            track.className = 'price-carousel__track';
+
+            // Add clone of last slide at the beginning
+            const lastCategory = displayCategories[displayCategories.length - 1];
+            const cloneFirst = createSlide(lastCategory);
+            cloneFirst.classList.add('is-clone');
+            track.appendChild(cloneFirst);
+
+            // Add real slides
+            displayCategories.forEach(category => {
+                track.appendChild(createSlide(category));
+            });
+
+            // Add clone of first slide at the end
+            const firstCategory = displayCategories[0];
+            const cloneLast = createSlide(firstCategory);
+            cloneLast.classList.add('is-clone');
+            track.appendChild(cloneLast);
+
+            // Replace loading indicator with track
+            container.innerHTML = '';
+            container.appendChild(track);
+
+            // Set initial position (no animation)
+            track.style.transition = 'none';
+            track.style.transform = 'translateX(-100%)'; // Start at trackIndex 1
+            // Force reflow
+            track.offsetHeight;
+            track.style.transition = '';
+
+            // Listen for transition end to handle infinite loop
+            track.addEventListener('transitionend', handleTransitionEnd);
+        }
+
+        /**
+         * Handle transition end for infinite loop
+         */
+        function handleTransitionEnd() {
+            isTransitioning = false;
+
+            // If we're at a clone, jump to the real slide
+            if (trackIndex === 0) {
+                // At clone of last slide, jump to real last slide
+                track.style.transition = 'none';
+                trackIndex = displayCategories.length;
+                track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+                track.offsetHeight; // Force reflow
+                track.style.transition = '';
+            } else if (trackIndex === displayCategories.length + 1) {
+                // At clone of first slide, jump to real first slide
+                track.style.transition = 'none';
+                trackIndex = 1;
+                track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+                track.offsetHeight; // Force reflow
+                track.style.transition = '';
+            }
+        }
+
+        /**
+         * Render carousel dots
+         */
+        function renderDots() {
+            if (!dotsContainer) return;
+
+            dotsContainer.innerHTML = '';
+            displayCategories.forEach((category, index) => {
+                const dot = document.createElement('button');
+                dot.className = 'price-carousel__dot' + (index === 0 ? ' is-active' : '');
+                dot.setAttribute('type', 'button');
+                dot.setAttribute('aria-label', 'Go to ' + category);
+                dot.dataset.index = index;
+
+                dot.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    goToSlide(index);
+                });
+
+                dotsContainer.appendChild(dot);
+            });
+        }
+
+        /**
+         * Update labels and dots based on currentIndex
+         */
+        function updateLabels() {
+            // Update global current category
+            currentPriceCategory = displayCategories[currentIndex];
+
+            // Update category label
+            if (categoryLabel) {
+                categoryLabel.textContent = displayCategories[currentIndex];
+            }
+
+            // Update timestamp
+            const categoryData = pricesData[displayCategories[currentIndex]];
+            if (updatedLabel && categoryData && categoryData.fetchedAt) {
+                updatedLabel.textContent = 'Updated: ' + categoryData.fetchedAt + ' (UTC+8)';
+            }
+
+            // Update dots
+            if (dotsContainer) {
+                const dots = dotsContainer.querySelectorAll('.price-carousel__dot');
+                dots.forEach((dot, index) => {
+                    if (index === currentIndex) {
+                        dot.classList.add('is-active');
+                    } else {
+                        dot.classList.remove('is-active');
+                    }
+                });
+            }
+        }
+
+        /**
+         * Move to next slide
+         */
+        function nextSlide() {
+            if (isTransitioning) return;
+
+            isTransitioning = true;
+            trackIndex++;
+            currentIndex = (currentIndex + 1) % displayCategories.length;
+
+            track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+            updateLabels();
+        }
+
+        /**
+         * Go to specific slide
+         */
+        function goToSlide(index) {
+            if (isTransitioning || index === currentIndex) return;
+
+            isTransitioning = true;
+            currentIndex = index;
+            trackIndex = index + 1; // +1 because of the clone at the beginning
+
+            track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+            updateLabels();
+
+            // Restart auto-play timer
+            startCarousel();
+
+            // Reset transitioning flag after a short delay (in case transitionend doesn't fire)
+            setTimeout(function() {
+                isTransitioning = false;
+            }, 600);
+        }
+
+        /**
+         * Start carousel auto-rotation
          */
         function startCarousel() {
             if (carouselInterval) {
                 clearInterval(carouselInterval);
             }
 
-            carouselInterval = setInterval(function() {
-                currentIndex = (currentIndex + 1) % displayCategories.length;
-                renderPriceTable(displayCategories[currentIndex]);
-            }, 10000);
+            carouselInterval = setInterval(nextSlide, 5000);
         }
 
         /**
          * Show error message
          */
         function showError(message) {
-            container.innerHTML = '<div class="price-table-error"><p>' + message + '</p></div>';
+            container.innerHTML = '<div class="price-table-loading"><p>' + message + '</p></div>';
         }
 
         // Start fetching prices

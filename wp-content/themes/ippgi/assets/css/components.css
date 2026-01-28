@@ -1910,6 +1910,70 @@
    Price Table (Updated)
    ========================================================================== */
 
+/* Price Carousel Container */
+.price-carousel {
+    position: relative;
+    margin: 0;
+}
+
+.price-carousel__viewport {
+    overflow: hidden;
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+    margin: 0 calc(var(--spacing-md) * -1);
+    padding: 0 var(--spacing-md);
+}
+
+.price-carousel__viewport:hover {
+    opacity: 0.9;
+}
+
+.price-carousel__viewport:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+}
+
+.price-carousel__track {
+    display: flex;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.price-carousel__slide {
+    min-width: 100%;
+    flex-shrink: 0;
+}
+
+/* Carousel Dots */
+.price-carousel__dots {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-md) 0 0;
+}
+
+.price-carousel__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-border);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.price-carousel__dot:hover {
+    background-color: var(--color-text-secondary);
+}
+
+.price-carousel__dot.is-active {
+    width: 24px;
+    border-radius: 4px;
+    background-color: var(--color-primary);
+}
+
+/* Old wrapper style - keep for backward compatibility */
 .price-table-wrapper {
     overflow-x: auto;
     margin: 0 calc(var(--spacing-md) * -1);
