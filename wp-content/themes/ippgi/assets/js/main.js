@@ -888,7 +888,7 @@
 
     /**
      * Initialize price carousel for homepage
-     * Fetches all 6 categories and displays PPGI, GI, GL in a sliding carousel
+     * Fetches all 6 categories and displays PPGI, GI, GL in an infinite loop carousel
      */
     function initPriceCarousel() {
         // Only run on front page
@@ -908,9 +908,13 @@
         // Categories to display in carousel
         const displayCategories = ['PPGI', 'GI', 'GL'];
         let pricesData = {};
+        // currentIndex is for the actual category (0, 1, 2)
         let currentIndex = 0;
+        // trackIndex includes clones: 0=GL-clone, 1=PPGI, 2=GI, 3=GL, 4=PPGI-clone
+        let trackIndex = 1;
         let carouselInterval = null;
         let track = null;
+        let isTransitioning = false;
 
         /**
          * Fetch prices for all categories
@@ -943,7 +947,7 @@
                 if (Object.keys(pricesData).length > 0) {
                     renderAllSlides();
                     renderDots();
-                    updateCarousel();
+                    updateLabels();
                     startCarousel();
                 } else {
                     showError('No price data available');
@@ -1016,25 +1020,83 @@
         }
 
         /**
-         * Render all slides at once
+         * Create a slide element
+         */
+        function createSlide(category, isClone) {
+            const slide = document.createElement('div');
+            slide.className = 'price-carousel__slide';
+            if (isClone) {
+                slide.classList.add('is-clone');
+            }
+            slide.dataset.category = category;
+            slide.innerHTML = buildPriceTableHTML(category);
+            return slide;
+        }
+
+        /**
+         * Render all slides with clones for infinite loop
+         * Structure: [GL-clone, PPGI, GI, GL, PPGI-clone]
+         * Index:     0          1     2   3   4
          */
         function renderAllSlides() {
             // Create track
             track = document.createElement('div');
             track.className = 'price-carousel__track';
 
-            // Create a slide for each display category
+            // Add clone of last slide at the beginning
+            const lastCategory = displayCategories[displayCategories.length - 1];
+            track.appendChild(createSlide(lastCategory, true));
+
+            // Add real slides
             displayCategories.forEach(category => {
-                const slide = document.createElement('div');
-                slide.className = 'price-carousel__slide';
-                slide.dataset.category = category;
-                slide.innerHTML = buildPriceTableHTML(category);
-                track.appendChild(slide);
+                track.appendChild(createSlide(category, false));
             });
+
+            // Add clone of first slide at the end
+            const firstCategory = displayCategories[0];
+            track.appendChild(createSlide(firstCategory, true));
 
             // Replace loading indicator with track
             container.innerHTML = '';
             container.appendChild(track);
+
+            // Set initial position to trackIndex 1 (first real slide) without animation
+            track.style.transition = 'none';
+            track.style.transform = 'translateX(-100%)';
+            // Force reflow
+            track.offsetHeight;
+            // Re-enable transition
+            track.style.transition = '';
+
+            // Listen for transition end to handle infinite loop
+            track.addEventListener('transitionend', handleTransitionEnd);
+        }
+
+        /**
+         * Handle transition end for infinite loop
+         */
+        function handleTransitionEnd() {
+            if (!isTransitioning) return;
+            isTransitioning = false;
+
+            // If we're at a clone, jump to the real slide without animation
+            if (trackIndex === 0) {
+                // At clone of last slide (GL), jump to real last slide
+                track.style.transition = 'none';
+                trackIndex = displayCategories.length;
+                currentIndex = displayCategories.length - 1;
+                track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+                track.offsetHeight; // Force reflow
+                track.style.transition = '';
+            } else if (trackIndex === displayCategories.length + 1) {
+                // At clone of first slide (PPGI), jump to real first slide
+                track.style.transition = 'none';
+                trackIndex = 1;
+                currentIndex = 0;
+                track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+                track.offsetHeight; // Force reflow
+                track.style.transition = '';
+            }
         }
 
         /**
@@ -1061,15 +1123,9 @@
         }
 
         /**
-         * Update carousel position and labels
+         * Update labels and dots based on currentIndex
          */
-        function updateCarousel() {
-            if (!track) return;
-
-            // Update transform
-            const offset = -currentIndex * 100;
-            track.style.transform = 'translateX(' + offset + '%)';
-
+        function updateLabels() {
             // Update global current category
             currentPriceCategory = displayCategories[currentIndex];
 
@@ -1098,13 +1154,39 @@
         }
 
         /**
-         * Go to specific slide
+         * Move to next slide
+         */
+        function nextSlide() {
+            if (isTransitioning) return;
+
+            isTransitioning = true;
+            trackIndex++;
+            currentIndex = (currentIndex + 1) % displayCategories.length;
+
+            track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+            updateLabels();
+        }
+
+        /**
+         * Go to specific slide by category index
          */
         function goToSlide(index) {
+            if (isTransitioning || index === currentIndex) return;
+
+            isTransitioning = true;
             currentIndex = index;
-            updateCarousel();
+            trackIndex = index + 1; // +1 because of the clone at the beginning
+
+            track.style.transform = 'translateX(' + (-trackIndex * 100) + '%)';
+            updateLabels();
+
             // Restart auto-play timer
             startCarousel();
+
+            // Reset transitioning flag after animation (in case transitionend doesn't fire)
+            setTimeout(function() {
+                isTransitioning = false;
+            }, 600);
         }
 
         /**
@@ -1115,10 +1197,7 @@
                 clearInterval(carouselInterval);
             }
 
-            carouselInterval = setInterval(function() {
-                currentIndex = (currentIndex + 1) % displayCategories.length;
-                updateCarousel();
-            }, 5000);
+            carouselInterval = setInterval(nextSlide, 5000);
         }
 
         /**
