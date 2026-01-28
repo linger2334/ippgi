@@ -1914,6 +1914,7 @@
 .price-carousel {
     position: relative;
     margin: 0;
+    overflow: hidden;
 }
 
 .price-carousel__viewport {
@@ -1941,7 +1942,9 @@
 
 .price-carousel__slide {
     min-width: 100%;
+    width: 100%;
     flex-shrink: 0;
+    overflow: hidden;
 }
 
 /* Carousel Dots */
