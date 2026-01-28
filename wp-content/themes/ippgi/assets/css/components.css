@@ -1943,6 +1943,8 @@
     width: 100%;
     flex-shrink: 0;
     box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 /* Carousel Dots */
@@ -2030,6 +2032,7 @@
     border-collapse: collapse;
     font-size: var(--font-size-sm);
     animation: fadeIn 0.3s ease;
+    table-layout: fixed;
 }
 
 @keyframes fadeIn {

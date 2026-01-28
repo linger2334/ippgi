@@ -250,7 +250,13 @@
 
     .price-table th,
     .price-table td {
-        padding: var(--spacing-sm);
+        padding: var(--spacing-xs) var(--spacing-xs);
+    }
+
+    /* 允许 Dimensions 列换行 */
+    .price-table__dimensions {
+        white-space: normal;
+        word-break: break-all;
     }
 
     .price-table th:first-child,
