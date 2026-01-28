@@ -1921,8 +1921,6 @@
     overflow: hidden;
     cursor: pointer;
     transition: opacity var(--transition-fast);
-    margin: 0 calc(var(--spacing-md) * -1);
-    padding: 0 var(--spacing-md);
 }
 
 .price-carousel__viewport:hover {
@@ -1944,7 +1942,7 @@
     min-width: 100%;
     width: 100%;
     flex-shrink: 0;
-    overflow: hidden;
+    box-sizing: border-box;
 }
 
 /* Carousel Dots */

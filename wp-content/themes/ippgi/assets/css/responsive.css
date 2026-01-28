@@ -240,10 +240,6 @@
    ========================================================================== */
 
 @media (max-width: 767px) {
-    .price-carousel__viewport {
-        margin: 0 calc(var(--spacing-md) * -1);
-    }
-
     .price-table-wrapper {
         margin: 0 calc(var(--spacing-md) * -1);
     }
