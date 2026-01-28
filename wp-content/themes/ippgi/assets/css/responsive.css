@@ -251,6 +251,7 @@
     .price-table th,
     .price-table td {
         padding: var(--spacing-xs) 4px;
+        text-align: center;
     }
 
     /* 列宽分配：Products、Dimensions 较宽，Latest、Change 较窄 */
