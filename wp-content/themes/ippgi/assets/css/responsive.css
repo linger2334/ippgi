@@ -245,18 +245,39 @@
     }
 
     .price-table {
-        font-size: var(--font-size-xs);
+        font-size: 11px;
     }
 
     .price-table th,
     .price-table td {
-        padding: var(--spacing-xs) var(--spacing-xs);
+        padding: var(--spacing-xs) 4px;
     }
 
-    /* 允许 Dimensions 列换行 */
-    .price-table__dimensions {
+    /* 列宽分配：Products 较窄，其他列均分剩余空间 */
+    .price-table th:nth-child(1),
+    .price-table td:nth-child(1) {
+        width: 18%;
+    }
+
+    .price-table th:nth-child(2),
+    .price-table td:nth-child(2) {
+        width: 30%;
+    }
+
+    .price-table th:nth-child(3),
+    .price-table td:nth-child(3) {
+        width: 26%;
+    }
+
+    .price-table th:nth-child(4),
+    .price-table td:nth-child(4) {
+        width: 26%;
+    }
+
+    /* 允许表头换行 */
+    .price-table th {
         white-space: normal;
-        word-break: break-all;
+        line-height: 1.2;
     }
 
     .price-table th:first-child,
