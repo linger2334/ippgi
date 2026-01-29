@@ -131,3 +131,14 @@ add_filter('wp_image_editors', function($editors) {
     // Prefer GD over Imagick to avoid memory issues
     return ['WP_Image_Editor_GD', 'WP_Image_Editor_Imagick'];
 });
+
+/**
+ * Redirect logged-in users from membership-login page to home
+ * This handles the redirect after Google/social login
+ */
+add_action('template_redirect', function() {
+    if (is_page('membership-login') && is_user_logged_in()) {
+        wp_redirect(home_url('/'));
+        exit;
+    }
+});
