@@ -69,40 +69,37 @@ class IPPGI_Prices_Cache_Manager {
     /**
      * Get real-time price from cache
      *
-     * @param string $product_type Product type (e.g., 'PPGI', 'GI')
-     * @param int    $width Width in mm
-     * @param float  $thickness Thickness
+     * @param string $product_spec Full productSpec (e.g., "1482328115005964290_1000_0.11_彩涂")
+     * @param string $date Date in YYYY-MM-DD format
      * @return array|false Price data or false if not cached
      */
-    public function get_realtime_price($product_type, $width, $thickness) {
-        $cache_key = $this->get_realtime_cache_key($product_type, $width, $thickness);
+    public function get_realtime_price($product_spec, $date) {
+        $cache_key = $this->get_realtime_cache_key($product_spec, $date);
         return get_transient($cache_key);
     }
 
     /**
      * Set real-time price cache
      *
-     * @param string $product_type Product type
-     * @param int    $width Width in mm
-     * @param float  $thickness Thickness
+     * @param string $product_spec Full productSpec
+     * @param string $date Date in YYYY-MM-DD format
      * @param array  $data Price data
      * @return bool True on success, false on failure
      */
-    public function set_realtime_price($product_type, $width, $thickness, $data) {
-        $cache_key = $this->get_realtime_cache_key($product_type, $width, $thickness);
+    public function set_realtime_price($product_spec, $date, $data) {
+        $cache_key = $this->get_realtime_cache_key($product_spec, $date);
         return set_transient($cache_key, $data, self::CACHE_EXPIRATION);
     }
 
     /**
      * Clear real-time price cache
      *
-     * @param string $product_type Product type
-     * @param int    $width Width in mm
-     * @param float  $thickness Thickness
+     * @param string $product_spec Full productSpec
+     * @param string $date Date in YYYY-MM-DD format
      * @return bool True on success, false on failure
      */
-    public function clear_realtime_price($product_type, $width, $thickness) {
-        $cache_key = $this->get_realtime_cache_key($product_type, $width, $thickness);
+    public function clear_realtime_price($product_spec, $date) {
+        $cache_key = $this->get_realtime_cache_key($product_spec, $date);
         return delete_transient($cache_key);
     }
 
@@ -144,14 +141,12 @@ class IPPGI_Prices_Cache_Manager {
     /**
      * Generate cache key for real-time price
      *
-     * @param string $product_type Product type
-     * @param int    $width Width in mm
-     * @param float  $thickness Thickness
+     * @param string $product_spec Full productSpec
+     * @param string $date Date in YYYY-MM-DD format
      * @return string Cache key
      */
-    private function get_realtime_cache_key($product_type, $width, $thickness) {
-        return self::CACHE_PREFIX . self::REALTIME_PRICE_PREFIX .
-               sanitize_key($product_type . '_' . $width . '_' . $thickness);
+    private function get_realtime_cache_key($product_spec, $date) {
+        return self::CACHE_PREFIX . self::REALTIME_PRICE_PREFIX . md5($product_spec . '_' . $date);
     }
 
     /**

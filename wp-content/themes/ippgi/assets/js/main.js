@@ -186,11 +186,36 @@
                 const priceId = this.dataset.priceId;
                 if (!priceId) return;
 
-                // Toggle active state
-                this.classList.toggle('is-active');
+                var button = this;
+                var svg = button.querySelector('svg');
 
-                // TODO: Send AJAX request to save favorite
-                console.log('Toggle favorite for price:', priceId);
+                // Send AJAX request to toggle favorite
+                var formData = new FormData();
+                formData.append('action', 'ippgi_toggle_favorite');
+                formData.append('price_id', priceId);
+                formData.append('nonce', ippgiData.nonce);
+
+                fetch(ippgiData.ajaxUrl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        var isAdded = data.data.action === 'added';
+                        button.classList.toggle('is-active', isAdded);
+                        if (svg) {
+                            svg.setAttribute('fill', isAdded ? 'currentColor' : 'none');
+                        }
+                        // Show toast (2 seconds)
+                        if (typeof ippgiToast !== 'undefined') {
+                            var msg = isAdded
+                                ? 'The dataset has been added to your favorites.'
+                                : 'The dataset has been removed from your favorites.';
+                            ippgiToast.success(msg, 2000);
+                        }
+                    }
+                });
             });
         });
     }
@@ -917,15 +942,43 @@
         let isTransitioning = false;
 
         /**
+         * Get the appropriate date for API request
+         * Before 9:00 AM Beijing time: use yesterday's date
+         * After 9:00 AM Beijing time: use today's date
+         */
+        function getApiDate() {
+            // Get current time in Beijing timezone (UTC+8)
+            const now = new Date();
+            const utcHours = now.getUTCHours();
+            const beijingHours = (utcHours + 8) % 24;
+
+            // Calculate Beijing date
+            let beijingDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+
+            // If before 9:00 AM Beijing time, use yesterday's date
+            if (beijingHours < 9) {
+                beijingDate.setDate(beijingDate.getDate() - 1);
+            }
+
+            // Format as YYYY-MM-DD 00:00:00
+            const year = beijingDate.getUTCFullYear();
+            const month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(beijingDate.getUTCDate()).padStart(2, '0');
+
+            return year + '-' + month + '-' + day + ' 00:00:00';
+        }
+
+        /**
          * Fetch prices for all categories
          */
         async function fetchAllPrices() {
             const restUrl = ippgiData.restUrl || '/wp-json/ippgi-prices/v1/';
+            const apiDate = getApiDate();
 
             try {
                 // Fetch all 6 categories in parallel
                 const promises = allCategories.map(category =>
-                    fetch(restUrl + 'prices/category?category=' + category)
+                    fetch(restUrl + 'prices/category?category=' + category + '&date=' + encodeURIComponent(apiDate))
                         .then(response => response.json())
                 );
 
@@ -1374,6 +1427,173 @@
 
         // Start autoplay
         startAutoplay();
+    }
+
+    // =========================================================================
+    // Prices Page Functionality
+    // =========================================================================
+    function initPricesPage() {
+        const productTrigger = document.getElementById('product-selector-trigger');
+        const productDropdown = document.getElementById('product-selector-dropdown');
+        const widthFilter = document.getElementById('width-filter');
+        const pricesTableBody = document.getElementById('prices-table-body');
+        const taxToggle = document.getElementById('tax-inclusive-toggle');
+
+        if (!productTrigger || !pricesTableBody) return;
+
+        var pageData = window.ippgiPricesPage || {};
+        var categoryPrices = pageData.categoryPrices || {};
+        var currentType = pageData.currentType || 'ppgi';
+        var currentWidth = pageData.currentWidth || '';
+        var showTaxInclusive = false;
+
+        // Product selector dropdown
+        productTrigger.addEventListener('click', function() {
+            var isExpanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', !isExpanded);
+            productDropdown.classList.toggle('is-open', !isExpanded);
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!productTrigger.contains(e.target) && !productDropdown.contains(e.target)) {
+                productTrigger.setAttribute('aria-expanded', 'false');
+                productDropdown.classList.remove('is-open');
+            }
+        });
+
+        // Product option selection — reload page with new type
+        var productOptions = productDropdown.querySelectorAll('.product-selector__option');
+        productOptions.forEach(function(option) {
+            option.addEventListener('click', function() {
+                var newType = this.dataset.type;
+                if (newType !== currentType) {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('type', newType);
+                    url.searchParams.delete('width');
+                    window.location.href = url.toString();
+                    return;
+                }
+                productTrigger.setAttribute('aria-expanded', 'false');
+                productDropdown.classList.remove('is-open');
+            });
+        });
+
+        // Width filter tabs — switch locally, no reload
+        if (widthFilter) {
+            var widthTabs = widthFilter.querySelectorAll('.width-filter__tab');
+            widthTabs.forEach(function(tab) {
+                tab.addEventListener('click', function() {
+                    var newWidth = this.dataset.width;
+                    if (newWidth === currentWidth) return;
+
+                    widthTabs.forEach(function(t) { t.classList.remove('is-active'); });
+                    this.classList.add('is-active');
+                    currentWidth = newWidth;
+
+                    renderCurrentWidth();
+
+                    // Update URL without reload
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('width', newWidth);
+                    window.history.pushState({}, '', url.toString());
+                });
+            });
+        }
+
+        // Tax inclusive toggle
+        if (taxToggle) {
+            taxToggle.addEventListener('change', function() {
+                showTaxInclusive = this.checked;
+                renderCurrentWidth();
+            });
+        }
+
+        // Render price table for current width
+        function renderCurrentWidth() {
+            var items = categoryPrices[currentWidth] || [];
+
+            if (items.length === 0) {
+                pricesTableBody.innerHTML =
+                    '<tr><td colspan="4" class="prices-table__loading">' +
+                    '<span>No price data available for this width.</span>' +
+                    '</td></tr>';
+                return;
+            }
+
+            var html = '';
+            items.forEach(function(item) {
+                var price = showTaxInclusive ? (item.price_tax || item.price) : item.price;
+                var change = showTaxInclusive ? (item.change_tax || 0) : (item.change || 0);
+                var changeClass = 'neutral';
+                var changeText = '$0';
+
+                if (change > 0) {
+                    changeClass = 'up';
+                    changeText = '+$' + formatNumber(change);
+                } else if (change < 0) {
+                    changeClass = 'down';
+                    changeText = '$' + formatNumber(change);
+                } else {
+                    changeText = '$0';
+                }
+
+                var canView = pageData.canViewHistory;
+                var homeUrl = (window.ippgiData && window.ippgiData.homeUrl) || '/';
+                var subscribeUrl = (window.ippgiData && window.ippgiData.subscribeUrl) || '/subscribe/';
+                var detailUrl = canView
+                    ? homeUrl + 'price-detail/?type=' + encodeURIComponent(currentType) + '&spec=' + encodeURIComponent(item.product_spec || item.dimensions)
+                    : subscribeUrl;
+
+                // Extract product name from product_spec (format: "categoryId_width_thickness_材料名称")
+                var displayDimensions = item.dimensions;
+                if (item.product_spec) {
+                    var specParts = item.product_spec.split('_');
+                    if (specParts.length >= 4) {
+                        // Get the last part (product name)
+                        var productName = specParts[specParts.length - 1];
+                        displayDimensions = item.dimensions + ' ' + productName;
+                    }
+                }
+
+                html +=
+                    '<tr>' +
+                    '<td>' + escapeHtml(displayDimensions) + '</td>' +
+                    '<td>$' + formatNumber(price) + '</td>' +
+                    '<td class="prices-table__change--' + changeClass + '">' + changeText + '</td>' +
+                    '<td>' +
+                    '<a href="' + escapeHtml(detailUrl) + '" class="prices-table__view-btn">' +
+                    'View <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+                    '</a>' +
+                    '</td>' +
+                    '</tr>';
+            });
+
+            pricesTableBody.innerHTML = html;
+        }
+
+        // Helper functions
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatNumber(num) {
+            var n = parseFloat(num);
+            if (isNaN(n)) return '0';
+            // Round to 2 decimal places, remove trailing zeros
+            var str = n.toFixed(2).replace(/\.?0+$/, '');
+            return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        // Initial render
+        renderCurrentWidth();
+    }
+
+    // Initialize prices page if on prices page
+    if (document.querySelector('.prices-table-section')) {
+        initPricesPage();
     }
 
 })();

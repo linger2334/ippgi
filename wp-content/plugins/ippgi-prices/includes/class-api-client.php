@@ -70,9 +70,10 @@ class IPPGI_Prices_API_Client {
      * Fetch price list from API
      *
      * @param bool $force_refresh Force refresh even if cached
+     * @param string $date Optional date in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format
      * @return array|WP_Error Price list data or error
      */
-    public function fetch_price_list($force_refresh = false) {
+    public function fetch_price_list($force_refresh = false, $date = '') {
         // Check cache first unless force refresh
         if (!$force_refresh) {
             $cached = $this->cache_manager->get_price_list();
@@ -81,15 +82,15 @@ class IPPGI_Prices_API_Client {
             }
         }
 
-        // Get date parameter
-        $date = $this->get_api_date();
+        // Get date parameter (use provided date or default to today)
+        $api_date = !empty($date) ? $this->normalize_date($date) : $this->get_api_date();
 
         // Fetch data for all categories
         $all_data = array();
         $errors = array();
 
         foreach (self::CATEGORY_IDS as $category_name => $category_id) {
-            $category_data = $this->fetch_category_prices($category_id, $category_name, $date);
+            $category_data = $this->fetch_category_prices($category_id, $category_name, $api_date);
 
             if (is_wp_error($category_data)) {
                 $errors[$category_name] = $category_data->get_error_message();
@@ -106,7 +107,7 @@ class IPPGI_Prices_API_Client {
         // Prepare combined result
         $result = array(
             'success' => true,
-            'date' => $date,
+            'date' => $api_date,
             'categories' => $all_data,
             'errors' => $errors,
             'fetched_at' => current_time('Y-m-d H:i:s'),
@@ -217,43 +218,41 @@ class IPPGI_Prices_API_Client {
     }
 
     /**
+     * Normalize date string to 'YYYY-MM-DD 00:00:00' format
+     *
+     * @param string $date Date in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format
+     * @return string Normalized date in 'YYYY-MM-DD 00:00:00' format
+     */
+    private function normalize_date($date) {
+        // Extract YYYY-MM-DD part
+        $date_part = substr(trim($date), 0, 10);
+        // Validate format
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_part)) {
+            return $date_part . ' 00:00:00';
+        }
+        // Fallback to today
+        return $this->get_api_date();
+    }
+
+    /**
      * Fetch real-time price from API
      *
-     * @param string $product_type Product type (e.g., 'PPGI', 'GI')
-     * @param int    $width Width in mm
-     * @param float  $thickness Thickness
-     * @param string $date Date in format (optional, defaults to today)
+     * @param string $product_spec Full productSpec from client (e.g., "1482328115005964290_1000_0.11_彩涂")
+     * @param string $category_id Category ID
+     * @param string $date Date in format YYYY-MM-DD (optional, defaults to today)
      * @param bool   $force_refresh Force refresh even if cached
      * @return array|WP_Error Price data or error
      */
-    public function fetch_realtime_price($product_type, $width, $thickness, $date = '', $force_refresh = false) {
+    public function fetch_realtime_price($product_spec, $category_id, $date = '', $force_refresh = false) {
         // Check cache first unless force refresh
         if (!$force_refresh) {
-            $cached = $this->cache_manager->get_realtime_price($product_type, $width, $thickness);
+            $cached = $this->cache_manager->get_realtime_price($product_spec, $date ?: $this->get_api_date_simple());
             if (false !== $cached) {
                 return $cached;
             }
         }
 
-        // Validate product type
-        if (!isset(self::CATEGORY_IDS[$product_type])) {
-            return new WP_Error('invalid_product_type', 'Invalid product type: ' . $product_type);
-        }
-
-        // Get category ID and Chinese name
-        $category_id = self::CATEGORY_IDS[$product_type];
-        $category_name_cn = self::CATEGORY_NAMES_CN[$product_type];
-
-        // Build productSpec: ${categoryId}_${width}_${thickness}_${中文名}
-        $product_spec = sprintf(
-            '%s_%d_%s_%s',
-            $category_id,
-            $width,
-            $thickness,
-            $category_name_cn
-        );
-
-        // Get date (yesterday if before 9am)
+        // Get date (default to today)
         if (empty($date)) {
             $date = $this->get_api_date_simple();
         }
@@ -312,7 +311,7 @@ class IPPGI_Prices_API_Client {
         }
 
         // Cache the data
-        $this->cache_manager->set_realtime_price($product_type, $width, $thickness, $data);
+        $this->cache_manager->set_realtime_price($product_spec, $date, $data);
 
         return $data;
     }
@@ -330,22 +329,22 @@ class IPPGI_Prices_API_Client {
     /**
      * Get price list (from cache or API)
      *
+     * @param string $date Optional date in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format
      * @return array|WP_Error Price list data or error
      */
-    public function get_price_list() {
-        return $this->fetch_price_list(false);
+    public function get_price_list($date = '') {
+        return $this->fetch_price_list(false, $date);
     }
 
     /**
      * Get real-time price (from cache or API)
      *
-     * @param string $product_type Product type
-     * @param int    $width Width in mm
-     * @param float  $thickness Thickness
+     * @param string $product_spec Full productSpec
+     * @param string $category_id Category ID
      * @param string $date Date (optional)
      * @return array|WP_Error Price data or error
      */
-    public function get_realtime_price($product_type, $width, $thickness, $date = '') {
-        return $this->fetch_realtime_price($product_type, $width, $thickness, $date, false);
+    public function get_realtime_price($product_spec, $category_id, $date = '') {
+        return $this->fetch_realtime_price($product_spec, $category_id, $date, false);
     }
 }

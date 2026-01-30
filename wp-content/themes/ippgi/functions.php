@@ -23,9 +23,9 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
             $latest_time = $mtime;
         }
     }
-    define('IPPGI_VERSION', $latest_time ?: '1.7.3');
+    define('IPPGI_VERSION', $latest_time ?: '1.8.0');
 } else {
-    define('IPPGI_VERSION', '1.7.3');
+    define('IPPGI_VERSION', '1.8.0');
 }
 define('IPPGI_THEME_DIR', get_template_directory());
 define('IPPGI_THEME_URI', get_template_directory_uri());
@@ -35,7 +35,7 @@ define('IPPGI_THEME_URI', get_template_directory_uri());
  * Set to true to simulate logged-in user with Plus membership (for local testing)
  * IMPORTANT: Set to false in production!
  */
-define('IPPGI_DEV_MODE', false);
+define('IPPGI_DEV_MODE', true);
 define('IPPGI_DEV_MEMBERSHIP_LEVEL', 'plus'); // Options: 'guest', 'basic', 'trial', 'plus', 'cancelled'
 
 /**

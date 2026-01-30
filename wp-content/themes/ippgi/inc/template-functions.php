@@ -221,21 +221,34 @@ function ippgi_get_user_favorites($user_id = null) {
         'ppgi' => ['name' => __('PPGI', 'ippgi'), 'type' => 'ppgi'],
         'hrc' => ['name' => __('HRC', 'ippgi'), 'type' => 'hrc'],
         'crc_hard' => ['name' => __('CRC Hard', 'ippgi'), 'type' => 'crc_hard'],
+        'crc' => ['name' => __('CRC Hard', 'ippgi'), 'type' => 'crc_hard'],
         'al' => ['name' => __('Aluminum Sheet', 'ippgi'), 'type' => 'al'],
+        'aluminum' => ['name' => __('Aluminum Sheet', 'ippgi'), 'type' => 'al'],
     ];
 
     $result = [];
     foreach ($favorites as $favorite_id) {
-        // Parse favorite_id format: type-spec (e.g., "ppgi-0.09*1000")
+        // Parse favorite_id format: type-spec (e.g., "ppgi-1482328115005964290_1000_0.11_彩涂")
         $parts = explode('-', $favorite_id, 2);
         $type = $parts[0] ?? '';
         $spec = $parts[1] ?? '';
 
         if (isset($material_types[$type])) {
+            // Parse spec into human-readable display
+            // productSpec format: "categoryId_width_thickness_名称"
+            $display_spec = $spec;
+            $spec_parts = explode('_', $spec);
+            if (count($spec_parts) >= 4) {
+                $width = $spec_parts[1];
+                $thickness = $spec_parts[2];
+                $product_name = end($spec_parts);
+                $display_spec = $thickness . '*' . $width . ' ' . $product_name;
+            }
+
             $result[] = [
                 'id' => $favorite_id,
                 'name' => $material_types[$type]['name'],
-                'spec' => $spec,
+                'spec' => $display_spec,
                 'type' => $material_types[$type]['type'],
             ];
         }
@@ -505,4 +518,97 @@ function ippgi_apply_date_filter($query) {
 
         $query->set('date_query', [$date_query]);
     }
+}
+
+/**
+ * Get product dimensions range (thickness and width) from cached price list
+ *
+ * @param string $product_type Product type key (ppgi, gi, gl, hrc, crc, aluminum)
+ * @return array|false Array with min/max thickness and width, or false on failure
+ */
+function ippgi_get_product_dimensions_range($product_type) {
+    // Map product type key to category name used in cache
+    $category_mapping = [
+        'ppgi'     => 'PPGI',
+        'gi'       => 'GI',
+        'gl'       => 'GL',
+        'hrc'      => 'HRC',
+        'crc'      => 'CRC Hard',
+        'aluminum' => 'AL',
+    ];
+
+    if (!isset($category_mapping[$product_type])) {
+        return false;
+    }
+
+    $category_name = $category_mapping[$product_type];
+
+    // Get cached price list
+    $cached_data = get_transient('ippgi_prices_price_list');
+
+    if (!$cached_data || !isset($cached_data['categories'][$category_name])) {
+        return false;
+    }
+
+    $category_data = $cached_data['categories'][$category_name];
+
+    // Check if data has result structure (直接在 category_data 下，不是 data.result)
+    if (!isset($category_data['result']) || !is_array($category_data['result'])) {
+        return false;
+    }
+
+    $result = $category_data['result'];
+
+    // Collect all thicknesses and widths
+    $thicknesses = [];
+    $widths = [];
+
+    foreach ($result as $width => $items) {
+        // Width is the key
+        $widths[] = intval($width);
+
+        // Items contain thickness
+        if (is_array($items)) {
+            foreach ($items as $item) {
+                if (isset($item['thickness']) && $item['thickness'] !== '') {
+                    $thicknesses[] = floatval($item['thickness']);
+                }
+            }
+        }
+    }
+
+    if (empty($thicknesses) || empty($widths)) {
+        return false;
+    }
+
+    return [
+        'min_thickness' => min($thicknesses),
+        'max_thickness' => max($thicknesses),
+        'min_width'     => min($widths),
+        'max_width'     => max($widths),
+    ];
+}
+
+/**
+ * Format dimensions range for display
+ *
+ * @param array $range Dimensions range from ippgi_get_product_dimensions_range()
+ * @return array Formatted strings for thickness and width
+ */
+function ippgi_format_dimensions_range($range) {
+    if (!$range) {
+        return [
+            'thickness' => 'N/A',
+            'width'     => 'N/A',
+        ];
+    }
+
+    // Format thickness (remove trailing zeros)
+    $min_thickness = rtrim(rtrim(number_format($range['min_thickness'], 2), '0'), '.');
+    $max_thickness = rtrim(rtrim(number_format($range['max_thickness'], 2), '0'), '.');
+
+    return [
+        'thickness' => $min_thickness . '-' . $max_thickness . 'mm',
+        'width'     => $range['min_width'] . '-' . $range['max_width'] . 'mm',
+    ];
 }

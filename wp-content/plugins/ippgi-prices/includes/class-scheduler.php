@@ -224,7 +224,7 @@ class IPPGI_Prices_Scheduler {
             current_time('Y-m-d H:i:s')
         ));
 
-        // Step 1: Collect and save current prices to database
+        // Collect and save current prices to database
         // At midnight, this saves yesterday's data (cached from 17:00)
         // The exchange rate is extracted from the cached price list data
         $collection_results = $this->price_collector->collect_all_current_prices(false);
@@ -242,25 +242,6 @@ class IPPGI_Prices_Scheduler {
             ));
         }
 
-        // Step 2: Clear all caches after saving data
-        $clear_results = $this->cache_manager->clear_all_caches();
-        error_log(sprintf(
-            'IPPGI Prices: Cleared caches after midnight collection - Price list: %s, Real-time prices: %d',
-            $clear_results['price_list'] ? 'yes' : 'no',
-            $clear_results['realtime_prices_count']
-        ));
-
-        // Step 3: Fetch new price list data (for today)
-        $price_list_result = $this->api_client->fetch_price_list(true);
-        if (is_wp_error($price_list_result)) {
-            error_log(sprintf(
-                'IPPGI Prices: Failed to fetch new price list after midnight - %s',
-                $price_list_result->get_error_message()
-            ));
-        } else {
-            error_log('IPPGI Prices: Successfully fetched and cached new price list for today');
-        }
-
         // Calculate execution time
         $execution_time = microtime(true) - $start_time;
 
@@ -276,8 +257,6 @@ class IPPGI_Prices_Scheduler {
             'execution_time' => $execution_time,
             'prices_collected' => $collection_results['success'],
             'prices_saved' => $collection_results['total_saved'],
-            'cache_cleared' => $clear_results,
-            'new_price_list_fetched' => !is_wp_error($price_list_result),
             'errors' => $collection_results['errors'],
         ));
     }

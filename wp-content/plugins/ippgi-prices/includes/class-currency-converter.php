@@ -327,7 +327,7 @@ class IPPGI_Prices_Currency_Converter {
         );
 
         foreach ($price_fields as $field) {
-            if (isset($price_data[$field]) && $price_data[$field] !== null) {
+            if (isset($price_data[$field]) && $price_data[$field] !== null && is_numeric($price_data[$field])) {
                 $price_data[$field . '_cny'] = $price_data[$field];
                 $price_data[$field . '_usd'] = self::cny_to_usd($price_data[$field], $exchange_rate);
                 $price_data[$field] = $price_data[$field . '_usd']; // Default to USD

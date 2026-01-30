@@ -55,7 +55,7 @@
 
 ### 自定义主题
 **位置**：`/wp-content/themes/ippgi/`
-**当前版本**：1.7.2
+**当前版本**：1.10.1
 
 **页面模板** (`/page-templates/`)：
 - `page-prices.php` - 价格列表页面
@@ -87,7 +87,7 @@
 **功能文件** (`/inc/`)：
 - `enqueue.php` - 资源加载
 - `customizer.php` - 主题定制器
-- `template-functions.php` - 模板函数
+- `template-functions.php` - 模板函数（含 `ippgi_get_product_dimensions_range()`、`ippgi_format_dimensions_range()`）
 - `membership.php` - 会员系统集成
 - `announcement.php` - 公告系统
 
@@ -214,8 +214,9 @@
 
 **收藏数据格式**：
 - 存储在 user meta `ippgi_favorites`
-- ID 格式：`type-spec`（如 `ppgi-0.09*1000`）
-- `ippgi_get_user_favorites()` 解析并返回结构化数据
+- ID 格式：`type-productSpec`（如 `ppgi-1482328115005964290_1000_0.11_彩涂`）
+- `ippgi_get_user_favorites()` 解析 productSpec 并返回结构化数据
+- 类型键映射：`crc` → `crc_hard`，`aluminum` → `al`
 
 **CSS 样式**：位于 `/assets/css/components.css`
 - `.favorites-page` - 页面容器
@@ -308,6 +309,164 @@ ippgiToast.show('消息内容', 'success', 5000);
 - `ippgiToast.error(message, duration)` - 显示错误提示
 - `ippgiToast.hide()` - 手动隐藏提示
 
+### 升级提示 Banner
+**模板文件**：`/template-parts/upgrade-prompt.php`
+
+**浮动提示组件**，固定在屏幕右下角，提示用户升级到 Plus 会员。
+
+**显示逻辑**（定义在 `footer.php`）：
+```php
+if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
+    get_template_part('template-parts/upgrade-prompt');
+}
+```
+
+**显示条件**：
+
+| 用户状态 | 是否显示 |
+|---------|---------|
+| 未登录（Guest） | ❌ 不显示 |
+| Basic 会员（Level 2） | ✅ 显示 |
+| Trial 会员（Level 3） | ✅ 显示 |
+| Plus 会员（Level 4） | ❌ 不显示 |
+
+**说明**：`ippgi_is_user_subscribed()` 函数只检查 Plus 会员，Trial 会员不被视为"已订阅"，因此也会显示升级提示。
+
+**功能**：
+- 点击 × 按钮可关闭
+- 点击 "Upgrade" 跳转到订阅页面
+
+### 价格列表页面 (Prices Page)
+**模板文件**：`/page-templates/page-prices.php`
+
+**页面结构**：
+1. **页面标题**
+   - 动态标题：`Price charts and tables of China {产品名称} and commodities`
+   - 副标题/免责声明：`*These prices reflect the transaction prices within China...`
+
+2. **产品选择器**
+   - 下拉按钮显示 "Product" + 向下箭头
+   - 点击展开下拉菜单，显示所有产品类型（PPGI、GI、GL、HRC、CRC Hard、Aluminum）
+   - 选中项带勾号标记
+
+3. **选中产品展示**
+   - 居中显示当前选中的产品名称（如 "PPGI"）
+   - 两侧带有装饰线
+
+4. **Key Attributes**
+   - 标题：`Key attributes`（粗体）
+   - 动态内容：从缓存数据中获取厚度范围和宽度范围
+   - 使用 `ippgi_get_product_dimensions_range()` 和 `ippgi_format_dimensions_range()` 函数
+
+5. **宽度筛选标签**
+   - 水平滚动的药丸式标签（如 1000mm、1200mm）
+   - 宽度选项从缓存数据动态获取，不再硬编码
+   - 点击标签本地切换数据（无需网络请求）
+
+6. **更新时间和含税切换**
+   - 左侧：更新时间（如 `Updated: Jan 30, 2026, 10:00 AM (UTC+8)`）
+   - 右侧：圆形单选按钮 + "Tax-inclusive price" 标签
+
+7. **价格表格**
+   - 表头：Dimensions(mm) | Latest($) | Change($) | Historical
+   - 蓝色表头背景（#e2f5fb）
+   - Dimensions 列显示：`厚度*宽度 材料名称`（如 `0.4*1200 民用镀锌`）
+   - Change 列根据涨跌显示不同颜色
+   - Historical 列显示 "View >" 按钮，跳转到价格详情页
+
+8. **Disclaimer**
+   - 动态文本，产品名称根据当前选中类型变化
+
+**URL 参数支持**：
+- `?type=ppgi` - 直接指定产品类型（小写）
+- `?category=PPGI` - 从首页跳转时使用（大写，自动映射）
+- `?width=1000` - 指定默认宽度
+
+**数据来源**：
+- 所有价格数据从 `get_transient('ippgi_prices_price_list')` 缓存获取
+- 通过 `window.ippgiPricesPage` 传递给 JavaScript
+- 宽度切换和含税切换均在本地完成，无需 API 调用
+
+**CSS 样式**：位于 `/assets/css/components.css`
+- `.prices-page-header` - 页面标题区域
+- `.product-selector` - 产品下拉选择器
+- `.selected-product` - 选中产品展示
+- `.key-attributes` - 属性描述区域
+- `.width-filter` - 宽度筛选标签
+- `.price-controls` - 更新时间和含税切换
+- `.prices-table` - 价格表格
+- `.prices-disclaimer` - 免责声明
+
+### 价格详情页面 (Price Detail Page)
+**模板文件**：`/page-templates/page-price-detail.php`
+**WordPress 页面**：`/price-detail/`（需在后台创建页面并选择模板）
+
+**页面结构**：
+1. **页面标题**
+   - 动态标题：`Price charts and tables of China {产品代码} and commodities`
+   - 副标题/免责声明
+
+2. **产品信息表格**
+   - 蓝色表头（#e7f5fb）：Product | Dimensions(mm) | Favorite
+   - 数据行：产品代码（粗体） | 规格（`厚度*宽度 材料名称`） | 心形收藏按钮
+   - 带边框样式
+
+3. **收藏功能**
+   - 心形按钮：已收藏显示红色实心，未收藏显示空心轮廓
+   - 点击切换收藏状态（AJAX 请求）
+   - 操作后显示 Toast 提示（2秒）
+   - 收藏 ID 格式：`type-productSpec`（如 `ppgi-1482328115005964290_1000_0.11_彩涂`）
+
+4. **实时数据区域**
+   - 标题：`Real-Time Data`
+   - 圆形含税切换按钮
+   - 大号当前价格（使用 `lastprice_usd` / `lastpriceTax_usd`）
+   - 涨跌值和百分比（涨绿跌红，使用 `riseAndFall_usd` 和 `riseRange`）
+   - 统计数据网格：
+     - Avg：使用 `price_usd` / `priceTax_usd`
+     - WoW：使用 `lastWeekDiff_usd` / `lastWeekDiffTax_usd`
+     - MoM：使用 `lastMonthDiff_usd` / `lastMonthDiffTax_usd`
+     - YoY：使用 `lastYearsDiff_usd` / `lastYearsDiffTax_usd`
+
+5. **价格图表区域**
+   - **日期范围选择器**：日历图标 + "Start Date ~ End Date"，点击打开底部日期选择器
+   - 时间范围标签：TD | 1M | 6M | 1Y | 2Y | 3Y | 4Y（带滑动切换动画）
+   - 图表标题：`{产品代码} Dimensions(mm):{规格}`
+   - **TD 标签**：Canvas 绘制当天价格走势图（9:00 AM 后从 `/statistics` API 获取数据）
+   - **1M/6M/1Y/2Y/3Y/4Y 标签**：从本地数据库 `/historical` API 获取历史数据
+   - **自定义日期范围**：通过日期选择器选择任意开始和结束日期
+   - **气球标记**：图表最高点和最低点显示 HTML 气球标记（椭圆形，亮蓝色 #7EE0FF）
+   - **X 轴标签**：TD 显示时间（09:00-18:00），历史数据显示日期（MM-DD 格式）
+   - **数据降采样**：数据量超过 300 点时自动降采样，保证图表流畅显示
+
+6. **日期选择器（底部弹出）**
+   - 与博客页面相同的底部弹出式日期选择器
+   - 支持选择开始日期和结束日期
+   - 日历导航（上一月/下一月）
+   - 禁止选择未来日期
+   - Clear 按钮清空选择，Confirm 按钮确认并加载数据
+   - 选择自定义日期范围后，预设标签（TD/1M等）取消激活状态
+   - 点击预设标签时，日期选择器文本重置为 "Start Date ~ End Date"
+
+7. **Disclaimer**
+   - 动态产品名称
+
+**URL 参数**：
+- `?type=ppgi&spec=categoryId_width_thickness_材料名称` - 从价格列表页跳转
+- `?material=gi` - 旧版兼容
+
+**数据来源**：
+- 实时数据通过 REST API `/wp-json/ippgi-prices/v1/price` 获取
+- 客户端发送：`productSpec`、`categoryId`、`date`
+- 服务器添加 `siteId` 后转发到 api.rendui.com
+- 响应数据自动转换为 USD 并缓存
+
+**CSS 样式**：位于 `/assets/css/components.css`
+- `.detail-product-info` / `.detail-product-table` - 产品信息表格
+- `.detail-realtime` - 实时数据区域
+- `.detail-chart-section` - 图表区域
+- `.detail-chart__range-tabs` - 时间范围标签
+
 ---
 
 ## REST API 接口
@@ -317,7 +476,67 @@ ippgiToast.show('消息内容', 'success', 5000);
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/wp-json/ippgi-prices/v1/prices` | GET | 获取所有材料价格列表 |
-| `/wp-json/ippgi-prices/v1/price` | GET | 获取特定规格价格（参数：product_type, width, thickness, date） |
+| `/wp-json/ippgi-prices/v1/price` | GET | 获取特定规格实时价格 |
+| `/wp-json/ippgi-prices/v1/statistics` | GET | 获取价格历史统计（用于 TD 图表，从外部 API） |
+| `/wp-json/ippgi-prices/v1/historical` | GET | 获取历史价格数据（用于 1M-4Y 图表，从本地数据库） |
+
+**实时价格接口参数** (`/price`)：
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `productSpec` | 是 | 完整产品规格（如 `1482328115005964290_1000_0.11_彩涂`） |
+| `categoryId` | 是 | 分类 ID |
+| `date` | 否 | 日期（YYYY-MM-DD 格式，默认今天） |
+
+**数据流程**：
+1. 客户端发送 `productSpec`、`categoryId`、`date`
+2. 服务器添加 `siteId`，检查缓存（键：`md5(productSpec + '_' + date)`）
+3. 缓存未命中则转发请求到 `api.rendui.com`
+4. 响应数据自动进行货币转换（CNY → USD）
+5. 转换后数据缓存并返回
+
+**统计数据接口参数** (`/statistics`)：
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `productSpec` | 是 | 完整产品规格 |
+| `categoryId` | 是 | 分类 ID |
+| `from` | 是 | 开始时间（YYYY-MM-DD HH:MM:SS 格式） |
+| `to` | 是 | 结束时间（YYYY-MM-DD HH:MM:SS 格式） |
+
+**统计数据流程**：
+1. 客户端发送 `productSpec`、`categoryId`、`from`、`to`
+2. 服务器生成缓存键：`ippgi_stats_` + `md5(productSpec + '_' + from + '_' + to)`
+3. 缓存命中直接返回（带 `cached: true` 标识）
+4. 缓存未命中则添加 `siteId` 和 `phone` 头转发到 `api.rendui.com/v1/jec/rendui/prices/statistics`
+5. 响应数据自动进行货币转换（CNY → USD），包括 `list` 数组和 `rangeAvgPrice`
+6. 转换后数据缓存 1 小时（3600 秒）并返回
+
+**历史数据接口参数** (`/historical`)：
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `productSpec` | 是 | 完整产品规格 |
+| `category` | 是 | 产品分类名称（GI、GL、PPGI、HRC、CRC Hard、AL） |
+| `range` | 否* | 预设时间范围（1m、6m、1y、2y、3y、4y） |
+| `from` | 否* | 自定义开始日期（YYYY-MM-DD 格式） |
+| `to` | 否* | 自定义结束日期（YYYY-MM-DD 格式） |
+
+*注：`range` 或 `from`+`to` 二选一必填
+
+**历史数据流程**：
+1. 客户端发送 `productSpec`、`category`，以及 `range` 或 `from`+`to`
+2. **同一天检测**：如果 `from` 和 `to` 是同一天，转发到外部 statistics API（09:00-17:00 时间范围）
+3. 服务器计算日期范围：
+   - 预设模式：根据 range 计算（如 4y = 4 年前的今天到今天）
+   - 自定义模式：使用 from 和 to 参数（to 不能超过今天）
+4. 生成缓存键：
+   - 预设模式：`ippgi_hist_` + `md5(productSpec + '_' + category + '_' + range)`
+   - 自定义模式：`ippgi_hist_` + `md5(productSpec + '_' + category + '_' + from + '_' + to)`
+5. 缓存命中直接返回
+6. 缓存未命中则查询本地数据库表（`ippgi_prices_{category}`）
+7. **日期填充**：遍历日期范围内的每一天
+   - 有数据的日期：使用实际价格
+   - 无数据但在首条数据之后（周末/节假日）：沿用前一天价格
+   - 无数据且在首条数据之前（产品不存在时期）：价格为 0
+8. 转换后数据缓存 1 小时并返回
 
 ### 管理员接口
 
@@ -339,8 +558,8 @@ ippgiToast.show('消息内容', 'success', 5000);
    - 从缓存数据中提取汇率（`exchange_rate` 字段）
    - 保存汇率到 `ippgi_prices_exchange_rates` 表
    - 保存价格数据到各材料表
-2. **清除所有缓存**
-3. **获取今日价格列表**
+
+**注意**：00:00 任务只保存数据，不清除缓存也不获取新数据。缓存中保留的是 17:00 的数据，供 00:00-09:00 期间使用。
 
 ### 09:00-17:00 每小时更新（北京时间，共9次）
 1. 清除所有缓存
@@ -351,6 +570,30 @@ ippgiToast.show('消息内容', 'success', 5000);
 - 使用 `wp_timezone()` 和 `DateTime` 对象计算正确的 Unix 时间戳
 - 避免使用 `current_time('timestamp')`（返回伪时间戳，会导致时区计算错误）
 - 相关代码位于 `/wp-content/plugins/ippgi-prices/includes/class-scheduler.php`
+
+---
+
+## 客户端日期请求逻辑
+
+**适用页面**：首页价格表、价格详情页
+
+**逻辑说明**：
+- 北京时间 9:00 之前：请求参数 `date` 使用**昨天**的日期
+- 北京时间 9:00 及之后：请求参数 `date` 使用**今天**的日期
+
+**原因**：
+- 9:00 之前外部 API 可能还没有今天的数据
+- 缓存中保留的是昨天 17:00 的数据
+- 确保用户始终能看到有效的价格数据
+
+**实现位置**：
+- 首页：`/assets/js/main.js` 中的 `getApiDate()` 函数
+- 价格详情页：`/page-templates/page-price-detail.php` 中的内联 `getApiDate()` 函数
+
+**服务端支持**：
+- `/prices/category` 端点支持 `date` 参数
+- `class-api-client.php` 中 `get_price_list($date)` 和 `fetch_price_list($force_refresh, $date)` 支持日期参数
+- 缓存键不含日期（`ippgi_prices_price_list`），依赖定时任务时机保证数据一致性
 
 ---
 
@@ -405,11 +648,61 @@ ippgiToast.show('消息内容', 'success', 5000);
 - 午夜数据保存：北京时间 00:00
 - 每小时刷新：北京时间 09:00-17:00
 
+#### 9. 价格列表页面重新设计 ✅
+- 根据 Figma 设计稿完全重写 `/prices/` 页面
+- 产品下拉选择器、宽度筛选标签、价格表格
+- 动态 Key Attributes（厚度/宽度范围从缓存获取）
+- 支持 `?type=` 和 `?category=` URL 参数
+- 本地数据切换（无需 API 调用）
+
+#### 10. 价格详情页面重新设计 ✅
+- 根据 Figma 设计稿完全重写 `/price-detail/` 页面
+- 产品信息表格、实时数据区域、图表区域占位
+- 从缓存获取当前价格和涨跌数据
+- 时间范围标签（TD、1M、6M、1Y、2Y、3Y、4Y）
+
+#### 11. 实时价格 API 重构 ✅
+- 重构数据流：客户端 → 服务器 REST API → 缓存检查 → api.rendui.com
+- 缓存键包含 `productSpec` 和 `date`（`md5(productSpec + '_' + date)`）
+- 自动货币转换（CNY → USD），支持含税/不含税价格
+- 处理 API 响应边缘情况（如 `lastYearsDiff` 为 "-" 字符串）
+
+#### 12. 价格详情页收藏功能 ✅
+- 心形收藏按钮：已收藏红色实心，未收藏空心轮廓
+- AJAX 切换收藏状态，Toast 提示反馈（2秒）
+- 收藏 ID 格式统一：`type-productSpec`
+- 修复 My Favorites 页面显示问题（类型键映射：crc→crc_hard, aluminum→al）
+
+#### 13. 实时数据字段映射 ✅
+- 主价格：`lastprice_usd` / `lastpriceTax_usd`
+- 涨跌值：`riseAndFall_usd` / `riseAndFallTax_usd`
+- 涨跌百分比：`riseRange` / `riseRangeTax`（直接使用，已是百分比）
+- 平均价：`price_usd` / `priceTax_usd`
+- WoW/MoM/YoY：对应 `lastWeekDiff`、`lastMonthDiff`、`lastYearsDiff` 字段
+
+#### 14. 午夜定时任务优化 ✅
+- 00:00 任务仅保存数据，移除了缓存清除和获取新数据步骤
+- 保留 17:00 缓存数据供 00:00-09:00 期间使用
+
+#### 15. 客户端日期请求逻辑 ✅
+- 首页价格表和价格详情页统一实现日期计算逻辑
+- 北京时间 9:00 之前请求昨天的日期，9:00 及之后请求今天的日期
+- `/prices/category` REST API 端点新增 `date` 参数支持
+- `class-api-client.php` 的 `get_price_list()` 和 `fetch_price_list()` 支持日期参数传递
+
+#### 16. 价格图表 - TD（当天）数据 ✅
+- `/statistics` REST API 端点：转发请求到 `api.rendui.com/v1/jec/rendui/prices/statistics`
+- 服务端自动进行货币转换（CNY → USD），包含 `price`、`priceTax`、`rangeAvgPrice`
+- 缓存策略：键为 `ippgi_stats_` + `md5(productSpec + '_' + from + '_' + to)`，过期时间 1 小时
+- 客户端 TD 标签逻辑：北京时间 9:00 之前不请求数据；9:00 之后请求当天 00:00:00 ~ 当前时间的统计数据
+- Canvas 绘制价格走势图：X 轴为时间戳，Y 轴为价格（USD）
+- 时间范围标签（TD、1M、6M、1Y、2Y、3Y、4Y）支持点击切换，带滑动动画效果
+
 ---
 
 ### Phase 2 - 待实现
 
-1. 价格历史图表 - 交互式价格趋势图表
+1. 价格历史图表 - 1M/6M/1Y/2Y/3Y/4Y 时间范围的历史数据图表（TD 已完成）
 2. 历史数据表格 - 从数据库加载历史价格表格
 3. 数据导出功能 - Plus 会员专属
 4. 价格提醒功能 - 价格变动通知

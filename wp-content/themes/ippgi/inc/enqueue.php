@@ -14,11 +14,19 @@ if (!defined('ABSPATH')) {
  * Enqueue theme styles
  */
 function ippgi_enqueue_styles() {
+    // Google Fonts - Alumni Sans and Inter
+    wp_enqueue_style(
+        'ippgi-google-fonts',
+        'https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap',
+        [],
+        null
+    );
+
     // CSS Variables
     wp_enqueue_style(
         'ippgi-variables',
         IPPGI_THEME_URI . '/assets/css/variables.css',
-        [],
+        ['ippgi-google-fonts'],
         IPPGI_VERSION
     );
 
