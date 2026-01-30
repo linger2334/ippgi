@@ -35,7 +35,7 @@ define('IPPGI_THEME_URI', get_template_directory_uri());
  * Set to true to simulate logged-in user with Plus membership (for local testing)
  * IMPORTANT: Set to false in production!
  */
-define('IPPGI_DEV_MODE', true);
+define('IPPGI_DEV_MODE', false);
 define('IPPGI_DEV_MEMBERSHIP_LEVEL', 'plus'); // Options: 'guest', 'basic', 'trial', 'plus', 'cancelled'
 
 /**
