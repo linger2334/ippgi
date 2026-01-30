@@ -241,6 +241,19 @@ if (is_user_logged_in()) {
                         </div>
                         <canvas id="detail-chart-canvas"></canvas>
                         <div class="detail-chart__balloons" id="detail-chart-balloons"></div>
+                        <!-- Touch Crosshair -->
+                        <div class="chart-crosshair" id="chart-crosshair">
+                            <div class="chart-crosshair__dot"></div>
+                        </div>
+                        <!-- Crosshair Info Box -->
+                        <div class="chart-infobox" id="chart-infobox">
+                            <div class="chart-infobox__time" id="chart-infobox-time"></div>
+                            <div class="chart-infobox__row">
+                                <span class="chart-infobox__name" id="chart-infobox-name"></span>
+                                <span class="chart-infobox__spec" id="chart-infobox-spec"></span>
+                                <span class="chart-infobox__price" id="chart-infobox-price"></span>
+                            </div>
+                        </div>
                         <div class="detail-chart__placeholder" id="detail-chart-placeholder">
                             <p><?php esc_html_e('Loading chart data...', 'ippgi'); ?></p>
                         </div>
@@ -516,6 +529,8 @@ window.ippgiPriceDetail = {
     // Store chart data
     var chartData = null;
     var currentRange = 'td';
+    // Store rendered chart state for touch crosshair
+    var chartRenderState = null;
 
     // Fetch TD (today) chart data - uses unified /historical endpoint
     function fetchTodayData() {
@@ -707,6 +722,18 @@ window.ippgiPriceDetail = {
             createBalloon(maxIdx);
             createBalloon(minIdx);
         }
+
+        // Store render state for touch crosshair
+        chartRenderState = {
+            list: sampledList,
+            prices: prices,
+            minPrice: minPrice,
+            maxPrice: maxPrice,
+            priceRange: priceRange,
+            canvasWidth: w,
+            canvasHeight: h,
+            isHistorical: isHistorical
+        };
     }
 
     // Update X-axis labels based on data type
@@ -720,8 +747,8 @@ window.ippgiPriceDetail = {
             for (var i = 0; i < labelCount; i++) {
                 var idx = Math.min(i * step, list.length - 1);
                 var item = list[idx];
-                // statisticsTime format: "YYYY-MM-DD HH:MM:SS"
-                var dateStr = item.statisticsTime || '';
+                // Note: external API uses 'satisticsTime' (typo), DB uses 'statisticsTime'
+                var dateStr = item.statisticsTime || item.satisticsTime || '';
                 if (dateStr) {
                     // Extract month and day: "MM-DD"
                     var parts = dateStr.split(' ')[0].split('-');
@@ -1106,6 +1133,164 @@ window.ippgiPriceDetail = {
         if (confirmBtn) confirmBtn.addEventListener('click', confirmSelectionDP);
         if (prevBtn) prevBtn.addEventListener('click', goToPrevMonthDP);
         if (nextBtn) nextBtn.addEventListener('click', goToNextMonthDP);
+    }
+
+    // ========== Touch Crosshair for Chart ==========
+
+    var chartArea = document.getElementById('detail-chart');
+    var crosshair = document.getElementById('chart-crosshair');
+    var infobox = document.getElementById('chart-infobox');
+
+    if (chartArea && crosshair && infobox) {
+        var crosshairDot = crosshair.querySelector('.chart-crosshair__dot');
+        var infoboxTime = document.getElementById('chart-infobox-time');
+        var infoboxName = document.getElementById('chart-infobox-name');
+        var infoboxSpec = document.getElementById('chart-infobox-spec');
+        var infoboxPrice = document.getElementById('chart-infobox-price');
+
+        // Get product info from page data
+        var productSpec = detail.productSpec || '';
+        var specParts = productSpec.split('_');
+        var productName = specParts.length >= 4 ? specParts[specParts.length - 1] : '';
+        var thickness = specParts.length >= 3 ? specParts[2] : '';
+        var width = specParts.length >= 2 ? specParts[1] : '';
+        var dimensionStr = thickness && width ? (thickness + '*' + width) : '';
+
+        // Month names for date formatting
+        var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        function showCrosshair(touchX) {
+            if (!chartRenderState || !chartRenderState.list.length) return;
+
+            var rect = chartArea.getBoundingClientRect();
+            var x = touchX - rect.left;
+            var w = rect.width;
+            var h = rect.height;
+
+            // Clamp x within chart bounds
+            x = Math.max(0, Math.min(x, w));
+
+            // Calculate index based on touch position
+            var ratio = x / w;
+            var idx = Math.round(ratio * (chartRenderState.prices.length - 1));
+            idx = Math.max(0, Math.min(idx, chartRenderState.prices.length - 1));
+
+            var item = chartRenderState.list[idx];
+            var price = chartRenderState.prices[idx];
+
+            // Snap to the actual data point X position
+            var snapX = (idx / (chartRenderState.prices.length - 1)) * w;
+
+            // Calculate Y position for the dot
+            var y = h - ((price - chartRenderState.minPrice) / chartRenderState.priceRange) * h;
+
+            // Position crosshair at snapped data point X
+            crosshair.style.left = snapX + 'px';
+            crosshair.classList.add('is-active');
+
+            // Position dot at data point
+            if (crosshairDot) {
+                crosshairDot.style.top = y + 'px';
+            }
+
+            // Format time/date string
+            var timeStr = '';
+            if (chartRenderState.isHistorical) {
+                // Historical: show date like "Oct 02, 2025"
+                // Note: external API uses 'satisticsTime' (typo), DB uses 'statisticsTime'
+                var dateStr = item.statisticsTime || item.satisticsTime || '';
+                if (dateStr) {
+                    var parts = dateStr.split(' ')[0].split('-');
+                    if (parts.length >= 3) {
+                        var monthIdx = parseInt(parts[1], 10) - 1;
+                        timeStr = monthNames[monthIdx] + ' ' + parts[2] + ', ' + parts[0];
+                    }
+                }
+            } else {
+                // Today: calculate time based on index position (09:00 - 17:00 range)
+                var totalPoints = chartRenderState.prices.length;
+                var timeRangeMinutes = 8 * 60; // 8 hours = 480 minutes
+                var startMinutes = 9 * 60; // 09:00 = 540 minutes from midnight
+                var pointMinutes = startMinutes + (idx / Math.max(1, totalPoints - 1)) * timeRangeMinutes;
+                var hours = Math.floor(pointMinutes / 60);
+                var minutes = Math.floor(pointMinutes % 60);
+                timeStr = String(hours).padStart(2, '0') + ':' +
+                          String(minutes).padStart(2, '0') + ':00 (UTC+8)';
+            }
+
+            // Update infobox content
+            if (infoboxTime) infoboxTime.textContent = timeStr;
+            if (infoboxName) infoboxName.textContent = productName;
+            if (infoboxSpec) infoboxSpec.textContent = dimensionStr;
+            if (infoboxPrice) infoboxPrice.textContent = '$' + Math.round(price);
+
+            // Position infobox - keep within chart bounds
+            var infoboxWidth = infobox.offsetWidth || 200;
+            var infoboxHeight = infobox.offsetHeight || 50;
+            var infoboxX = snapX + 10; // 10px to the right of crosshair
+            var infoboxY = y - infoboxHeight / 2; // Center vertically at data point
+
+            // Keep within horizontal bounds
+            if (infoboxX + infoboxWidth > w) {
+                infoboxX = snapX - infoboxWidth - 10; // Flip to left side
+            }
+            if (infoboxX < 0) {
+                infoboxX = 5;
+            }
+
+            // Keep within vertical bounds
+            if (infoboxY < 0) {
+                infoboxY = 5;
+            }
+            if (infoboxY + infoboxHeight > h) {
+                infoboxY = h - infoboxHeight - 5;
+            }
+
+            infobox.style.left = infoboxX + 'px';
+            infobox.style.top = infoboxY + 'px';
+            infobox.classList.add('is-active');
+        }
+
+        function hideCrosshair() {
+            crosshair.classList.remove('is-active');
+            infobox.classList.remove('is-active');
+        }
+
+        // Touch events (mobile)
+        chartArea.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                showCrosshair(e.touches[0].clientX);
+            }
+        }, { passive: false });
+
+        chartArea.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                showCrosshair(e.touches[0].clientX);
+            }
+        }, { passive: false });
+
+        chartArea.addEventListener('touchend', function(e) {
+            hideCrosshair();
+        });
+
+        chartArea.addEventListener('touchcancel', function(e) {
+            hideCrosshair();
+        });
+
+        // Mouse events (desktop)
+        chartArea.addEventListener('mouseenter', function(e) {
+            showCrosshair(e.clientX);
+        });
+
+        chartArea.addEventListener('mousemove', function(e) {
+            showCrosshair(e.clientX);
+        });
+
+        chartArea.addEventListener('mouseleave', function(e) {
+            hideCrosshair();
+        });
     }
 })();
 </script>

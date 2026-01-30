@@ -4765,6 +4765,7 @@ html:has(.edit-profile-page-body) {
     border-left: 2px solid #333;
     border-bottom: 2px solid #333;
     overflow: visible;
+    cursor: crosshair;
 }
 
 .detail-chart__grid {
@@ -4825,6 +4826,93 @@ html:has(.edit-profile-page-body) {
     border-right: 6px solid transparent;
     border-top: 12px solid #7EE0FF;
     margin-top: -2px;
+}
+
+/* Chart Touch Crosshair - Mobile only */
+.chart-crosshair {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: repeating-linear-gradient(
+        to bottom,
+        #666 0px,
+        #666 4px,
+        transparent 4px,
+        transparent 7px
+    );
+    border: none;
+    pointer-events: none;
+    z-index: 10;
+    display: none;
+}
+
+.chart-crosshair.is-active {
+    display: block;
+}
+
+/* Chart Infobox - floating info panel on crosshair */
+.chart-infobox {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px 10px;
+    pointer-events: none;
+    z-index: 15;
+    display: none;
+    min-width: 200px;
+    max-width: 260px;
+}
+
+.chart-infobox.is-active {
+    display: block;
+}
+
+.chart-infobox__time {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.chart-infobox__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: #555;
+}
+
+.chart-infobox__name {
+    flex-shrink: 0;
+}
+
+.chart-infobox__spec {
+    flex: 1;
+    text-align: center;
+    color: #888;
+    font-size: 11px;
+}
+
+.chart-infobox__price {
+    flex-shrink: 0;
+    font-weight: 600;
+    color: #333;
+    font-size: 13px;
+}
+
+.chart-crosshair__dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border: 2px solid #2196F3;
+    border-radius: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
 }
 
 .detail-chart__placeholder {
