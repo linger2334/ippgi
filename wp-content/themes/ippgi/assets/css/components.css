@@ -4657,7 +4657,8 @@ html:has(.edit-profile-page-body) {
     padding: var(--spacing-md);
     border: 2px solid #d7d7d7;
     border-radius: var(--radius-md);
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
 }
 
 .detail-chart__date-picker {
@@ -4754,8 +4755,7 @@ html:has(.edit-profile-page-body) {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    overflow-x: hidden;
-    overflow-y: visible;
+    overflow: visible;
 }
 
 .detail-chart__area {
