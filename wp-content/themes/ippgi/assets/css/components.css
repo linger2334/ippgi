@@ -4751,9 +4751,10 @@ html:has(.edit-profile-page-body) {
 
 .detail-chart__main {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    overflow: visible;
+    overflow: hidden;
 }
 
 .detail-chart__area {
@@ -4912,7 +4913,7 @@ html:has(.edit-profile-page-body) {
     }
 
     .detail-chart__x-axis {
-        margin-left: 43px;
+        margin-left: -10px;
     }
 
     .detail-chart__x-axis span {
