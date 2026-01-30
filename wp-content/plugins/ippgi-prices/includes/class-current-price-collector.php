@@ -304,13 +304,24 @@ class IPPGI_Prices_Current_Price_Collector {
             ? IPPGI_Prices_API_Client::CATEGORY_IDS[$material_type]
             : '';
 
-        // Get prices (note: API uses lastprice and lastpriceTax)
-        $price_cny = isset($item['lastprice']) ? floatval($item['lastprice']) : 0;
-        $price_tax_cny = isset($item['lastpriceTax']) ? floatval($item['lastpriceTax']) : 0;
+        // Get prices - IMPORTANT: Use _cny fields since lastprice has been converted to USD by API client
+        // The API client's convert_price_data() stores original CNY in lastprice_cny and changes lastprice to USD
+        $price_cny = isset($item['lastprice_cny']) ? floatval($item['lastprice_cny']) : 0;
+        $price_tax_cny = isset($item['lastpriceTax_cny']) ? floatval($item['lastpriceTax_cny']) : 0;
 
-        // Convert to USD
-        $price_usd = IPPGI_Prices_Currency_Converter::cny_to_usd($price_cny, $exchange_rate);
-        $price_tax_usd = IPPGI_Prices_Currency_Converter::cny_to_usd($price_tax_cny, $exchange_rate);
+        // If _cny fields don't exist (shouldn't happen but fallback), use the pre-converted USD values directly
+        if ($price_cny <= 0 && isset($item['lastprice_usd'])) {
+            // Data already converted, use USD values directly
+            $price_usd = floatval($item['lastprice_usd']);
+            $price_tax_usd = isset($item['lastpriceTax_usd']) ? floatval($item['lastpriceTax_usd']) : 0;
+            // Reverse calculate CNY from USD for storage
+            $price_cny = IPPGI_Prices_Currency_Converter::usd_to_cny($price_usd, $exchange_rate);
+            $price_tax_cny = IPPGI_Prices_Currency_Converter::usd_to_cny($price_tax_usd, $exchange_rate);
+        } else {
+            // Normal case: convert CNY to USD
+            $price_usd = IPPGI_Prices_Currency_Converter::cny_to_usd($price_cny, $exchange_rate);
+            $price_tax_usd = IPPGI_Prices_Currency_Converter::cny_to_usd($price_tax_cny, $exchange_rate);
+        }
 
         // Convert statistics_date to timestamp
         $timestamp = strtotime($statistics_date);
