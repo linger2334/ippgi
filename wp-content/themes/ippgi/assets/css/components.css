@@ -4754,7 +4754,8 @@ html:has(.edit-profile-page-body) {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: visible;
 }
 
 .detail-chart__area {
