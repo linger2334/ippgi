@@ -738,7 +738,7 @@ window.ippgiPriceDetail = {
 
     // Update X-axis labels based on data type
     function updateXAxisLabels(xAxisEl, list, isHistorical) {
-        var labelCount = 10; // Number of labels to show
+        var labelCount = 9; // Number of labels to show
         var labels = [];
 
         if (isHistorical && list.length > 0) {
@@ -762,8 +762,9 @@ window.ippgiPriceDetail = {
                 }
             }
         } else {
-            // For today's data, show times (09:00 - 18:00)
-            labels = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+            // For today's data, show fixed hourly time labels (09:00 - 17:00)
+            // 9 labels for 8-hour range, evenly distributed
+            labels = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
         }
 
         // Update DOM
