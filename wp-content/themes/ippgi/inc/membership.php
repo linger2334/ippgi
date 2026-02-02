@@ -999,8 +999,17 @@ function ippgi_get_stripe_next_billing_date($subscr_id) {
     $sub_data = json_decode(wp_remote_retrieve_body($response), true);
 
     // Get current_period_end (Unix timestamp)
+    // First try top-level (older API versions), then try items.data[0] (newer API versions)
+    $period_end = null;
+
     if (!empty($sub_data['current_period_end'])) {
-        return date('F j, Y', $sub_data['current_period_end']);
+        $period_end = $sub_data['current_period_end'];
+    } elseif (!empty($sub_data['items']['data'][0]['current_period_end'])) {
+        $period_end = $sub_data['items']['data'][0]['current_period_end'];
+    }
+
+    if ($period_end) {
+        return date('F j, Y', $period_end);
     }
 
     return null;
