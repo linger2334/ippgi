@@ -56,15 +56,32 @@ function ippgi_get_user_membership_level($user_id = null) {
 }
 
 /**
- * Check if user has Plus membership (Level 4)
+ * Check if user has Plus membership (Level 4) or active bonus access
  */
 function ippgi_user_has_plus($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
     $level = ippgi_get_user_membership_level($user_id);
 
     // SWPM Level 4 = Plus membership
     $plus_levels = ['plus', '4', 4];
 
-    return in_array($level, $plus_levels, true);
+    if (in_array($level, $plus_levels, true)) {
+        return true;
+    }
+
+    // Check for active bonus access
+    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    if ($bonus_active) {
+        $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+        if (!empty($end_date) && strtotime($end_date) > time()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -169,10 +186,41 @@ function ippgi_on_membership_level_change($member_id, $old_level, $new_level) {
     // Log the change
     error_log(sprintf('IPPGI: Member %d changed from level %s to %s', $member_id, $old_level, $new_level));
 
-    // If upgraded to Plus, send welcome email
-    $plus_levels = ['plus', 'plus_monthly', 'plus_yearly', '2'];
+    // Get WP user ID from SWPM member
+    global $wpdb;
+    $member = $wpdb->get_row($wpdb->prepare(
+        "SELECT user_name FROM {$wpdb->prefix}swpm_members_tbl WHERE member_id = %d",
+        $member_id
+    ));
+
+    if (!$member) {
+        return;
+    }
+
+    $wp_user = get_user_by('login', $member->user_name);
+    if (!$wp_user) {
+        return;
+    }
+
+    $user_id = $wp_user->ID;
+
+    // Plus level is 4
+    $plus_levels = ['4', 4];
+
+    // If upgraded to Plus, send welcome email and clear cancellation flag
     if (in_array($new_level, $plus_levels, true) && !in_array($old_level, $plus_levels, true)) {
         ippgi_send_plus_welcome_email($member_id);
+        delete_user_meta($user_id, 'ippgi_subscription_cancelled');
+        delete_user_meta($user_id, 'ippgi_subscription_cancelled_date');
+    }
+
+    // If downgraded from Plus (subscription expired), activate bonus days if available
+    if (in_array($old_level, $plus_levels, true) && !in_array($new_level, $plus_levels, true)) {
+        $bonus_days = ippgi_get_unused_bonus_days($user_id);
+        if ($bonus_days > 0) {
+            error_log(sprintf('IPPGI: User %d downgraded from Plus, activating %d bonus days', $user_id, $bonus_days));
+            ippgi_activate_bonus_access($user_id);
+        }
     }
 }
 
@@ -257,93 +305,263 @@ function ippgi_save_referral_cookie() {
 add_action('init', 'ippgi_save_referral_cookie');
 
 /**
- * Award referral bonus - extend Plus membership by specified days
+ * Award referral bonus - accumulate bonus days for user
+ *
+ * For subscription-based payments (PayPal/Stripe), we can't modify the billing dates.
+ * Instead, we accumulate bonus days that will be used AFTER the subscription ends/cancels.
+ *
+ * How it works:
+ * - Active subscription: Bonus days accumulate but don't affect billing
+ * - Active bonus access: Extend the current bonus period
+ * - Cancelled/expired subscription: Bonus days extend access beyond subscription end
+ * - Non-subscriber: Bonus days give temporary Plus access
  *
  * @param int $user_id The WordPress user ID of the referrer
  * @param int $bonus_days Number of days to add (default: 3)
  * @return bool True on success, false on failure
  */
 function ippgi_award_referral_bonus($user_id, $bonus_days = 3) {
-    if (!ippgi_is_swpm_active() || !class_exists('SwpmMemberUtils')) {
-        error_log('IPPGI: Cannot award referral bonus - SWPM not active');
-        return false;
-    }
-
-    // Get the WP user
     $wp_user = get_user_by('id', $user_id);
     if (!$wp_user) {
         error_log(sprintf('IPPGI: Cannot award referral bonus - WP user %d not found', $user_id));
         return false;
     }
 
-    // Get the SWPM member record
-    $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
-    if (!$swpm_member) {
-        error_log(sprintf('IPPGI: Cannot award referral bonus - SWPM member not found for user %s', $wp_user->user_login));
+    // Track the bonus award
+    ippgi_track_referral_bonus($user_id, $bonus_days, 'accumulated');
+
+    // Check current state
+    $has_active_subscription = ippgi_has_active_subscription($user_id);
+    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+
+    if ($has_active_subscription) {
+        // User has active subscription - just accumulate bonus days for later use
+        $current_bonus = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+        $new_bonus = $current_bonus + $bonus_days;
+        update_user_meta($user_id, 'ippgi_unused_bonus_days', $new_bonus);
+        error_log(sprintf('IPPGI: Awarded %d bonus days to user %d (accumulated). Total unused: %d days', $bonus_days, $user_id, $new_bonus));
+    } elseif ($bonus_active) {
+        // User already has bonus access - extend the current bonus period
+        $current_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+        $new_end = date('Y-m-d H:i:s', strtotime($current_end . " +{$bonus_days} days"));
+        update_user_meta($user_id, 'ippgi_bonus_access_end', $new_end);
+
+        // Reschedule expiration check
+        wp_clear_scheduled_hook('ippgi_check_bonus_access_expired', [$user_id]);
+        wp_schedule_single_event(strtotime($new_end), 'ippgi_check_bonus_access_expired', [$user_id]);
+
+        error_log(sprintf('IPPGI: Extended bonus access for user %d by %d days. New end: %s', $user_id, $bonus_days, $new_end));
+    } else {
+        // User has no active subscription and no bonus access - activate immediately
+        $current_bonus = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+        update_user_meta($user_id, 'ippgi_unused_bonus_days', $current_bonus + $bonus_days);
+        ippgi_activate_bonus_access($user_id);
+        error_log(sprintf('IPPGI: Activated %d bonus days for user %d', $bonus_days, $user_id));
+    }
+
+    return true;
+}
+
+/**
+ * Check if user has an active PayPal/Stripe subscription
+ *
+ * @param int $user_id User ID
+ * @return bool True if has active subscription
+ */
+function ippgi_has_active_subscription($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    if (!ippgi_is_swpm_active() || !class_exists('SwpmMemberUtils')) {
         return false;
     }
 
-    $member_id = $swpm_member->member_id;
-    $current_level = $swpm_member->membership_level;
-    $subscription_starts = $swpm_member->subscription_starts;
+    $wp_user = get_user_by('id', $user_id);
+    if (!$wp_user) {
+        return false;
+    }
 
-    // Define Plus level IDs (configure these based on your SWPM setup)
-    // Level 4 = Plus membership in SWPM
-    $plus_level_id = apply_filters('ippgi_plus_membership_level_id', 4);
+    $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
+    if (!$swpm_member) {
+        return false;
+    }
 
-    // Check if user already has Plus membership
-    if (ippgi_user_has_plus($user_id)) {
-        // User has Plus - extend their subscription
-        $new_start_date = ippgi_extend_subscription_date($subscription_starts, $bonus_days);
+    // Check if has subscription ID and is Plus level
+    if (empty($swpm_member->subscr_id) || $swpm_member->membership_level != 4) {
+        return false;
+    }
 
-        global $wpdb;
-        $result = $wpdb->update(
-            $wpdb->prefix . 'swpm_members_tbl',
-            ['subscription_starts' => $new_start_date],
-            ['member_id' => $member_id],
-            ['%s'],
-            ['%d']
-        );
+    // Check if subscription is not cancelled
+    $is_cancelled = get_user_meta($user_id, 'ippgi_subscription_cancelled', true);
+    if ($is_cancelled) {
+        return false;
+    }
 
-        if ($result !== false) {
-            // Track the bonus
-            ippgi_track_referral_bonus($user_id, $bonus_days, 'extended');
-            error_log(sprintf('IPPGI: Extended Plus membership for user %d by %d days. New start date: %s', $user_id, $bonus_days, $new_start_date));
-            return true;
-        }
-    } else {
-        // User doesn't have Plus - give them a temporary Plus upgrade
-        // Store their original level so we can restore it later if needed
-        update_user_meta($user_id, 'ippgi_original_membership_level', $current_level);
+    return true;
+}
 
-        // Set subscription start to today
-        $today = date('Y-m-d');
+/**
+ * Activate bonus access for user (upgrade to Plus temporarily using bonus days)
+ *
+ * @param int $user_id User ID
+ * @return bool True on success
+ */
+function ippgi_activate_bonus_access($user_id) {
+    $bonus_days = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+    if ($bonus_days <= 0) {
+        return false;
+    }
 
-        global $wpdb;
-        $result = $wpdb->update(
-            $wpdb->prefix . 'swpm_members_tbl',
-            [
-                'membership_level' => $plus_level_id,
-                'subscription_starts' => $today,
-            ],
-            ['member_id' => $member_id],
-            ['%s', '%s'],
-            ['%d']
-        );
+    // Set bonus access start and end dates
+    $start_date = current_time('mysql');
+    $end_date = date('Y-m-d H:i:s', strtotime("+{$bonus_days} days"));
 
-        if ($result !== false) {
-            // Schedule the downgrade after bonus days
-            $downgrade_time = strtotime("+{$bonus_days} days");
-            wp_schedule_single_event($downgrade_time, 'ippgi_referral_bonus_expired', [$user_id, $current_level]);
+    update_user_meta($user_id, 'ippgi_bonus_access_start', $start_date);
+    update_user_meta($user_id, 'ippgi_bonus_access_end', $end_date);
+    update_user_meta($user_id, 'ippgi_bonus_access_active', true);
 
-            // Track the bonus
-            ippgi_track_referral_bonus($user_id, $bonus_days, 'upgraded');
-            error_log(sprintf('IPPGI: Upgraded user %d to Plus for %d days', $user_id, $bonus_days));
-            return true;
+    // Clear unused bonus days (they're now being used)
+    update_user_meta($user_id, 'ippgi_unused_bonus_days', 0);
+
+    // Upgrade to Plus level in SWPM
+    if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
+        $wp_user = get_user_by('id', $user_id);
+        if ($wp_user) {
+            $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
+            if ($swpm_member) {
+                // Store original level for potential restoration
+                update_user_meta($user_id, 'ippgi_original_membership_level', $swpm_member->membership_level);
+
+                global $wpdb;
+                $wpdb->update(
+                    $wpdb->prefix . 'swpm_members_tbl',
+                    ['membership_level' => 4], // Plus level
+                    ['member_id' => $swpm_member->member_id],
+                    ['%d'],
+                    ['%d']
+                );
+            }
         }
     }
 
-    return false;
+    // Schedule access expiration check
+    wp_schedule_single_event(strtotime($end_date), 'ippgi_check_bonus_access_expired', [$user_id]);
+
+    error_log(sprintf('IPPGI: Activated bonus access for user %d until %s', $user_id, $end_date));
+    return true;
+}
+
+/**
+ * Check and handle bonus access expiration
+ *
+ * @param int $user_id User ID
+ */
+function ippgi_check_bonus_access_expired($user_id) {
+    $is_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    if (!$is_active) {
+        return;
+    }
+
+    $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+    if (empty($end_date) || strtotime($end_date) > time()) {
+        return; // Not expired yet
+    }
+
+    // Check if user now has active subscription (they might have subscribed during bonus period)
+    if (ippgi_has_active_subscription($user_id)) {
+        // Clear bonus access flags but don't downgrade
+        delete_user_meta($user_id, 'ippgi_bonus_access_active');
+        delete_user_meta($user_id, 'ippgi_bonus_access_start');
+        delete_user_meta($user_id, 'ippgi_bonus_access_end');
+        error_log(sprintf('IPPGI: User %d subscribed during bonus period, clearing bonus flags', $user_id));
+        return;
+    }
+
+    // Check if there are new accumulated bonus days (from referrals during bonus period)
+    $new_bonus_days = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+    if ($new_bonus_days > 0) {
+        // Extend bonus access with new days
+        $new_end = date('Y-m-d H:i:s', strtotime("+{$new_bonus_days} days"));
+        update_user_meta($user_id, 'ippgi_bonus_access_start', current_time('mysql'));
+        update_user_meta($user_id, 'ippgi_bonus_access_end', $new_end);
+        update_user_meta($user_id, 'ippgi_unused_bonus_days', 0);
+
+        // Schedule next expiration check
+        wp_schedule_single_event(strtotime($new_end), 'ippgi_check_bonus_access_expired', [$user_id]);
+
+        error_log(sprintf('IPPGI: User %d bonus extended with %d accumulated days until %s', $user_id, $new_bonus_days, $new_end));
+        return;
+    }
+
+    // No subscription, no new bonus days - downgrade user to original level
+    $original_level = get_user_meta($user_id, 'ippgi_original_membership_level', true);
+    if (empty($original_level)) {
+        $original_level = 2; // Default to Basic
+    }
+
+    if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
+        $wp_user = get_user_by('id', $user_id);
+        if ($wp_user) {
+            $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
+            if ($swpm_member) {
+                global $wpdb;
+                $wpdb->update(
+                    $wpdb->prefix . 'swpm_members_tbl',
+                    ['membership_level' => $original_level],
+                    ['member_id' => $swpm_member->member_id],
+                    ['%d'],
+                    ['%d']
+                );
+            }
+        }
+    }
+
+    // Clear bonus access flags
+    delete_user_meta($user_id, 'ippgi_bonus_access_active');
+    delete_user_meta($user_id, 'ippgi_bonus_access_start');
+    delete_user_meta($user_id, 'ippgi_bonus_access_end');
+    delete_user_meta($user_id, 'ippgi_original_membership_level');
+
+    error_log(sprintf('IPPGI: Bonus access expired for user %d, downgraded to level %d', $user_id, $original_level));
+}
+add_action('ippgi_check_bonus_access_expired', 'ippgi_check_bonus_access_expired');
+
+/**
+ * Get user's unused bonus days
+ *
+ * @param int $user_id User ID
+ * @return int Number of unused bonus days
+ */
+function ippgi_get_unused_bonus_days($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+    return (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+}
+
+/**
+ * Get user's bonus access end date (if currently using bonus access)
+ *
+ * @param int $user_id User ID
+ * @return string|null Formatted date or null
+ */
+function ippgi_get_bonus_access_end_date($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    $is_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    if (!$is_active) {
+        return null;
+    }
+
+    $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+    if (empty($end_date)) {
+        return null;
+    }
+
+    return date('F j, Y', strtotime($end_date));
 }
 
 /**
@@ -512,7 +730,7 @@ function ippgi_mask_email($email) {
 
 /**
  * Get user's subscription status
- * Returns one of: 'trial', 'active', 'cancelled', 'terminated'
+ * Returns one of: 'trial', 'active', 'cancelled', 'bonus', 'terminated'
  *
  * @param int $user_id User ID
  * @return string Subscription status
@@ -544,7 +762,21 @@ function ippgi_get_subscription_status($user_id = null) {
         return 'trial';
     }
 
-    // Check Plus status (Level 4)
+    // Check for bonus access first
+    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    if ($bonus_active) {
+        $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+        if (!empty($end_date) && strtotime($end_date) > time()) {
+            return 'bonus';
+        }
+    }
+
+    // Check for active subscription
+    if (ippgi_has_active_subscription($user_id)) {
+        return 'active';
+    }
+
+    // Check Plus status without active subscription (cancelled but not expired)
     if (ippgi_user_has_plus($user_id)) {
         // Check if subscription is cancelled
         $is_cancelled = ippgi_is_subscription_cancelled($user_id);
@@ -606,17 +838,196 @@ function ippgi_get_formatted_subscription_end_date($user_id = null) {
         $wp_user = get_user_by('id', $user_id);
         if ($wp_user) {
             $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
-            if ($swpm_member && !empty($swpm_member->subscription_starts)) {
-                // Calculate end date based on membership level duration
-                $start_date = $swpm_member->subscription_starts;
-                // Default to 1 year subscription for Plus, 7 days for Trial
-                $duration = ippgi_user_has_trial($user_id) ? '+7 days' : '+1 year';
-                return date('F j, Y', strtotime($start_date . ' ' . $duration));
+            if ($swpm_member && !empty($swpm_member->subscr_id)) {
+                // Try to get next billing date from PayPal/Stripe API
+                $next_billing_date = ippgi_get_subscription_next_billing_date($swpm_member->subscr_id, $swpm_member->member_id);
+                if ($next_billing_date) {
+                    return $next_billing_date;
+                }
             }
         }
     }
 
     return '';
+}
+
+/**
+ * Get next billing date from PayPal or Stripe API
+ *
+ * @param string $subscr_id Subscription ID
+ * @param int $member_id SWPM Member ID
+ * @return string|null Formatted date or null
+ */
+function ippgi_get_subscription_next_billing_date($subscr_id, $member_id) {
+    if (empty($subscr_id)) {
+        return null;
+    }
+
+    // Check cache first (cache for 1 hour)
+    $cache_key = 'ippgi_next_billing_' . md5($subscr_id);
+    $cached = get_transient($cache_key);
+    if ($cached !== false) {
+        return $cached;
+    }
+
+    // Determine if PayPal or Stripe subscription
+    // PayPal subscription IDs start with "I-"
+    // Stripe subscription IDs start with "sub_"
+    if (strpos($subscr_id, 'I-') === 0) {
+        $next_date = ippgi_get_paypal_next_billing_date($subscr_id);
+    } elseif (strpos($subscr_id, 'sub_') === 0) {
+        $next_date = ippgi_get_stripe_next_billing_date($subscr_id);
+    } else {
+        // Unknown subscription type, try to get from payment record
+        $next_date = ippgi_estimate_next_billing_date($member_id);
+    }
+
+    if ($next_date) {
+        set_transient($cache_key, $next_date, HOUR_IN_SECONDS);
+    }
+
+    return $next_date;
+}
+
+/**
+ * Get next billing date from PayPal Subscriptions API
+ *
+ * @param string $subscr_id PayPal Subscription ID
+ * @return string|null Formatted date or null
+ */
+function ippgi_get_paypal_next_billing_date($subscr_id) {
+    // Get PayPal API credentials from SWPM settings
+    $settings = get_option('swpm-settings');
+    $is_sandbox = !empty($settings['enable-sandbox-testing']);
+
+    $client_id = $is_sandbox
+        ? ($settings['paypal-sandbox-client-id'] ?? '')
+        : ($settings['paypal-live-client-id'] ?? '');
+    $client_secret = $is_sandbox
+        ? ($settings['paypal-sandbox-secret-key'] ?? '')
+        : ($settings['paypal-live-secret-key'] ?? '');
+
+    if (empty($client_id) || empty($client_secret)) {
+        return null;
+    }
+
+    // PayPal API base URL
+    $api_base = $is_sandbox
+        ? 'https://api-m.sandbox.paypal.com'
+        : 'https://api-m.paypal.com';
+
+    // Get access token
+    $token_response = wp_remote_post($api_base . '/v1/oauth2/token', [
+        'headers' => [
+            'Authorization' => 'Basic ' . base64_encode($client_id . ':' . $client_secret),
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ],
+        'body' => 'grant_type=client_credentials',
+        'timeout' => 30,
+    ]);
+
+    if (is_wp_error($token_response)) {
+        error_log('PayPal token error: ' . $token_response->get_error_message());
+        return null;
+    }
+
+    $token_data = json_decode(wp_remote_retrieve_body($token_response), true);
+    if (empty($token_data['access_token'])) {
+        error_log('PayPal token error: No access token');
+        return null;
+    }
+
+    // Get subscription details
+    $sub_response = wp_remote_get($api_base . '/v1/billing/subscriptions/' . $subscr_id, [
+        'headers' => [
+            'Authorization' => 'Bearer ' . $token_data['access_token'],
+            'Content-Type' => 'application/json',
+        ],
+        'timeout' => 30,
+    ]);
+
+    if (is_wp_error($sub_response)) {
+        error_log('PayPal subscription error: ' . $sub_response->get_error_message());
+        return null;
+    }
+
+    $sub_data = json_decode(wp_remote_retrieve_body($sub_response), true);
+
+    // Get next billing time
+    if (!empty($sub_data['billing_info']['next_billing_time'])) {
+        $next_billing_time = $sub_data['billing_info']['next_billing_time'];
+        // Format: 2024-02-02T00:00:00Z
+        $date = new DateTime($next_billing_time);
+        return $date->format('F j, Y');
+    }
+
+    return null;
+}
+
+/**
+ * Get next billing date from Stripe Subscriptions API
+ *
+ * @param string $subscr_id Stripe Subscription ID
+ * @return string|null Formatted date or null
+ */
+function ippgi_get_stripe_next_billing_date($subscr_id) {
+    // Get Stripe API key from SWPM settings
+    $settings = get_option('swpm-settings');
+    $is_sandbox = !empty($settings['enable-sandbox-testing']);
+
+    $secret_key = $is_sandbox
+        ? ($settings['stripe-test-secret-key'] ?? '')
+        : ($settings['stripe-live-secret-key'] ?? '');
+
+    if (empty($secret_key)) {
+        return null;
+    }
+
+    // Get subscription from Stripe API
+    $response = wp_remote_get('https://api.stripe.com/v1/subscriptions/' . $subscr_id, [
+        'headers' => [
+            'Authorization' => 'Bearer ' . $secret_key,
+        ],
+        'timeout' => 30,
+    ]);
+
+    if (is_wp_error($response)) {
+        error_log('Stripe subscription error: ' . $response->get_error_message());
+        return null;
+    }
+
+    $sub_data = json_decode(wp_remote_retrieve_body($response), true);
+
+    // Get current_period_end (Unix timestamp)
+    if (!empty($sub_data['current_period_end'])) {
+        return date('F j, Y', $sub_data['current_period_end']);
+    }
+
+    return null;
+}
+
+/**
+ * Estimate next billing date from payment record (fallback)
+ *
+ * @param int $member_id SWPM Member ID
+ * @return string|null Formatted date or null
+ */
+function ippgi_estimate_next_billing_date($member_id) {
+    global $wpdb;
+
+    $payment = $wpdb->get_row($wpdb->prepare(
+        "SELECT payment_amount, txn_date FROM {$wpdb->prefix}swpm_payments_tbl
+         WHERE member_id = %d ORDER BY id DESC LIMIT 1",
+        $member_id
+    ));
+
+    if ($payment && !empty($payment->txn_date)) {
+        // Estimate based on payment amount: $100 = yearly, $10 = monthly
+        $duration = ($payment->payment_amount >= 100) ? '+1 year' : '+1 month';
+        return date('F j, Y', strtotime($payment->txn_date . ' ' . $duration));
+    }
+
+    return null;
 }
 
 /**
@@ -698,18 +1109,175 @@ function ippgi_ajax_cancel_subscription() {
 
     $user_id = get_current_user_id();
 
-    // Set cancellation flag
+    // Get SWPM member to find subscription ID
+    if (!ippgi_is_swpm_active() || !class_exists('SwpmMemberUtils')) {
+        wp_send_json_error(['message' => __('Membership system not available.', 'ippgi')]);
+    }
+
+    $wp_user = get_user_by('id', $user_id);
+    if (!$wp_user) {
+        wp_send_json_error(['message' => __('User not found.', 'ippgi')]);
+    }
+
+    $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
+    if (!$swpm_member || empty($swpm_member->subscr_id)) {
+        wp_send_json_error(['message' => __('No active subscription found.', 'ippgi')]);
+    }
+
+    $subscr_id = $swpm_member->subscr_id;
+
+    // Cancel subscription via PayPal or Stripe API
+    if (strpos($subscr_id, 'I-') === 0) {
+        // PayPal subscription
+        $result = ippgi_cancel_paypal_subscription($subscr_id);
+    } elseif (strpos($subscr_id, 'sub_') === 0) {
+        // Stripe subscription
+        $result = ippgi_cancel_stripe_subscription($subscr_id);
+    } else {
+        wp_send_json_error(['message' => __('Unknown subscription type.', 'ippgi')]);
+    }
+
+    if (is_wp_error($result)) {
+        wp_send_json_error(['message' => $result->get_error_message()]);
+    }
+
+    // Set local cancellation flag
     update_user_meta($user_id, 'ippgi_subscription_cancelled', true);
     update_user_meta($user_id, 'ippgi_subscription_cancelled_date', current_time('mysql'));
 
+    // Clear next billing date cache
+    $cache_key = 'ippgi_next_billing_' . md5($subscr_id);
+    delete_transient($cache_key);
+
+    // Check if user has bonus days to activate after subscription ends
+    $bonus_days = ippgi_get_unused_bonus_days($user_id);
+    if ($bonus_days > 0) {
+        error_log(sprintf('IPPGI: User %d has %d bonus days that will be activated after subscription ends', $user_id, $bonus_days));
+    }
+
     // Log the cancellation
-    error_log(sprintf('IPPGI: User %d cancelled their subscription', $user_id));
+    error_log(sprintf('IPPGI: User %d cancelled their subscription %s', $user_id, $subscr_id));
 
     wp_send_json_success([
         'message' => __('Your subscription has been cancelled.', 'ippgi'),
     ]);
 }
 add_action('wp_ajax_ippgi_cancel_subscription', 'ippgi_ajax_cancel_subscription');
+
+/**
+ * Cancel PayPal subscription via API
+ *
+ * @param string $subscr_id PayPal Subscription ID
+ * @return true|WP_Error
+ */
+function ippgi_cancel_paypal_subscription($subscr_id) {
+    $settings = get_option('swpm-settings');
+    $is_sandbox = !empty($settings['enable-sandbox-testing']);
+
+    $client_id = $is_sandbox
+        ? ($settings['paypal-sandbox-client-id'] ?? '')
+        : ($settings['paypal-live-client-id'] ?? '');
+    $client_secret = $is_sandbox
+        ? ($settings['paypal-sandbox-secret-key'] ?? '')
+        : ($settings['paypal-live-secret-key'] ?? '');
+
+    if (empty($client_id) || empty($client_secret)) {
+        return new WP_Error('config_error', __('PayPal API credentials not configured.', 'ippgi'));
+    }
+
+    $api_base = $is_sandbox
+        ? 'https://api-m.sandbox.paypal.com'
+        : 'https://api-m.paypal.com';
+
+    // Get access token
+    $token_response = wp_remote_post($api_base . '/v1/oauth2/token', [
+        'headers' => [
+            'Authorization' => 'Basic ' . base64_encode($client_id . ':' . $client_secret),
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ],
+        'body' => 'grant_type=client_credentials',
+        'timeout' => 30,
+    ]);
+
+    if (is_wp_error($token_response)) {
+        return new WP_Error('api_error', __('Failed to connect to PayPal.', 'ippgi'));
+    }
+
+    $token_data = json_decode(wp_remote_retrieve_body($token_response), true);
+    if (empty($token_data['access_token'])) {
+        return new WP_Error('auth_error', __('Failed to authenticate with PayPal.', 'ippgi'));
+    }
+
+    // Cancel subscription
+    $cancel_response = wp_remote_post($api_base . '/v1/billing/subscriptions/' . $subscr_id . '/cancel', [
+        'headers' => [
+            'Authorization' => 'Bearer ' . $token_data['access_token'],
+            'Content-Type' => 'application/json',
+        ],
+        'body' => json_encode([
+            'reason' => 'Customer requested cancellation'
+        ]),
+        'timeout' => 30,
+    ]);
+
+    if (is_wp_error($cancel_response)) {
+        return new WP_Error('api_error', __('Failed to cancel subscription.', 'ippgi'));
+    }
+
+    $status_code = wp_remote_retrieve_response_code($cancel_response);
+    if ($status_code !== 204 && $status_code !== 200) {
+        $body = json_decode(wp_remote_retrieve_body($cancel_response), true);
+        $error_msg = $body['message'] ?? __('Failed to cancel subscription.', 'ippgi');
+        return new WP_Error('cancel_error', $error_msg);
+    }
+
+    return true;
+}
+
+/**
+ * Cancel Stripe subscription via API
+ *
+ * @param string $subscr_id Stripe Subscription ID
+ * @return true|WP_Error
+ */
+function ippgi_cancel_stripe_subscription($subscr_id) {
+    $settings = get_option('swpm-settings');
+    $is_sandbox = !empty($settings['enable-sandbox-testing']);
+
+    $secret_key = $is_sandbox
+        ? ($settings['stripe-test-secret-key'] ?? '')
+        : ($settings['stripe-live-secret-key'] ?? '');
+
+    if (empty($secret_key)) {
+        return new WP_Error('config_error', __('Stripe API key not configured.', 'ippgi'));
+    }
+
+    // Cancel subscription (cancel at period end to let user keep access until billing period ends)
+    $response = wp_remote_post('https://api.stripe.com/v1/subscriptions/' . $subscr_id, [
+        'headers' => [
+            'Authorization' => 'Bearer ' . $secret_key,
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ],
+        'body' => [
+            'cancel_at_period_end' => 'true',
+        ],
+        'timeout' => 30,
+    ]);
+
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', __('Failed to connect to Stripe.', 'ippgi'));
+    }
+
+    $status_code = wp_remote_retrieve_response_code($response);
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+
+    if ($status_code !== 200) {
+        $error_msg = $body['error']['message'] ?? __('Failed to cancel subscription.', 'ippgi');
+        return new WP_Error('cancel_error', $error_msg);
+    }
+
+    return true;
+}
 
 /**
  * Add Simple Membership settings notice

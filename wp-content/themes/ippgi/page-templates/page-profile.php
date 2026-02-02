@@ -81,12 +81,46 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                             <?php printf(esc_html__('Your trial period ends on %s', 'ippgi'), esc_html($subscription_end_date)); ?>
                         </p>
 
+                    <?php elseif ($subscription_status === 'bonus') : ?>
+                        <!-- Referral Bonus Access -->
+                        <?php $bonus_end_date = ippgi_get_bonus_access_end_date($current_user->ID); ?>
+                        <p class="profile-section__value"><?php esc_html_e('Referral Bonus', 'ippgi'); ?></p>
+                        <p class="profile-section__value">
+                            <?php printf(esc_html__('Your bonus access ends on %s', 'ippgi'), esc_html($bonus_end_date)); ?>
+                        </p>
+                        <p class="profile-section__hint">
+                            <?php esc_html_e('You are using bonus days earned from referrals. Subscribe to continue access after bonus expires.', 'ippgi'); ?>
+                        </p>
+                        <div class="profile-section__action">
+                            <a href="<?php echo esc_url(home_url('/subscribe')); ?>" class="profile-btn">
+                                <?php esc_html_e('Subscribe', 'ippgi'); ?>
+                                <span>&gt;</span>
+                            </a>
+                        </div>
+
                     <?php elseif ($subscription_status === 'active') : ?>
                         <!-- Active Subscription -->
                         <p class="profile-section__value"><?php esc_html_e('Active', 'ippgi'); ?></p>
                         <p class="profile-section__value">
-                            <?php printf(esc_html__('Your subscription ends on %s', 'ippgi'), esc_html($subscription_end_date)); ?>
+                            <?php printf(esc_html__('Next billing date: %s', 'ippgi'), esc_html($subscription_end_date)); ?>
                         </p>
+                        <?php
+                        // Show accumulated bonus days if any
+                        $unused_bonus = ippgi_get_unused_bonus_days($current_user->ID);
+                        if ($unused_bonus > 0) :
+                        ?>
+                        <p class="profile-section__bonus">
+                            <?php printf(
+                                esc_html(_n(
+                                    'Referral bonus: %d day available (will be used after subscription ends)',
+                                    'Referral bonus: %d days available (will be used after subscription ends)',
+                                    $unused_bonus,
+                                    'ippgi'
+                                )),
+                                $unused_bonus
+                            ); ?>
+                        </p>
+                        <?php endif; ?>
                         <div class="profile-section__action">
                             <a href="#" class="profile-btn" id="cancel-subscription-btn">
                                 <?php esc_html_e('Cancel Subscription', 'ippgi'); ?>
@@ -100,6 +134,23 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                         <p class="profile-section__value">
                             <?php printf(esc_html__('Your subscription ends on %s', 'ippgi'), esc_html($subscription_end_date)); ?>
                         </p>
+                        <?php
+                        // Show accumulated bonus days if any
+                        $unused_bonus = ippgi_get_unused_bonus_days($current_user->ID);
+                        if ($unused_bonus > 0) :
+                        ?>
+                        <p class="profile-section__bonus">
+                            <?php printf(
+                                esc_html(_n(
+                                    'Referral bonus: %d day available (will extend access after subscription ends)',
+                                    'Referral bonus: %d days available (will extend access after subscription ends)',
+                                    $unused_bonus,
+                                    'ippgi'
+                                )),
+                                $unused_bonus
+                            ); ?>
+                        </p>
+                        <?php endif; ?>
 
                     <?php else : ?>
                         <!-- Terminated / No subscription -->

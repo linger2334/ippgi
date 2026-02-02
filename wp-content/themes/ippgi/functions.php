@@ -142,3 +142,25 @@ add_action('template_redirect', function() {
         exit;
     }
 });
+
+/**
+ * Set PayPal SDK locale based on WordPress language setting
+ * This ensures PayPal buttons display in the same language as the site
+ */
+add_filter('swpm_generate_paypal_js_sdk_args', function($sdk_args) {
+    // Get WordPress locale (e.g., 'en_US', 'zh_CN', 'fr_FR')
+    $wp_locale = get_locale();
+
+    // PayPal SDK uses the same format, so we can use it directly
+    // Fallback to en_US if locale is not set
+    $sdk_args['locale'] = $wp_locale ?: 'en_US';
+
+    return $sdk_args;
+});
+
+/**
+ * Remove Stripe's default button CSS so we can use our own styling
+ */
+add_action('wp_enqueue_scripts', function() {
+    wp_deregister_style('swpm.stripe.style');
+}, 20);

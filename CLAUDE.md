@@ -14,6 +14,7 @@
 
 ## 会员系统
 - **插件**：Simple Membership Plugin
+- **支付方式**：PayPal 订阅 + Stripe 订阅（测试环境使用 Sandbox/Test 模式）
 - **会员等级配置**：
 
 | 等级 | SWPM Level ID | 说明 |
@@ -22,6 +23,82 @@
 | Basic | 2 | 免费注册用户，查看当天价格 |
 | Trial | 3 | 试用会员，查看完整历史数据和图表 |
 | Plus | 4 | 付费高级会员，查看完整历史数据、图表、数据导出 |
+
+### SWPM 支付按钮 ID
+
+| 按钮 | SWPM Button ID | 说明 |
+|-----|---------------|------|
+| PayPal Monthly | 123 | PayPal 月度订阅 |
+| PayPal Yearly | 124 | PayPal 年度订阅 |
+| Stripe Monthly | 126 | Stripe 月度订阅 |
+| Stripe Yearly | 127 | Stripe 年度订阅 |
+
+### 订阅价格
+- 月度：US$10.00/month
+- 年度：US$100.00/year
+
+### 订阅状态获取
+- 使用 PayPal/Stripe API 获取真实的下次扣款日期（`next_billing_time` / `current_period_end`）
+- PayPal：通过 OAuth2 认证调用 `/v1/billing/subscriptions/{id}` 获取 `billing_info.next_billing_time`
+- Stripe：通过 Secret Key 调用 `/v1/subscriptions/{id}` 获取 `current_period_end`
+- API 凭证从 SWPM 设置（`swpm-settings`）中读取
+- 缓存键：`ippgi_next_billing_` + `md5(subscr_id)`，缓存 1 小时
+- 订阅 ID 前缀判断类型：`I-` = PayPal，`sub_` = Stripe
+
+### 取消订阅功能
+用户可以从 Profile 页面取消订阅，系统会调用 PayPal/Stripe API 实际取消订阅。
+
+**前端流程**：
+1. 用户点击 "Cancel Subscription" 按钮
+2. 弹出确认对话框
+3. 确认后发送 AJAX 请求到 `ippgi_cancel_subscription` action
+4. 成功后页面刷新显示 "Cancelled" 状态
+
+**后端处理** (`ippgi_ajax_cancel_subscription`)：
+1. 验证用户登录状态和 nonce
+2. 获取 SWPM 会员的 `subscr_id`
+3. 根据订阅 ID 前缀判断类型并调用对应 API：
+   - `I-` 开头 → `ippgi_cancel_paypal_subscription()`
+   - `sub_` 开头 → `ippgi_cancel_stripe_subscription()`
+4. 设置本地取消标记（`ippgi_subscription_cancelled`）
+5. 清除下次扣款日期缓存
+6. 返回成功/失败响应
+
+**PayPal 取消 API** (`ippgi_cancel_paypal_subscription`)：
+```
+POST https://api-m.paypal.com/v1/billing/subscriptions/{id}/cancel
+Authorization: Bearer {access_token}
+Content-Type: application/json
+Body: {"reason": "Customer requested cancellation"}
+```
+- 先通过 OAuth2 获取 access_token（`/v1/oauth2/token`）
+- 成功返回 HTTP 204
+- 取消后用户可继续使用到当前计费周期结束
+
+**Stripe 取消 API** (`ippgi_cancel_stripe_subscription`)：
+```
+POST https://api.stripe.com/v1/subscriptions/{id}
+Authorization: Bearer {secret_key}
+Body: cancel_at_period_end=true
+```
+- 设置 `cancel_at_period_end=true` 而非立即取消
+- 用户可继续使用到当前计费周期结束
+- Stripe webhook 会在周期结束时通知 SWPM 降级用户
+
+**用户 Meta 字段**：
+| Meta Key | 说明 |
+|---------|------|
+| `ippgi_subscription_cancelled` | 是否已取消订阅（bool） |
+| `ippgi_subscription_cancelled_date` | 取消订阅的时间 |
+
+**相关函数**：
+- `ippgi_ajax_cancel_subscription()` - AJAX 处理函数
+- `ippgi_cancel_paypal_subscription($subscr_id)` - PayPal API 取消
+- `ippgi_cancel_stripe_subscription($subscr_id)` - Stripe API 取消
+
+**Webhook 配置**：
+- PayPal：SWPM 自动创建 webhook，无需手动配置
+- Stripe：需在 Stripe Dashboard 手动配置 webhook URL（SWPM 设置页面显示）
 
 ## 展示的原材料种类（6种）
 
@@ -138,25 +215,121 @@
 
 ### 功能说明
 - 用户邀请好友注册成功后，邀请者获得 **3 天 Plus 会员** 奖励
-- 如果邀请者已有 Plus 会员：延长到期时间
-- 如果邀请者没有 Plus 会员：临时升级为 Plus（3天后自动降级）
+- 由于使用 PayPal/Stripe 订阅模式，无法修改支付平台的扣款日期
+- 因此奖励天数**单独追踪**，在订阅结束后自动生效
+
+### 奖励天数机制
+
+**核心原则**：奖励天数不影响 PayPal/Stripe 扣款，而是在订阅结束后延长访问权限。
+
+| 用户状态 | 获得奖励时的行为 |
+|---------|---------------|
+| 有活跃订阅 | 奖励天数累积到 `ippgi_unused_bonus_days`，订阅结束后自动生效 |
+| 正在使用奖励天数 | 直接延长当前奖励到期日期 |
+| 无订阅、无奖励访问 | 立即激活奖励天数，临时升级为 Plus |
+
+**自动激活触发点**：
+1. **订阅到期**：SWPM 降级用户 → `ippgi_on_membership_level_change` 检测到从 Plus 降级 → 自动激活累积的奖励天数
+2. **获得新推荐奖励时**：`ippgi_award_referral_bonus` 检测到用户无活跃订阅 → 立即激活
+
+**奖励到期处理**（`ippgi_check_bonus_access_expired`）：
+- 如果用户已订阅 → 清除奖励标记，不降级
+- 如果有新累积的奖励天数 → 自动续期
+- 否则 → 降级到原始会员等级
+
+### 用户 Meta 字段
+
+| Meta Key | 说明 |
+|---------|------|
+| `ippgi_unused_bonus_days` | 未使用的累积奖励天数 |
+| `ippgi_bonus_access_active` | 是否正在使用奖励访问（bool） |
+| `ippgi_bonus_access_start` | 奖励访问开始时间 |
+| `ippgi_bonus_access_end` | 奖励访问到期时间 |
+| `ippgi_original_membership_level` | 激活奖励前的原始会员等级（到期后恢复） |
+| `ippgi_total_referral_bonus_days` | 历史累计获得的奖励天数 |
+| `ippgi_referral_bonuses` | 奖励历史记录数组 |
+| `ippgi_referral_count` | 推荐人数 |
+| `ippgi_invite_code` | 用户的邀请码 |
+| `ippgi_referred_by` | 推荐人的用户 ID |
+
+### Profile 页面订阅状态
+
+| 状态 | 说明 | 显示内容 |
+|-----|------|---------|
+| `trial` | 试用期 | 试用到期日期 |
+| `bonus` | 使用奖励天数 | 奖励到期日期 + 订阅按钮 |
+| `active` | 活跃订阅 | 下次扣款日期 + 累积奖励天数提示 + 取消订阅按钮 |
+| `cancelled` | 已取消（未到期） | 订阅结束日期 + 累积奖励天数提示 |
+| `terminated` | 已终止 | 订阅按钮 |
 
 ### 工作流程
 1. 用户访问 `/invite` 页面获取邀请链接
 2. 邀请链接格式：`https://yoursite.com/?ref=xxxxxxxx`
 3. 被邀请者点击链接，邀请码保存到 Cookie（30天有效）
 4. 被邀请者通过 SWPM 注册
-5. 系统自动奖励邀请者 3 天 Plus 会员
+5. 系统自动奖励邀请者 3 天 Plus 会员（累积或立即激活）
 
 ### 相关函数
 - `ippgi_get_user_invite_link()` - 生成邀请链接
 - `ippgi_save_referral_cookie()` - 保存邀请码到 Cookie
 - `ippgi_process_referral()` - 处理推荐逻辑
-- `ippgi_award_referral_bonus()` - 奖励 Plus 会员时间
-- `ippgi_get_user_referral_count()` - 获取推荐人数
-- `ippgi_get_user_total_bonus_days()` - 获取累计奖励天数
+- `ippgi_award_referral_bonus()` - 累积或激活奖励天数
+- `ippgi_has_active_subscription()` - 检查是否有活跃的 PayPal/Stripe 订阅
+- `ippgi_activate_bonus_access()` - 激活奖励天数为 Plus 访问权限
+- `ippgi_check_bonus_access_expired()` - 处理奖励到期（降级或续期）
+- `ippgi_get_unused_bonus_days()` - 获取未使用的奖励天数
+- `ippgi_get_bonus_access_end_date()` - 获取奖励访问到期日期
+- `ippgi_get_user_total_bonus_days()` - 获取历史累计奖励天数
 - `ippgi_get_invitation_history()` - 获取邀请历史记录
 - `ippgi_mask_email()` - 邮箱脱敏显示（如 `john***@gmail.com`）
+
+### 支付页面 UI 实现
+**模板文件**：`/page-templates/page-payment.php`
+
+**页面特点**：
+- 不使用 `get_header()` / `get_footer()`，使用自定义 HTML 结构（无站点头部/底部/升级提示）
+- 隐藏 WordPress admin bar
+
+**页面结构**：
+1. **渐变色头部**
+   - 副标题：`Subscribe to Plus`
+   - 大号价格：`US$10.00` + `/month`（根据 URL 参数动态显示）
+
+2. **白色卡片区域**
+   - **Contact Information**：显示当前用户邮箱（只读）
+   - **Payment Method**：单选按钮选择 PayPal 或 Credit Card（默认 PayPal）
+   - **SWPM 支付按钮区域**：根据选择的支付方式显示对应的 SWPM 按钮
+   - **Terms 文本**：订阅条款 + 链接（Terms & Conditions、Privacy Policy、Contact Us）
+
+**URL 参数**：
+- `?plan=monthly` - 月度订阅（默认）
+- `?plan=yearly` - 年度订阅
+
+**支付方式切换**：
+- JavaScript 监听 radio button change 事件
+- 切换 `#paypal-btn` 和 `#stripe-btn` 容器的显示/隐藏
+- 选中项添加 `payment-method--selected` 类
+
+**按钮样式定制**（`functions.php`）：
+- PayPal SDK 语言：通过 `swpm_generate_paypal_js_sdk_args` 过滤器设置 `locale` 为 WordPress 语言
+- Stripe 按钮文字：CSS 伪元素将 "Buy Now" 替换为 "Subscribe"
+- Stripe 默认样式：通过 `wp_deregister_style('swpm.stripe.style')` 移除
+- 所有按钮统一高度 45px
+
+**CSS 样式**：位于 `/assets/css/components.css`
+- `.payment-page-body` - 页面 body（隐藏 admin bar）
+- `.payment-header` - 渐变色头部
+- `.payment-card` - 白色卡片区域
+- `.payment-section` - 信息区块
+- `.payment-method` - 支付方式选项
+- `.payment-buttons-area` - SWPM 按钮容器
+- `.payment-terms` - 条款文本
+
+**注意事项**：
+- SWPM 支付按钮由 `[swpm_payment_button id="X"]` shortcode 渲染
+- PayPal 按钮由 PayPal SDK 动态生成，不支持程序化点击
+- 必须直接显示 SWPM 按钮容器，不能隐藏后模拟点击
+- SWPM 创建会员记录时使用 PayPal 邮箱，需确保 SWPM `user_name` 与 WordPress `user_login` 匹配
 
 ### 邀请页面 UI 实现
 **模板文件**：`/page-templates/page-invite.php`
@@ -697,6 +870,38 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
 - 客户端 TD 标签逻辑：北京时间 9:00 之前不请求数据；9:00 之后请求当天 00:00:00 ~ 当前时间的统计数据
 - Canvas 绘制价格走势图：X 轴为时间戳，Y 轴为价格（USD）
 - 时间范围标签（TD、1M、6M、1Y、2Y、3Y、4Y）支持点击切换，带滑动动画效果
+
+#### 17. 支付页面实现 ✅
+- 根据 Figma 设计稿重写 `/payment` 页面
+- 支持 PayPal 和 Stripe 两种订阅支付方式
+- 移除站点头部/底部，使用自定义页面结构
+- PayPal SDK 语言自动跟随 WordPress 语言设置
+- Stripe 按钮文字从 "Buy Now" 改为 "Subscribe"
+- 统一按钮样式（高度 45px）
+
+#### 18. 订阅状态与下次扣款日期 ✅
+- 从 PayPal/Stripe API 获取真实的下次扣款日期
+- PayPal：OAuth2 认证 → `/v1/billing/subscriptions/{id}` → `billing_info.next_billing_time`
+- Stripe：`/v1/subscriptions/{id}` → `current_period_end`
+- 缓存 1 小时避免频繁 API 调用
+- Profile 页面显示 "Next billing date" 而非固定期限
+
+#### 19. 邀请奖励系统重构 ✅
+- 由于 PayPal/Stripe 订阅模式无法修改扣款日期，重构为累积机制
+- 奖励天数单独追踪在 `ippgi_unused_bonus_days` 用户 meta
+- 有活跃订阅时：奖励累积，订阅到期后自动激活
+- 无订阅时：立即激活奖励天数
+- 正在使用奖励时：直接延长奖励到期日期
+- 奖励到期时：检查新累积天数自动续期，否则降级
+- Profile 页面显示 bonus 状态和累积奖励天数
+
+#### 20. 取消订阅功能 ✅
+- Profile 页面添加 "Cancel Subscription" 按钮（带确认对话框）
+- 调用 PayPal API `/v1/billing/subscriptions/{id}/cancel` 取消 PayPal 订阅
+- 调用 Stripe API 设置 `cancel_at_period_end=true` 取消 Stripe 订阅
+- 取消后用户可继续使用到当前计费周期结束
+- 设置本地取消标记并清除缓存
+- 取消后如有累积奖励天数，订阅到期时自动激活
 
 ---
 
