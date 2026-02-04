@@ -181,10 +181,22 @@ add_shortcode('ippgi_protected', 'ippgi_protected_content_shortcode');
 
 /**
  * Handle membership level change
+ *
+ * SWPM passes a single array argument with keys: member_id, from_level, to_level
  */
-function ippgi_on_membership_level_change($member_id, $old_level, $new_level) {
+function ippgi_on_membership_level_change($args) {
+    // Extract values from SWPM's array argument
+    $member_id = isset($args['member_id']) ? intval($args['member_id']) : 0;
+    $old_level = isset($args['from_level']) ? $args['from_level'] : '';
+    $new_level = isset($args['to_level']) ? $args['to_level'] : '';
+
     // Log the change
     error_log(sprintf('IPPGI: Member %d changed from level %s to %s', $member_id, $old_level, $new_level));
+
+    if (empty($member_id)) {
+        error_log('IPPGI: Invalid member_id in membership level change hook');
+        return;
+    }
 
     // Get WP user ID from SWPM member
     global $wpdb;
@@ -241,8 +253,8 @@ function ippgi_register_swpm_hooks() {
         return;
     }
 
-    // Hook into membership level change
-    add_action('swpm_membership_level_changed', 'ippgi_on_membership_level_change', 10, 3);
+    // Hook into membership level change (SWPM passes single array argument)
+    add_action('swpm_membership_level_changed', 'ippgi_on_membership_level_change', 10, 1);
 
     // Hook into registration complete
     add_action('swpm_registration_complete', 'ippgi_on_swpm_registration', 10, 1);

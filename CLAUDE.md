@@ -903,6 +903,12 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
 - 设置本地取消标记并清除缓存
 - 取消后如有累积奖励天数，订阅到期时自动激活
 
+#### 21. Stripe 订阅日期获取修复 ✅
+- 修复 `ippgi_get_stripe_next_billing_date()` 函数无法获取下次扣款日期的问题
+- 原因：Stripe API 返回的 `current_period_end` 在 `items.data[0]` 中，而非顶层
+- 修复：同时检查顶层和 `items.data[0].current_period_end` 两个位置
+- Profile 页面现在可以正确显示 Stripe 订阅的 Next billing date
+
 ---
 
 ### Phase 2 - 待实现
