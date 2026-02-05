@@ -520,7 +520,7 @@ ippgiToast.show('消息内容', 'success', 5000);
 
 **显示逻辑**（定义在 `footer.php`）：
 ```php
-if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
+if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe')) {
     get_template_part('template-parts/upgrade-prompt');
 }
 ```
@@ -533,8 +533,9 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
 | Basic 会员（Level 2） | ✅ 显示 |
 | Trial 会员（Level 3） | ✅ 显示 |
 | Plus 会员（Level 4） | ❌ 不显示 |
+| 订阅页面（subscribe） | ❌ 不显示 |
 
-**说明**：`ippgi_is_user_subscribed()` 函数只检查 Plus 会员，Trial 会员不被视为"已订阅"，因此也会显示升级提示。
+**说明**：`ippgi_is_user_subscribed()` 函数只检查 Plus 会员，Trial 会员不被视为"已订阅"，因此也会显示升级提示。订阅页面本身已包含订阅相关内容，无需重复显示升级提示。
 
 **功能**：
 - 点击 × 按钮可关闭

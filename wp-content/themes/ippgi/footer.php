@@ -82,8 +82,8 @@ if (!is_user_logged_in()) {
 ?>
 
 <?php
-// Show upgrade prompt for non-subscribed logged-in users
-if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
+// Show upgrade prompt for non-subscribed logged-in users (except on subscribe page)
+if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe')) {
     get_template_part('template-parts/upgrade-prompt');
 }
 ?>
