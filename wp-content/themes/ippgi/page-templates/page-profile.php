@@ -319,6 +319,11 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
 
         // Confirm cancellation
         modalConfirmBtn.addEventListener('click', function() {
+            // Prevent multiple clicks
+            if (modalConfirmBtn.disabled) return;
+            modalConfirmBtn.disabled = true;
+            modalConfirmBtn.textContent = '<?php echo esc_js(__('Cancelling...', 'ippgi')); ?>';
+
             const formData = new FormData();
             formData.append('action', 'ippgi_cancel_subscription');
             formData.append('nonce', '<?php echo wp_create_nonce('ippgi_cancel_subscription'); ?>');
@@ -333,11 +338,15 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                     location.reload();
                 } else {
                     alert(data.data?.message || '<?php echo esc_js(__('Failed to cancel subscription. Please try again.', 'ippgi')); ?>');
+                    modalConfirmBtn.disabled = false;
+                    modalConfirmBtn.textContent = '<?php echo esc_js(__('Confirm', 'ippgi')); ?>';
                     cancelModal.style.display = 'none';
                 }
             })
             .catch(error => {
                 alert('<?php echo esc_js(__('An error occurred. Please try again.', 'ippgi')); ?>');
+                modalConfirmBtn.disabled = false;
+                modalConfirmBtn.textContent = '<?php echo esc_js(__('Confirm', 'ippgi')); ?>';
                 cancelModal.style.display = 'none';
             });
         });
