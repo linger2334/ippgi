@@ -51,8 +51,9 @@
 **前端流程**：
 1. 用户点击 "Cancel Subscription" 按钮
 2. 弹出确认对话框
-3. 确认后发送 AJAX 请求到 `ippgi_cancel_subscription` action
-4. 成功后页面刷新显示 "Cancelled" 状态
+3. 点击确认后按钮禁用并显示 "Cancelling..."（防止重复点击）
+4. 发送 AJAX 请求到 `ippgi_cancel_subscription` action
+5. 成功后页面刷新显示 "Cancelled" 状态；失败时恢复按钮状态
 
 **后端处理** (`ippgi_ajax_cancel_subscription`)：
 1. 验证用户登录状态和 nonce
@@ -971,6 +972,10 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 #### 25. 订阅页面隐藏升级提示 ✅
 - subscribe 页面不再显示升级提示 Banner（页面本身已包含订阅信息）
 - `footer.php` 增加 `!is_page('subscribe')` 条件判断
+
+#### 26. 取消订阅防重复点击 ✅
+- 点击确认按钮后立即禁用，文字变为 "Cancelling..."
+- 请求失败时恢复按钮状态允许重试
 
 ---
 

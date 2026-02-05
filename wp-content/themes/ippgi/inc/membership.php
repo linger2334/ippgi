@@ -262,8 +262,105 @@ function ippgi_register_swpm_hooks() {
 
     // Hook into registration complete
     add_action('swpm_registration_complete', 'ippgi_on_swpm_registration', 10, 1);
+
+    // Hook into subscription cancelled (triggered by Stripe/PayPal webhook when subscription expires)
+    add_action('swpm_subscription_payment_cancelled', 'ippgi_on_subscription_cancelled', 10, 1);
+
+    // Hook into payment processed (for debugging - triggered when any payment is processed)
+    add_action('swpm_payment_ipn_processed', 'ippgi_on_payment_processed', 10, 1);
+    add_action('swpm_stripe_ipn_processed', 'ippgi_on_stripe_payment_processed', 10, 1);
 }
 add_action('init', 'ippgi_register_swpm_hooks');
+
+/**
+ * Debug: Log when any payment is processed
+ */
+function ippgi_on_payment_processed($ipn_data) {
+    error_log('IPPGI: swpm_payment_ipn_processed triggered');
+    error_log('IPPGI: Payment IPN data: ' . print_r($ipn_data, true));
+}
+
+/**
+ * Debug: Log when Stripe payment is processed
+ */
+function ippgi_on_stripe_payment_processed($ipn_data) {
+    error_log('IPPGI: swpm_stripe_ipn_processed triggered');
+    error_log('IPPGI: Stripe IPN data: ' . print_r($ipn_data, true));
+}
+
+/**
+ * Handle subscription cancelled (from Stripe/PayPal webhook)
+ *
+ * This is triggered when SWPM receives a subscription cancellation webhook.
+ * We need to downgrade the user and activate bonus days if available.
+ *
+ * @param array $ipn_data IPN data from payment gateway
+ */
+function ippgi_on_subscription_cancelled($ipn_data) {
+    error_log('IPPGI: swpm_subscription_payment_cancelled triggered');
+    error_log('IPPGI: IPN data: ' . print_r($ipn_data, true));
+
+    // Try to get member info from IPN data
+    $subscr_id = isset($ipn_data['subscr_id']) ? $ipn_data['subscr_id'] : '';
+    $member_id = isset($ipn_data['member_id']) ? intval($ipn_data['member_id']) : 0;
+
+    if (empty($subscr_id) && empty($member_id)) {
+        error_log('IPPGI: No subscr_id or member_id in IPN data');
+        return;
+    }
+
+    // Find member by subscr_id if member_id not provided
+    if (empty($member_id) && !empty($subscr_id)) {
+        global $wpdb;
+        $member = $wpdb->get_row($wpdb->prepare(
+            "SELECT member_id, user_name FROM {$wpdb->prefix}swpm_members_tbl WHERE subscr_id = %s",
+            $subscr_id
+        ));
+        if ($member) {
+            $member_id = $member->member_id;
+        }
+    }
+
+    if (empty($member_id)) {
+        error_log('IPPGI: Could not find member for subscription cancellation');
+        return;
+    }
+
+    // Get WP user
+    global $wpdb;
+    $member = $wpdb->get_row($wpdb->prepare(
+        "SELECT user_name, membership_level FROM {$wpdb->prefix}swpm_members_tbl WHERE member_id = %d",
+        $member_id
+    ));
+
+    if (!$member) {
+        error_log('IPPGI: Member not found: ' . $member_id);
+        return;
+    }
+
+    $wp_user = get_user_by('login', $member->user_name);
+    if (!$wp_user) {
+        error_log('IPPGI: WP user not found for: ' . $member->user_name);
+        return;
+    }
+
+    $user_id = $wp_user->ID;
+    error_log(sprintf('IPPGI: Processing subscription cancellation for user %d (member %d)', $user_id, $member_id));
+
+    // Check if user has bonus days to activate
+    $bonus_days = ippgi_get_unused_bonus_days($user_id);
+    if ($bonus_days > 0) {
+        error_log(sprintf('IPPGI: User %d has %d bonus days, activating', $user_id, $bonus_days));
+        ippgi_activate_bonus_access($user_id);
+    }
+
+    // Clear subscription-related meta
+    delete_user_meta($user_id, 'ippgi_subscription_cancelled');
+    delete_user_meta($user_id, 'ippgi_subscription_cancelled_date');
+    delete_user_meta($user_id, 'ippgi_subscription_end_date');
+
+    error_log(sprintf('IPPGI: Subscription cancellation processed for user %d', $user_id));
+}
 
 /**
  * Handle new SWPM registration
