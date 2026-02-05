@@ -224,6 +224,7 @@ function ippgi_on_membership_level_change($args) {
         ippgi_send_plus_welcome_email($member_id);
         delete_user_meta($user_id, 'ippgi_subscription_cancelled');
         delete_user_meta($user_id, 'ippgi_subscription_cancelled_date');
+        delete_user_meta($user_id, 'ippgi_subscription_end_date');
 
         // Set flag for showing payment success toast on next page load
         update_user_meta($user_id, 'ippgi_payment_just_completed', true);
@@ -849,6 +850,12 @@ function ippgi_get_formatted_subscription_end_date($user_id = null) {
         return date('F j, Y', strtotime('+30 days'));
     }
 
+    // Check stored end date first (saved when subscription was cancelled)
+    $stored_end_date = get_user_meta($user_id, 'ippgi_subscription_end_date', true);
+    if (!empty($stored_end_date)) {
+        return $stored_end_date;
+    }
+
     if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
         $wp_user = get_user_by('id', $user_id);
         if ($wp_user) {
@@ -1149,6 +1156,12 @@ function ippgi_ajax_cancel_subscription() {
     }
 
     $subscr_id = $swpm_member->subscr_id;
+
+    // Save subscription end date BEFORE cancelling (API may not return it after cancellation)
+    $end_date = ippgi_get_subscription_next_billing_date($subscr_id, $swpm_member->member_id);
+    if ($end_date) {
+        update_user_meta($user_id, 'ippgi_subscription_end_date', $end_date);
+    }
 
     // Cancel subscription via PayPal or Stripe API
     if (strpos($subscr_id, 'I-') === 0) {

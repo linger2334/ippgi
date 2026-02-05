@@ -57,12 +57,13 @@
 **后端处理** (`ippgi_ajax_cancel_subscription`)：
 1. 验证用户登录状态和 nonce
 2. 获取 SWPM 会员的 `subscr_id`
-3. 根据订阅 ID 前缀判断类型并调用对应 API：
+3. 保存订阅结束日期到 `ippgi_subscription_end_date`（取消后 API 可能不再返回）
+4. 根据订阅 ID 前缀判断类型并调用对应 API：
    - `I-` 开头 → `ippgi_cancel_paypal_subscription()`
    - `sub_` 开头 → `ippgi_cancel_stripe_subscription()`
-4. 设置本地取消标记（`ippgi_subscription_cancelled`）
-5. 清除下次扣款日期缓存
-6. 返回成功/失败响应
+5. 设置本地取消标记（`ippgi_subscription_cancelled`）
+6. 清除下次扣款日期缓存
+7. 返回成功/失败响应
 
 **PayPal 取消 API** (`ippgi_cancel_paypal_subscription`)：
 ```
@@ -90,6 +91,7 @@ Body: cancel_at_period_end=true
 |---------|------|
 | `ippgi_subscription_cancelled` | 是否已取消订阅（bool） |
 | `ippgi_subscription_cancelled_date` | 取消订阅的时间 |
+| `ippgi_subscription_end_date` | 取消时保存的订阅结束日期（格式化字符串，重新订阅时清除） |
 | `ippgi_payment_just_completed` | 支付刚完成标记，用于显示成功模态框（一次性） |
 
 **相关函数**：
@@ -958,6 +960,17 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - `functions.php`：`wp_footer` hook 输出模态框 HTML 和 JavaScript
 - `components.css`：模态框样式（`.payment-success-*` 类）
 - `membership.php`：`ippgi_on_membership_level_change()` 设置 meta 标记
+
+#### 24. 取消订阅结束日期修复 ✅
+- 修复取消订阅后 Profile 页面 "Your subscription ends on" 后面日期为空的问题
+- 原因：取消后清除了缓存，PayPal API 取消后可能不再返回 `next_billing_time`
+- 修复：取消前先保存结束日期到 `ippgi_subscription_end_date` user meta
+- `ippgi_get_formatted_subscription_end_date()` 优先读取存储的 meta，再从 API 获取
+- 重新订阅时（`ippgi_on_membership_level_change` 升级到 Plus）清除 `ippgi_subscription_end_date`
+
+#### 25. 订阅页面隐藏升级提示 ✅
+- subscribe 页面不再显示升级提示 Banner（页面本身已包含订阅信息）
+- `footer.php` 增加 `!is_page('subscribe')` 条件判断
 
 ---
 
