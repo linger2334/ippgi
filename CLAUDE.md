@@ -90,11 +90,42 @@ Body: cancel_at_period_end=true
 |---------|------|
 | `ippgi_subscription_cancelled` | 是否已取消订阅（bool） |
 | `ippgi_subscription_cancelled_date` | 取消订阅的时间 |
+| `ippgi_payment_just_completed` | 支付刚完成标记，用于显示成功模态框（一次性） |
 
 **相关函数**：
 - `ippgi_ajax_cancel_subscription()` - AJAX 处理函数
 - `ippgi_cancel_paypal_subscription($subscr_id)` - PayPal API 取消
 - `ippgi_cancel_stripe_subscription($subscr_id)` - Stripe API 取消
+
+### 支付成功提示
+当用户完成 PayPal/Stripe 订阅支付后，返回网站首页会显示成功模态框。
+
+**实现机制**：
+1. SWPM 处理支付完成后触发 `swpm_membership_level_changed` hook
+2. `ippgi_on_membership_level_change()` 检测到升级到 Plus，设置 `ippgi_payment_just_completed` user meta
+3. 用户被重定向到 Return URL（首页）
+4. `wp_footer` hook 检测到该 meta，显示成功模态框并删除 meta（一次性）
+
+**模态框 UI**（基于 Figma 设计稿）：
+- 半透明深色遮罩层（`rgba(0, 0, 0, 0.5)`）
+- 白色渐变卡片（从天蓝 `#7ecde8` 到白色 55%），圆角 16px
+- 绿色圆形打钩图标（30px，`#6abf40`，笔划宽度 5px）
+- 标题："You're all set!"（21px，深灰色 `#5e6b71`）
+- 描述："Subscription successful! / Full access to all pricing data."（15px，`#515557`，左对齐）
+- 蓝色按钮："Continue to iPPGI"（`#1e98d7`，圆角 13px）
+- 点击按钮关闭模态框
+
+**CSS 类**：位于 `/assets/css/components.css`
+- `.payment-success-overlay` - 全屏遮罩层
+- `.payment-success-card` - 居中卡片
+- `.payment-success-card__icon` - 打钩图标
+- `.payment-success-card__title` - 标题
+- `.payment-success-card__desc` - 描述文字
+- `.payment-success-card__btn` - 按钮
+
+**注意**：
+- SWPM 的 `swpm_membership_level_changed` action 传递**单个数组参数**（包含 `member_id`、`from_level`、`to_level`），而非 3 个独立参数
+- Toast 组件 `ippgiToast` 仍保留用于其他功能（收藏、复制链接等）
 
 **Webhook 配置**：
 - PayPal：SWPM 自动创建 webhook，无需手动配置
@@ -908,6 +939,24 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed()) {
 - 原因：Stripe API 返回的 `current_period_end` 在 `items.data[0]` 中，而非顶层
 - 修复：同时检查顶层和 `items.data[0].current_period_end` 两个位置
 - Profile 页面现在可以正确显示 Stripe 订阅的 Next billing date
+
+#### 22. SWPM Hook 参数格式修复 ✅
+- 修复 PayPal 订阅支付成功后 `admin-ajax.php` 返回 500 错误的问题
+- 原因：SWPM 的 `swpm_membership_level_changed` action 传递**单个数组参数**（`array('member_id' => ..., 'from_level' => ..., 'to_level' => ...)`），但 `ippgi_on_membership_level_change()` 函数期望 3 个独立参数
+- 修复：函数签名改为接收单个 `$args` 数组，从中提取 `member_id`、`from_level`、`to_level`
+- `add_action` 注册从 `10, 3` 改为 `10, 1`
+
+#### 23. 支付成功提示模态框 ✅
+- 服务端检测机制：升级到 Plus 时设置 `ippgi_payment_just_completed` user meta
+- 在 `wp_footer` 中检测该 meta 并清除（一次性标记）
+- 根据 Figma 设计稿实现模态框 UI，替换原有 Toast 提示
+- 模态框组件：半透明遮罩 + 白色渐变卡片 + 绿色打钩图标 + 标题/描述 + 蓝色按钮
+- CSS 样式：`.payment-success-overlay`、`.payment-success-card` 等
+
+**代码位置**：
+- `functions.php`：`wp_footer` hook 输出模态框 HTML 和 JavaScript
+- `components.css`：模态框样式（`.payment-success-*` 类）
+- `membership.php`：`ippgi_on_membership_level_change()` 设置 meta 标记
 
 ---
 

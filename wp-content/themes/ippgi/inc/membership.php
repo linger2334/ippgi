@@ -224,6 +224,9 @@ function ippgi_on_membership_level_change($args) {
         ippgi_send_plus_welcome_email($member_id);
         delete_user_meta($user_id, 'ippgi_subscription_cancelled');
         delete_user_meta($user_id, 'ippgi_subscription_cancelled_date');
+
+        // Set flag for showing payment success toast on next page load
+        update_user_meta($user_id, 'ippgi_payment_just_completed', true);
     }
 
     // If downgraded from Plus (subscription expired), activate bonus days if available

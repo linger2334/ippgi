@@ -164,3 +164,50 @@ add_filter('swpm_generate_paypal_js_sdk_args', function($sdk_args) {
 add_action('wp_enqueue_scripts', function() {
     wp_deregister_style('swpm.stripe.style');
 }, 20);
+
+/**
+ * Detect payment success return and show success modal
+ *
+ * Uses a user meta flag set by ippgi_on_membership_level_change() when user upgrades to Plus.
+ * The flag is checked on page load and cleared after showing the modal (one-time).
+ */
+add_action('wp_footer', function() {
+    if (!is_user_logged_in()) {
+        return;
+    }
+
+    $user_id = get_current_user_id();
+    $payment_success = get_user_meta($user_id, 'ippgi_payment_just_completed', true);
+
+    if (!$payment_success) {
+        return;
+    }
+
+    // Clear the flag so it only shows once
+    delete_user_meta($user_id, 'ippgi_payment_just_completed');
+    ?>
+    <div class="payment-success-overlay" id="payment-success-modal">
+        <div class="payment-success-card">
+            <div class="payment-success-card__icon">
+                <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+                    <circle cx="15" cy="15" r="15" fill="#6abf40"/>
+                    <polyline points="9,15 13,20 21,10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h2 class="payment-success-card__title"><?php esc_html_e("You're all set!", 'ippgi'); ?></h2>
+            <p class="payment-success-card__desc">
+                <?php esc_html_e('Subscription successful!', 'ippgi'); ?><br>
+                <?php esc_html_e('Full access to all pricing data.', 'ippgi'); ?>
+            </p>
+            <button type="button" class="payment-success-card__btn" id="payment-success-continue">
+                <?php esc_html_e('Continue to iPPGI', 'ippgi'); ?>
+            </button>
+        </div>
+    </div>
+    <script>
+    document.getElementById('payment-success-continue').addEventListener('click', function() {
+        document.getElementById('payment-success-modal').style.display = 'none';
+    });
+    </script>
+    <?php
+}, 99);

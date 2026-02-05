@@ -3433,6 +3433,73 @@ html:has(.edit-profile-page-body) {
     color: #f44336;
 }
 
+/* Payment Success Modal */
+.payment-success-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+}
+
+.payment-success-card {
+    background: linear-gradient(180deg, #7ecde8 0%, #fff 55%);
+    border-radius: 16px;
+    padding: 24px 32px 20px;
+    text-align: center;
+    width: 80%;
+    max-width: 300px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.payment-success-card__icon {
+    margin-bottom: 12px;
+}
+
+.payment-success-card__icon svg {
+    display: block;
+    margin: 0 auto;
+}
+
+.payment-success-card__title {
+    font-size: 21px;
+    font-weight: 400;
+    color: #5e6b71;
+    margin: 0 0 8px;
+}
+
+.payment-success-card__desc {
+    font-size: 15px;
+    font-weight: 400;
+    color: #515557;
+    line-height: 1.3;
+    margin: 0 0 16px;
+    text-align: left;
+}
+
+.payment-success-card__btn {
+    display: block;
+    width: 100%;
+    padding: 12px 24px;
+    background: #1e98d7;
+    color: #cae6f5;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    border-radius: 13px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.payment-success-card__btn:hover {
+    background: #1885be;
+}
+
 /* Modal Dialog */
 .modal-overlay {
     position: fixed;
