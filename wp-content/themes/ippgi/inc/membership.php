@@ -1266,8 +1266,9 @@ function ippgi_get_paypal_next_billing_date($subscr_id) {
     // Get next billing time (may not exist after cancellation)
     if (!empty($sub_data['billing_info']['next_billing_time'])) {
         $next_billing_time = $sub_data['billing_info']['next_billing_time'];
-        // Format: 2024-02-02T00:00:00Z
+        // Format: 2024-02-02T00:00:00Z (UTC)
         $date = new DateTime($next_billing_time);
+        $date->setTimezone(wp_timezone()); // Convert to site timezone (UTC+8)
         return $date->format('F j, Y');
     }
 
@@ -1275,6 +1276,7 @@ function ippgi_get_paypal_next_billing_date($subscr_id) {
     if (!empty($sub_data['billing_info']['last_payment']['time'])) {
         $last_payment_time = $sub_data['billing_info']['last_payment']['time'];
         $date = new DateTime($last_payment_time);
+        $date->setTimezone(wp_timezone()); // Convert to site timezone (UTC+8)
 
         // Determine billing cycle from plan (monthly or yearly)
         // Check the billing cycle tenure_type or interval_unit
@@ -1357,7 +1359,10 @@ function ippgi_get_stripe_next_billing_date($subscr_id) {
     }
 
     if ($period_end) {
-        return date('F j, Y', $period_end);
+        // Stripe returns Unix timestamp (UTC), convert to site timezone
+        $date = new DateTime('@' . $period_end);
+        $date->setTimezone(wp_timezone()); // Convert to site timezone (UTC+8)
+        return $date->format('F j, Y');
     }
 
     return null;
@@ -1381,7 +1386,10 @@ function ippgi_estimate_next_billing_date($member_id) {
     if ($payment && !empty($payment->txn_date)) {
         // Estimate based on payment amount: $100 = yearly, $10 = monthly
         $duration = ($payment->payment_amount >= 100) ? '+1 year' : '+1 month';
-        return date('F j, Y', strtotime($payment->txn_date . ' ' . $duration));
+        $date = new DateTime($payment->txn_date);
+        $date->setTimezone(wp_timezone());
+        $date->modify($duration);
+        return $date->format('F j, Y');
     }
 
     return null;

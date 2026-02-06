@@ -1076,6 +1076,14 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   5. 保存结束日期后，检查是否到期，未到期则跳过降级
 - **相关函数**：`ippgi_get_paypal_next_billing_date()` 增加了备用计算逻辑
 
+#### 33. 订阅日期时区修复 ✅
+- **问题**：PayPal 返回 UTC 时间（如 `2024-02-02T00:00:00Z`），Stripe 返回 Unix 时间戳，页面展示用 UTC+8，存在 8 小时时差
+- **修复**：统一使用 `wp_timezone()` 转换到站点时区后再格式化
+- **修复的函数**：
+  1. `ippgi_get_paypal_next_billing_date()` - PayPal UTC 字符串 → `setTimezone(wp_timezone())`
+  2. `ippgi_get_stripe_next_billing_date()` - Stripe Unix 时间戳 → `DateTime('@' . $ts)` + `setTimezone(wp_timezone())`
+  3. `ippgi_estimate_next_billing_date()` - SWPM 数据库日期 → `DateTime` + `setTimezone(wp_timezone())`
+
 ---
 
 ### Phase 2 - 待实现
