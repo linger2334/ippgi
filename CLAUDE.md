@@ -24,6 +24,26 @@
 | Trial | 3 | 试用会员，查看完整历史数据和图表 |
 | Plus | 4 | 付费高级会员，查看完整历史数据、图表、数据导出 |
 
+**注意**：Plus 等级在 SWPM 后台设置为 "No Expiry"，所以 SWPM 不会自动降级用户，需要我们的代码在订阅到期时手动处理降级。
+
+### SWPM Hook 集成
+
+我们使用以下 SWPM hook 处理订阅生命周期：
+
+| Hook | 触发时机 | 处理函数 | 做什么 |
+|------|---------|---------|--------|
+| `swpm_payment_ipn_processed` | 首次支付成功、续费成功 | `ippgi_on_payment_success()` | 显示成功模态框、清除取消状态、发送欢迎邮件 |
+| `swpm_subscription_payment_cancelled` | 订阅到期（取消后到期、续费失败终止） | `ippgi_on_subscription_expired()` | 清除 subscr_id、激活奖励天数或降级为 Basic |
+| `swpm_registration_complete` | 新用户注册 | `ippgi_on_swpm_registration()` | 处理邀请码逻辑 |
+
+**订阅到期处理流程**（`ippgi_on_subscription_expired`）：
+1. 验证用户当前是 Plus (4)
+2. 清除 SWPM 的 `subscr_id`（订阅已结束）
+3. 检查是否有累积奖励天数：
+   - 有 → 激活奖励天数（保持 Plus 访问权限）
+   - 无 → 降级为 Basic (2)
+4. 清除订阅相关 user meta
+
 ### SWPM 支付按钮 ID
 
 | 按钮 | SWPM Button ID | 说明 |
@@ -967,7 +987,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 原因：取消后清除了缓存，PayPal API 取消后可能不再返回 `next_billing_time`
 - 修复：取消前先保存结束日期到 `ippgi_subscription_end_date` user meta
 - `ippgi_get_formatted_subscription_end_date()` 优先读取存储的 meta，再从 API 获取
-- 重新订阅时（`ippgi_on_membership_level_change` 升级到 Plus）清除 `ippgi_subscription_end_date`
+- 重新订阅时清除 `ippgi_subscription_end_date`
 
 #### 25. 订阅页面隐藏升级提示 ✅
 - subscribe 页面不再显示升级提示 Banner（页面本身已包含订阅信息）
@@ -976,6 +996,14 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 #### 26. 取消订阅防重复点击 ✅
 - 点击确认按钮后立即禁用，文字变为 "Cancelling..."
 - 请求失败时恢复按钮状态允许重试
+
+#### 27. SWPM Hook 重构 ✅
+- 移除不可靠的 `swpm_membership_level_changed` hook
+- 改用 `swpm_payment_ipn_processed` 处理首次支付和续费成功
+- 使用 `swpm_subscription_payment_cancelled` 处理订阅到期
+- 订阅到期时手动降级用户为 Basic（因为 SWPM Plus 等级设置为 No Expiry）
+- 订阅到期时清除 `subscr_id`
+- 三个 hook 都添加了 debug 日志
 
 ---
 
