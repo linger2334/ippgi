@@ -141,9 +141,17 @@ Body: cancel_at_period_end=true
 3. 保存结束日期，检查是否到期 → 未到期则保留 Plus 权限
 4. 每日午夜定时任务 → 检查 `ippgi_subscription_end_date` → 已过期则降级
 
-**Stripe 流程**：
+**Stripe 流程**（网站取消）：
 1. 用户取消订阅 → 保存结束日期，Stripe 设置 `cancel_at_period_end=true`
-2. 计费周期结束时 Stripe 发送 webhook → 检测到是 Stripe（`sub_` 前缀）→ 直接降级
+2. 计费周期结束时 Stripe 发送 `customer.subscription.deleted` webhook → 检测到是 Stripe（`sub_` 前缀）→ 直接降级
+
+**Stripe 流程**（Stripe Dashboard 取消）：
+- Stripe Dashboard 提供两种取消方式：
+  - **Cancel immediately**：立即发送 `customer.subscription.deleted` → 立即降级
+  - **Cancel at end of period**：先发送 `customer.subscription.updated`（SWPM 不处理），周期结束时发送 `customer.subscription.deleted` → 降级
+- 注意：Stripe Dashboard 选择"Cancel at end of period"时，网站在周期结束前**不知道**用户已标记取消，Profile 页面仍显示 Active
+- SWPM 不监听 `customer.subscription.updated` 事件，仅监听 `customer.subscription.deleted`
+- 此行为已知且可接受（用户通常通过网站取消，极少去 Stripe Dashboard 操作）
 
 ### 支付成功提示
 当用户完成 PayPal/Stripe 订阅支付后，返回网站首页会显示成功模态框。
