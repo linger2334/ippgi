@@ -119,13 +119,31 @@ Body: cancel_at_period_end=true
 - `ippgi_ajax_cancel_subscription()` - AJAX 处理函数
 - `ippgi_cancel_paypal_subscription($subscr_id)` - PayPal API 取消
 - `ippgi_cancel_stripe_subscription($subscr_id)` - Stripe API 取消
+- `ippgi_on_subscription_expired($ipn_data)` - 处理取消 webhook（区分 PayPal/Stripe）
+- `ippgi_check_expired_cancelled_subscriptions()` - 每日定时任务，处理真正过期的订阅
+
+**取消订阅后的降级机制**（PayPal 和 Stripe 行为不同）：
+
+| 平台 | 取消时 | webhook 时机 | 降级时机 |
+|-----|-------|-------------|---------|
+| PayPal | 立即发送 IPN | 取消时立即 | 每日定时任务检查到期后降级 |
+| Stripe | 标记 `cancel_at_period_end` | 周期结束时 | webhook 触发时立即降级 |
+
+**PayPal 流程**：
+1. 用户取消订阅 → 保存结束日期到 `ippgi_subscription_end_date`
+2. PayPal 立即发送 IPN → 检测到是 PayPal（`I-` 前缀）且还没到期 → 只清除 subscr_id，保留 Plus 权限
+3. 每日午夜定时任务 → 检查 `ippgi_subscription_end_date` → 已过期则降级
+
+**Stripe 流程**：
+1. 用户取消订阅 → 保存结束日期，Stripe 设置 `cancel_at_period_end=true`
+2. 计费周期结束时 Stripe 发送 webhook → 检测到是 Stripe（`sub_` 前缀）→ 直接降级
 
 ### 支付成功提示
 当用户完成 PayPal/Stripe 订阅支付后，返回网站首页会显示成功模态框。
 
 **实现机制**：
-1. SWPM 处理支付完成后触发 `swpm_membership_level_changed` hook
-2. `ippgi_on_membership_level_change()` 检测到升级到 Plus，设置 `ippgi_payment_just_completed` user meta
+1. SWPM 处理支付完成后触发 `swpm_payment_ipn_processed` hook
+2. `ippgi_on_payment_success()` 设置 `ippgi_payment_just_completed` user meta
 3. 用户被重定向到 Return URL（首页）
 4. `wp_footer` hook 检测到该 meta，显示成功模态框并删除 meta（一次性）
 
@@ -147,7 +165,7 @@ Body: cancel_at_period_end=true
 - `.payment-success-card__btn` - 按钮
 
 **注意**：
-- SWPM 的 `swpm_membership_level_changed` action 传递**单个数组参数**（包含 `member_id`、`from_level`、`to_level`），而非 3 个独立参数
+- 我们使用 `swpm_payment_ipn_processed` hook 而非 `swpm_membership_level_changed`（后者不可靠）
 - Toast 组件 `ippgiToast` 仍保留用于其他功能（收藏、复制链接等）
 
 **Webhook 配置**：
@@ -1004,6 +1022,41 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 订阅到期时手动降级用户为 Basic（因为 SWPM Plus 等级设置为 No Expiry）
 - 订阅到期时清除 `subscr_id`
 - 三个 hook 都添加了 debug 日志
+
+#### 28. PayPal 首次支付 member_id 提取修复 ✅
+- 问题：PayPal 首次支付的 IPN 数据中没有 `member_id`，但 `custom` 字段包含 `swpm_id`
+- 格式：`custom: "subsc_ref=125&swpm_id=1"`
+- 修复：`ippgi_on_payment_success()` 函数增加从 `custom` 字段解析 `swpm_id` 的逻辑
+- 使用 `parse_str()` 解析 custom 字段内容
+
+#### 29. PayPal vs Stripe 取消订阅行为差异说明 ✅
+- **PayPal**：调用取消 API 后，PayPal 立即将订阅状态改为 "CANCELLED"，并发送 IPN 通知，触发 `swpm_subscription_payment_cancelled` hook
+- **Stripe**：使用 `cancel_at_period_end=true`，只是标记为"计划在周期结束时取消"，订阅仍为 `active` 状态
+- Stripe 的 `swpm_subscription_payment_cancelled` hook 会在实际到期时触发（需用 test clock 推进时间测试）
+- 这是两个平台的预期行为差异，不是 bug
+
+#### 30. 取消订阅保留剩余会员期修复 ✅
+- **问题**：PayPal 取消订阅时立即发送 IPN，导致用户被立即降级，丢失剩余会员期
+- **修复**：
+  1. 修改 `ippgi_on_subscription_expired()` 函数，根据 `subscr_id` 前缀区分 PayPal 和 Stripe
+  2. **PayPal**（`I-` 前缀）：检查 `ippgi_subscription_end_date` 是否已过期，未到期则跳过降级
+  3. **Stripe**（`sub_` 前缀）：直接降级，因为 Stripe 只在真正到期时才发送 webhook
+  4. 添加每日定时任务 `ippgi_check_expired_cancelled_subscriptions()` 作为备份机制
+- **定时任务**：每天午夜（站点时区）运行 `ippgi_check_expired_subscriptions_hook`
+- **PayPal 流程**：
+  1. 用户点击取消订阅 → 保存结束日期到 `ippgi_subscription_end_date`
+  2. PayPal 立即发送 IPN → 检测到是 PayPal 且还没到期 → 只清除 subscr_id，保留 Plus 权限
+  3. 每日定时任务检查 → 发现已过期 → 降级或激活奖励天数
+- **Stripe 流程**：
+  1. 用户点击取消订阅 → 保存结束日期，Stripe 设置 `cancel_at_period_end=true`
+  2. 计费周期真正结束时 Stripe 发送 webhook → 检测到是 Stripe → 直接降级
+
+#### 31. PayPal API 限制调研 ✅
+- **调研结论**：PayPal Subscriptions API **没有**类似 Stripe 的 `cancel_at_period_end` 功能
+- PayPal 的 cancel 是**立即且最终的**，取消后无法恢复，且立即发送 IPN
+- **替代方案**：PayPal 提供 `suspend`（暂停）功能，但不适合我们的场景
+- **最终决策**：保持当前方案，在代码中区分 PayPal 和 Stripe 的处理逻辑
+- 这是 PayPal 平台的设计限制，非代码问题
 
 ---
 

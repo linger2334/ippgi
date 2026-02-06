@@ -218,6 +218,16 @@ function ippgi_on_payment_success($ipn_data) {
     $member_id = isset($ipn_data['member_id']) ? intval($ipn_data['member_id']) : 0;
     $subscr_id = isset($ipn_data['subscr_id']) ? $ipn_data['subscr_id'] : '';
 
+    // PayPal IPN may not have member_id directly, but has it in 'custom' field
+    // Format: "subsc_ref=125&swpm_id=1"
+    if (empty($member_id) && !empty($ipn_data['custom'])) {
+        parse_str($ipn_data['custom'], $custom_data);
+        if (!empty($custom_data['swpm_id'])) {
+            $member_id = intval($custom_data['swpm_id']);
+            error_log('IPPGI: Extracted member_id from custom field: ' . $member_id);
+        }
+    }
+
     if (empty($member_id)) {
         error_log('IPPGI: No member_id in payment IPN data');
         return;
@@ -259,12 +269,16 @@ function ippgi_on_payment_success($ipn_data) {
 }
 
 /**
- * Handle subscription expired (订阅到期：续费失败终止、取消后到期)
+ * Handle subscription cancellation webhook (PayPal/Stripe 发送取消通知)
  *
- * Triggered when SWPM receives a subscription cancellation/deletion webhook.
- * This happens when:
- * - User cancelled subscription and billing period ended
+ * Triggered when SWPM receives a subscription cancellation webhook.
+ *
+ * IMPORTANT: This may be triggered when:
+ * - User manually cancels (PayPal sends IPN immediately, but user still has access until period end)
+ * - Subscription actually expires (billing period ended after cancellation)
  * - Renewal payment failed after all retries
+ *
+ * We need to distinguish between "just cancelled" and "actually expired".
  *
  * @param array $ipn_data IPN data from payment gateway
  */
@@ -317,13 +331,49 @@ function ippgi_on_subscription_expired($ipn_data) {
 
     $user_id = $wp_user->ID;
     $current_level = $member->membership_level;
-    error_log(sprintf('IPPGI: Processing subscription expiration for user %d (member %d, current level %s)', $user_id, $member_id, $current_level));
+    error_log(sprintf('IPPGI: Processing subscription cancellation for user %d (member %d, current level %s)', $user_id, $member_id, $current_level));
 
     // Only process if user is currently Plus (4)
     if ($current_level != 4 && $current_level != '4') {
         error_log(sprintf('IPPGI: User %d is not Plus (level %s), skipping', $user_id, $current_level));
         return;
     }
+
+    // Determine if this is PayPal or Stripe based on subscr_id prefix
+    // PayPal: I-XXXXXXXXXX
+    // Stripe: sub_XXXXXXXXXX
+    $is_paypal = !empty($subscr_id) && strpos($subscr_id, 'I-') === 0;
+    $is_stripe = !empty($subscr_id) && strpos($subscr_id, 'sub_') === 0;
+
+    // For PayPal: Check if this is a user-initiated cancellation that hasn't expired yet
+    // PayPal sends IPN immediately when user cancels, but user should keep access until period end
+    // For Stripe: Skip this check because Stripe only sends webhook when subscription actually ends
+    if ($is_paypal) {
+        $is_user_cancelled = get_user_meta($user_id, 'ippgi_subscription_cancelled', true);
+        $end_date_str = get_user_meta($user_id, 'ippgi_subscription_end_date', true);
+
+        if ($is_user_cancelled && !empty($end_date_str)) {
+            $end_timestamp = strtotime($end_date_str);
+            $now = time();
+
+            if ($end_timestamp && $end_timestamp > $now) {
+                // Subscription not yet expired, user still has access until end date
+                // Just clear the subscr_id but don't downgrade
+                error_log(sprintf('IPPGI: PayPal user %d cancelled but subscription valid until %s, not downgrading yet', $user_id, $end_date_str));
+
+                $wpdb->update(
+                    "{$wpdb->prefix}swpm_members_tbl",
+                    ['subscr_id' => ''],
+                    ['member_id' => $member_id]
+                );
+
+                return;
+            }
+        }
+    }
+
+    // Subscription has actually expired - proceed with downgrade
+    error_log(sprintf('IPPGI: User %d subscription has expired (%s), proceeding with downgrade', $user_id, $is_stripe ? 'Stripe' : 'PayPal'));
 
     // Clear subscr_id since subscription has ended
     $wpdb->update(
@@ -354,6 +404,125 @@ function ippgi_on_subscription_expired($ipn_data) {
 
     error_log(sprintf('IPPGI: Subscription expiration processed for user %d', $user_id));
 }
+
+/**
+ * Check and process expired cancelled subscriptions
+ *
+ * This function handles the case where:
+ * - User cancelled their subscription
+ * - PayPal sent cancellation IPN immediately (which we ignored because subscription wasn't expired yet)
+ * - Now the billing period has ended and user should be downgraded
+ *
+ * Should be run daily via WP-Cron.
+ */
+function ippgi_check_expired_cancelled_subscriptions() {
+    error_log('IPPGI: Running expired subscription check');
+
+    global $wpdb;
+
+    // Find all users with cancelled subscription that has expired
+    $users = get_users([
+        'meta_query' => [
+            'relation' => 'AND',
+            [
+                'key' => 'ippgi_subscription_cancelled',
+                'value' => '1',
+                'compare' => '='
+            ],
+            [
+                'key' => 'ippgi_subscription_end_date',
+                'compare' => 'EXISTS'
+            ]
+        ]
+    ]);
+
+    $now = time();
+    $processed = 0;
+
+    foreach ($users as $user) {
+        $end_date_str = get_user_meta($user->ID, 'ippgi_subscription_end_date', true);
+        if (empty($end_date_str)) {
+            continue;
+        }
+
+        $end_timestamp = strtotime($end_date_str);
+        if (!$end_timestamp || $end_timestamp > $now) {
+            // Not yet expired
+            continue;
+        }
+
+        error_log(sprintf('IPPGI: User %d subscription expired on %s, processing downgrade', $user->ID, $end_date_str));
+
+        // Get SWPM member
+        $member = SwpmMemberUtils::get_user_by_user_name($user->user_login);
+        if (!$member) {
+            error_log(sprintf('IPPGI: SWPM member not found for user %d', $user->ID));
+            continue;
+        }
+
+        $member_id = $member->member_id;
+        $current_level = $member->membership_level;
+
+        // Only process if user is still Plus (4)
+        if ($current_level != 4 && $current_level != '4') {
+            // Already downgraded, just clean up meta
+            delete_user_meta($user->ID, 'ippgi_subscription_cancelled');
+            delete_user_meta($user->ID, 'ippgi_subscription_cancelled_date');
+            delete_user_meta($user->ID, 'ippgi_subscription_end_date');
+            continue;
+        }
+
+        // Clear subscr_id
+        $wpdb->update(
+            "{$wpdb->prefix}swpm_members_tbl",
+            ['subscr_id' => ''],
+            ['member_id' => $member_id]
+        );
+
+        // Check for bonus days
+        $bonus_days = ippgi_get_unused_bonus_days($user->ID);
+        if ($bonus_days > 0) {
+            error_log(sprintf('IPPGI: User %d has %d bonus days, activating', $user->ID, $bonus_days));
+            ippgi_activate_bonus_access($user->ID);
+        } else {
+            // Downgrade to Basic (2)
+            error_log(sprintf('IPPGI: User %d has no bonus days, downgrading to Basic', $user->ID));
+            $wpdb->update(
+                "{$wpdb->prefix}swpm_members_tbl",
+                ['membership_level' => 2],
+                ['member_id' => $member_id]
+            );
+        }
+
+        // Clear subscription-related meta
+        delete_user_meta($user->ID, 'ippgi_subscription_cancelled');
+        delete_user_meta($user->ID, 'ippgi_subscription_cancelled_date');
+        delete_user_meta($user->ID, 'ippgi_subscription_end_date');
+
+        $processed++;
+    }
+
+    error_log(sprintf('IPPGI: Expired subscription check complete, processed %d users', $processed));
+}
+
+/**
+ * Schedule daily cron job to check expired subscriptions
+ */
+function ippgi_schedule_subscription_check() {
+    if (!wp_next_scheduled('ippgi_check_expired_subscriptions_hook')) {
+        // Schedule for midnight in site timezone
+        $timezone = wp_timezone();
+        $now = new DateTime('now', $timezone);
+        $midnight = new DateTime('tomorrow 00:00:00', $timezone);
+
+        wp_schedule_event($midnight->getTimestamp(), 'daily', 'ippgi_check_expired_subscriptions_hook');
+        error_log('IPPGI: Scheduled daily subscription expiration check');
+    }
+}
+add_action('init', 'ippgi_schedule_subscription_check');
+
+// Hook the cron action
+add_action('ippgi_check_expired_subscriptions_hook', 'ippgi_check_expired_cancelled_subscriptions');
 
 /**
  * Send Plus welcome email
