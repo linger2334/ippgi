@@ -121,6 +121,7 @@ Body: cancel_at_period_end=true
 - `ippgi_cancel_stripe_subscription($subscr_id)` - Stripe API 取消
 - `ippgi_on_subscription_expired($ipn_data)` - 处理取消 webhook（区分 PayPal/Stripe）
 - `ippgi_check_expired_cancelled_subscriptions()` - 每日定时任务，处理真正过期的订阅
+- `ippgi_get_paypal_next_billing_date($subscr_id)` - 获取 PayPal 订阅结束日期
 
 **取消订阅后的降级机制**（PayPal 和 Stripe 行为不同）：
 
@@ -129,10 +130,16 @@ Body: cancel_at_period_end=true
 | PayPal | 立即发送 IPN | 取消时立即 | 每日定时任务检查到期后降级 |
 | Stripe | 标记 `cancel_at_period_end` | 周期结束时 | webhook 触发时立即降级 |
 
-**PayPal 流程**：
+**PayPal 流程**（网站取消）：
 1. 用户取消订阅 → 保存结束日期到 `ippgi_subscription_end_date`
 2. PayPal 立即发送 IPN → 检测到是 PayPal（`I-` 前缀）且还没到期 → 只清除 subscr_id，保留 Plus 权限
 3. 每日午夜定时任务 → 检查 `ippgi_subscription_end_date` → 已过期则降级
+
+**PayPal 流程**（PayPal 后台取消）：
+1. 用户在 PayPal 后台取消 → PayPal 立即发送 IPN（没有预先保存的结束日期）
+2. 检测到没有 `ippgi_subscription_end_date` → 调用 PayPal API 获取或计算结束日期
+3. 保存结束日期，检查是否到期 → 未到期则保留 Plus 权限
+4. 每日午夜定时任务 → 检查 `ippgi_subscription_end_date` → 已过期则降级
 
 **Stripe 流程**：
 1. 用户取消订阅 → 保存结束日期，Stripe 设置 `cancel_at_period_end=true`
@@ -1058,6 +1065,17 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **最终决策**：保持当前方案，在代码中区分 PayPal 和 Stripe 的处理逻辑
 - 这是 PayPal 平台的设计限制，非代码问题
 
+#### 32. PayPal 后台取消订阅支持 ✅
+- **问题**：用户从 PayPal 后台取消订阅时，没有 `ippgi_subscription_end_date`，导致立即降级
+- **原因**：网站取消会先保存结束日期再调用 API，但 PayPal 后台取消直接发 IPN
+- **修复**：
+  1. 收到 PayPal IPN 时，如果没有 `ippgi_subscription_end_date`，从 PayPal API 获取
+  2. 优先使用 `billing_info.next_billing_time`
+  3. 如果不存在（取消后可能不返回），使用 `last_payment.time` + 订阅周期计算
+  4. 通过上次付款金额判断订阅周期（≥$50 为年度，否则为月度）
+  5. 保存结束日期后，检查是否到期，未到期则跳过降级
+- **相关函数**：`ippgi_get_paypal_next_billing_date()` 增加了备用计算逻辑
+
 ---
 
 ### Phase 2 - 待实现
@@ -1120,9 +1138,15 @@ mysql -u username -p database_name < ippgi_full_backup.sql
 
 #### 6. 配置定时任务
 ```bash
-# 添加 crontab 确保 WP-Cron 正常运行
-*/5 * * * * curl -s https://yoursite.com/wp-cron.php > /dev/null 2>&1
+# 添加 crontab 确保 WP-Cron 正常运行（推荐使用 PHP CLI 方式）
+* * * * * cd /path/to/wordpress && /usr/bin/php wp-cron.php >> /var/log/wp-cron.log 2>&1
 ```
+
+**说明**：
+- 每分钟执行一次，确保定时任务及时触发
+- 使用 PHP CLI 直接执行，比 curl HTTP 请求更可靠
+- 日志记录到 `/var/log/wp-cron.log`，方便调试
+- 需要将 `/path/to/wordpress` 替换为实际的 WordPress 安装目录
 
 ---
 

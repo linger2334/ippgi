@@ -345,14 +345,28 @@ function ippgi_on_subscription_expired($ipn_data) {
     $is_paypal = !empty($subscr_id) && strpos($subscr_id, 'I-') === 0;
     $is_stripe = !empty($subscr_id) && strpos($subscr_id, 'sub_') === 0;
 
-    // For PayPal: Check if this is a user-initiated cancellation that hasn't expired yet
-    // PayPal sends IPN immediately when user cancels, but user should keep access until period end
+    // For PayPal: Check if subscription period has actually ended
+    // PayPal sends IPN immediately when user cancels (from website OR PayPal dashboard),
+    // but user should keep access until period end
     // For Stripe: Skip this check because Stripe only sends webhook when subscription actually ends
     if ($is_paypal) {
-        $is_user_cancelled = get_user_meta($user_id, 'ippgi_subscription_cancelled', true);
         $end_date_str = get_user_meta($user_id, 'ippgi_subscription_end_date', true);
 
-        if ($is_user_cancelled && !empty($end_date_str)) {
+        // If no end date saved (user cancelled from PayPal dashboard), try to get it from PayPal API
+        if (empty($end_date_str)) {
+            error_log(sprintf('IPPGI: No end date for PayPal user %d, fetching from API', $user_id));
+            $end_date_str = ippgi_get_paypal_next_billing_date($subscr_id, $member_id);
+
+            if (!empty($end_date_str)) {
+                // Save the end date for future reference
+                update_user_meta($user_id, 'ippgi_subscription_end_date', $end_date_str);
+                update_user_meta($user_id, 'ippgi_subscription_cancelled', true);
+                update_user_meta($user_id, 'ippgi_subscription_cancelled_date', current_time('mysql'));
+                error_log(sprintf('IPPGI: Saved PayPal end date for user %d: %s', $user_id, $end_date_str));
+            }
+        }
+
+        if (!empty($end_date_str)) {
             $end_timestamp = strtotime($end_date_str);
             $now = time();
 
@@ -1246,11 +1260,52 @@ function ippgi_get_paypal_next_billing_date($subscr_id) {
 
     $sub_data = json_decode(wp_remote_retrieve_body($sub_response), true);
 
-    // Get next billing time
+    // Log the response for debugging
+    error_log('PayPal subscription data: ' . print_r($sub_data, true));
+
+    // Get next billing time (may not exist after cancellation)
     if (!empty($sub_data['billing_info']['next_billing_time'])) {
         $next_billing_time = $sub_data['billing_info']['next_billing_time'];
         // Format: 2024-02-02T00:00:00Z
         $date = new DateTime($next_billing_time);
+        return $date->format('F j, Y');
+    }
+
+    // If cancelled, calculate end date from last payment + billing cycle
+    if (!empty($sub_data['billing_info']['last_payment']['time'])) {
+        $last_payment_time = $sub_data['billing_info']['last_payment']['time'];
+        $date = new DateTime($last_payment_time);
+
+        // Determine billing cycle from plan (monthly or yearly)
+        // Check the billing cycle tenure_type or interval_unit
+        $interval = 'P1M'; // Default to 1 month
+        if (!empty($sub_data['billing_info']['cycle_executions'])) {
+            foreach ($sub_data['billing_info']['cycle_executions'] as $cycle) {
+                if (!empty($cycle['tenure_type']) && $cycle['tenure_type'] === 'REGULAR') {
+                    // Get interval from the subscription plan if available
+                    if (!empty($cycle['sequence']) && $cycle['sequence'] == 1) {
+                        // This is the regular billing cycle
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check plan details for interval
+        if (!empty($sub_data['plan_id'])) {
+            // For now, assume monthly for short plan IDs, yearly if plan suggests it
+            // A more robust solution would be to fetch the plan details
+            // But we can also check the amount - yearly subscriptions are typically ~$100
+            if (!empty($sub_data['billing_info']['last_payment']['amount']['value'])) {
+                $amount = floatval($sub_data['billing_info']['last_payment']['amount']['value']);
+                if ($amount >= 50) {
+                    // Likely yearly subscription
+                    $interval = 'P1Y';
+                }
+            }
+        }
+
+        $date->add(new DateInterval($interval));
         return $date->format('F j, Y');
     }
 
