@@ -20,11 +20,31 @@
 | 等级 | SWPM Level ID | 说明 |
 |-----|---------------|------|
 | Guest | - | 未登录用户，仅查看当天价格 |
-| Basic | 2 | 免费注册用户，查看当天价格 |
-| Trial | 3 | 试用会员，查看完整历史数据和图表 |
+| Basic | 2 | 免费注册用户（默认等级），查看当天价格 |
 | Plus | 4 | 付费高级会员，查看完整历史数据、图表、数据导出 |
 
-**注意**：Plus 等级在 SWPM 后台设置为 "No Expiry"，所以 SWPM 不会自动降级用户，需要我们的代码在订阅到期时手动处理降级。
+**注意**：
+- 新用户注册时默认为 Basic，系统自动通过 bonus 机制给予 7 天 Plus 访问权限
+- Plus 等级在 SWPM 后台设置为 "No Expiry"，所以 SWPM 不会自动降级用户，需要我们的代码在订阅到期时手动处理降级
+- 原 Trial (Level 3) 已废弃，统一使用 bonus 机制管理所有赠送天数
+
+### Bonus 访问机制
+
+所有赠送天数统一由 bonus 机制管理：
+
+| 来源 | 天数 | 说明 |
+|------|------|------|
+| 新用户注册 | 7 天 | 注册时自动激活 |
+| 邀请奖励 | 3 天 | 邀请好友注册成功后获得 |
+
+**User Meta 字段**：
+| Meta Key | 说明 |
+|---------|------|
+| `ippgi_bonus_access_active` | 是否正在使用 bonus 访问（bool） |
+| `ippgi_bonus_access_start` | bonus 访问开始时间 |
+| `ippgi_bonus_access_end` | bonus 访问到期时间 |
+| `ippgi_unused_bonus_days` | 未使用的累积奖励天数（订阅期间累积，订阅到期后激活） |
+| `ippgi_original_membership_level` | 激活 bonus 前的原始会员等级（到期后恢复） |
 
 ### SWPM Hook 集成
 
@@ -34,7 +54,7 @@
 |------|---------|---------|--------|
 | `swpm_payment_ipn_processed` | 首次支付成功、续费成功 | `ippgi_on_payment_success()` | 显示成功模态框、清除取消状态、发送欢迎邮件 |
 | `swpm_subscription_payment_cancelled` | 订阅到期（取消后到期、续费失败终止） | `ippgi_on_subscription_expired()` | 清除 subscr_id、激活奖励天数或降级为 Basic |
-| `swpm_registration_complete` | 新用户注册 | `ippgi_on_swpm_registration()` | 处理邀请码逻辑 |
+| `swpm_registration_complete` | 新用户注册 | `ippgi_on_swpm_registration()` | 给予 7 天 bonus 访问、处理邀请码逻辑 |
 
 **订阅到期处理流程**（`ippgi_on_subscription_expired`）：
 1. 验证用户当前是 Plus (4)
@@ -343,11 +363,11 @@ Body: cancel_at_period_end=true
 
 | 状态 | 说明 | 显示内容 |
 |-----|------|---------|
-| `trial` | 试用期 | 试用到期日期 |
-| `bonus` | 使用奖励天数 | 奖励到期日期 + 订阅按钮 |
-| `active` | 活跃订阅 | 下次扣款日期 + 累积奖励天数提示 + 取消订阅按钮 |
-| `cancelled` | 已取消（未到期） | 订阅结束日期 + 累积奖励天数提示 |
-| `terminated` | 已终止 | 订阅按钮 |
+| `active` | 活跃订阅 | 下次扣款日期 + 取消订阅按钮 |
+| `cancelled` | 已取消（未到期） | 订阅结束日期 |
+| `terminated` | 已终止（无订阅或已到期） | 订阅按钮 |
+
+**注意**：`bonus` 状态（正在使用赠送天数）在订阅状态判断中归类为 `terminated`，但用户仍有 Plus 访问权限。Profile 页面下半部分会显示 "Remaining Bonus Days" 展示剩余天数。
 
 ### 工作流程
 1. 用户访问 `/invite` 页面获取邀请链接
@@ -587,11 +607,11 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 |---------|---------|
 | 未登录（Guest） | ❌ 不显示 |
 | Basic 会员（Level 2） | ✅ 显示 |
-| Trial 会员（Level 3） | ✅ 显示 |
+| Bonus 访问中 | ✅ 显示（有 Plus 权限但建议订阅） |
 | Plus 会员（Level 4） | ❌ 不显示 |
 | 订阅页面（subscribe） | ❌ 不显示 |
 
-**说明**：`ippgi_is_user_subscribed()` 函数只检查 Plus 会员，Trial 会员不被视为"已订阅"，因此也会显示升级提示。订阅页面本身已包含订阅相关内容，无需重复显示升级提示。
+**说明**：`ippgi_is_user_subscribed()` 函数只检查 Plus 会员（有活跃订阅），Bonus 访问用户不被视为"已订阅"，因此会显示升级提示。订阅页面本身已包含订阅相关内容，无需重复显示升级提示。
 
 **功能**：
 - 点击 × 按钮可关闭

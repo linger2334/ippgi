@@ -5,9 +5,13 @@
  *
  * SWPM Membership Levels:
  * - Level 2 = Basic (免费注册用户)
- * - Level 3 = Trial (试用会员)
  * - Level 4 = Plus (付费高级会员)
  * - Guest = 未登录用户 (不在SWPM中配置)
+ *
+ * Bonus Access:
+ * - 新用户注册获得 7 天 bonus access
+ * - 邀请奖励获得 3 天 bonus access
+ * - 所有赠送天数统一由 bonus 机制管理
  *
  * @package IPPGI
  * @since 1.0.0
@@ -85,38 +89,12 @@ function ippgi_user_has_plus($user_id = null) {
 }
 
 /**
- * Check if user has Trial membership (Level 3)
- */
-function ippgi_user_has_trial($user_id = null) {
-    $level = ippgi_get_user_membership_level($user_id);
-
-    // SWPM Level 3 = Trial membership
-    $trial_levels = ['trial', '3', 3];
-
-    return in_array($level, $trial_levels, true);
-}
-
-/**
- * Check if user has used their free trial
- */
-function ippgi_user_has_used_trial($user_id = null) {
-    if (!$user_id) {
-        $user_id = get_current_user_id();
-    }
-
-    if (!$user_id) {
-        return false;
-    }
-
-    return (bool) get_user_meta($user_id, 'ippgi_trial_used', true);
-}
-
-/**
  * Check if user can view historical price data
+ * Plus members and users with active bonus access can view history
  */
 function ippgi_user_can_view_history($user_id = null) {
-    // Plus and Trial members can view history
-    return ippgi_user_has_plus($user_id) || ippgi_user_has_trial($user_id);
+    // ippgi_user_has_plus() already checks for both Plus membership and bonus access
+    return ippgi_user_has_plus($user_id);
 }
 
 /**
@@ -149,8 +127,8 @@ function ippgi_protected_content_shortcode($atts, $content = null) {
         case 'plus':
             $can_view = ippgi_user_has_plus();
             break;
-        case 'trial':
-            $can_view = ippgi_user_has_trial() || ippgi_user_has_plus();
+        case 'bonus':
+            $can_view = ippgi_user_has_bonus_access() || ippgi_user_has_plus();
             break;
         case 'member':
             $can_view = is_user_logged_in();
@@ -253,6 +231,28 @@ function ippgi_on_payment_success($ipn_data) {
 
     $user_id = $wp_user->ID;
     error_log(sprintf('IPPGI: Processing payment success for user %d (member %d)', $user_id, $member_id));
+
+    // If user is currently using bonus access, save remaining days for later
+    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    if ($bonus_active) {
+        $bonus_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+        if ($bonus_end) {
+            $end_time = strtotime($bonus_end . ' ' . wp_timezone_string());
+            $now = current_time('timestamp');
+            if ($end_time > $now) {
+                // Calculate remaining days and save for later use
+                $remaining_days = ceil(($end_time - $now) / DAY_IN_SECONDS);
+                $existing_unused = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+                update_user_meta($user_id, 'ippgi_unused_bonus_days', $existing_unused + $remaining_days);
+                error_log(sprintf('IPPGI: Saved %d remaining bonus days for user %d (total unused: %d)', $remaining_days, $user_id, $existing_unused + $remaining_days));
+            }
+        }
+        // Clear bonus access status (now using paid subscription)
+        delete_user_meta($user_id, 'ippgi_bonus_access_active');
+        delete_user_meta($user_id, 'ippgi_bonus_access_start');
+        delete_user_meta($user_id, 'ippgi_bonus_access_end');
+        wp_clear_scheduled_hook('ippgi_check_bonus_access_expired', [$user_id]);
+    }
 
     // Clear cancellation-related meta (in case user re-subscribed)
     delete_user_meta($user_id, 'ippgi_subscription_cancelled');
@@ -554,7 +554,23 @@ function ippgi_on_swpm_registration($member_data) {
     error_log('IPPGI: swpm_registration_complete triggered');
     error_log('IPPGI: Registration data: ' . print_r($member_data, true));
 
-    // Check if referred
+    // Get WordPress user
+    $wp_user = null;
+    if (!empty($member_data['email'])) {
+        $wp_user = get_user_by('email', $member_data['email']);
+    }
+
+    // Give new user 7 days bonus access (replaces Trial mechanism)
+    if ($wp_user) {
+        // Activate 7 days bonus access immediately
+        ippgi_activate_bonus_access($wp_user->ID, 7);
+        error_log(sprintf('IPPGI: Granted 7 days bonus access to new user %d', $wp_user->ID));
+
+        // Set registration success flag for showing welcome modal
+        update_user_meta($wp_user->ID, 'ippgi_registration_just_completed', true);
+    }
+
+    // Check if referred - award referrer bonus
     if (isset($_COOKIE['ippgi_referral'])) {
         $referral_code = sanitize_text_field($_COOKIE['ippgi_referral']);
         ippgi_process_referral($referral_code, $member_data);
@@ -706,24 +722,61 @@ function ippgi_has_active_subscription($user_id = null) {
  * Activate bonus access for user (upgrade to Plus temporarily using bonus days)
  *
  * @param int $user_id User ID
+ * @param int $days Optional. Number of days to activate. If not provided, uses ippgi_unused_bonus_days meta.
  * @return bool True on success
  */
-function ippgi_activate_bonus_access($user_id) {
-    $bonus_days = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+function ippgi_activate_bonus_access($user_id, $days = null) {
+    // If days not provided, get from user meta
+    if ($days === null) {
+        $bonus_days = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
+        $clear_unused = true;
+    } else {
+        $bonus_days = (int) $days;
+        $clear_unused = false;
+    }
+
     if ($bonus_days <= 0) {
         return false;
     }
 
-    // Set bonus access start and end dates
+    // Check if already using bonus access - extend instead of replace
+    $is_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    if ($is_active) {
+        // Extend existing bonus access
+        $current_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+        if ($current_end) {
+            $current_end_time = strtotime($current_end . ' ' . wp_timezone_string());
+            $now = current_time('timestamp');
+            // If current end is in the future, extend from there; otherwise from now
+            $base_time = max($current_end_time, $now);
+            $end_date = date('Y-m-d H:i:s', $base_time + ($bonus_days * DAY_IN_SECONDS));
+            update_user_meta($user_id, 'ippgi_bonus_access_end', $end_date);
+
+            if ($clear_unused) {
+                update_user_meta($user_id, 'ippgi_unused_bonus_days', 0);
+            }
+
+            // Reschedule expiration check
+            wp_clear_scheduled_hook('ippgi_check_bonus_access_expired', [$user_id]);
+            wp_schedule_single_event(strtotime($end_date . ' ' . wp_timezone_string()), 'ippgi_check_bonus_access_expired', [$user_id]);
+
+            error_log(sprintf('IPPGI: Extended bonus access for user %d by %d days until %s', $user_id, $bonus_days, $end_date));
+            return true;
+        }
+    }
+
+    // Set bonus access start and end dates (using local timezone consistently)
     $start_date = current_time('mysql');
-    $end_date = date('Y-m-d H:i:s', strtotime("+{$bonus_days} days"));
+    $end_date = date('Y-m-d H:i:s', current_time('timestamp') + ($bonus_days * DAY_IN_SECONDS));
 
     update_user_meta($user_id, 'ippgi_bonus_access_start', $start_date);
     update_user_meta($user_id, 'ippgi_bonus_access_end', $end_date);
     update_user_meta($user_id, 'ippgi_bonus_access_active', true);
 
-    // Clear unused bonus days (they're now being used)
-    update_user_meta($user_id, 'ippgi_unused_bonus_days', 0);
+    // Clear unused bonus days if we used them
+    if ($clear_unused) {
+        update_user_meta($user_id, 'ippgi_unused_bonus_days', 0);
+    }
 
     // Upgrade to Plus level in SWPM
     if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
@@ -747,7 +800,7 @@ function ippgi_activate_bonus_access($user_id) {
     }
 
     // Schedule access expiration check
-    wp_schedule_single_event(strtotime($end_date), 'ippgi_check_bonus_access_expired', [$user_id]);
+    wp_schedule_single_event(strtotime($end_date . ' ' . wp_timezone_string()), 'ippgi_check_bonus_access_expired', [$user_id]);
 
     error_log(sprintf('IPPGI: Activated bonus access for user %d until %s', $user_id, $end_date));
     return true;
@@ -1031,7 +1084,7 @@ function ippgi_mask_email($email) {
 
 /**
  * Get user's subscription status
- * Returns one of: 'trial', 'active', 'cancelled', 'bonus', 'terminated'
+ * Returns one of: 'active', 'cancelled', 'bonus', 'terminated'
  *
  * @param int $user_id User ID
  * @return string Subscription status
@@ -1048,8 +1101,8 @@ function ippgi_get_subscription_status($user_id = null) {
     // Development mode
     if (defined('IPPGI_DEV_MODE') && IPPGI_DEV_MODE) {
         $dev_level = defined('IPPGI_DEV_MEMBERSHIP_LEVEL') ? IPPGI_DEV_MEMBERSHIP_LEVEL : 'plus';
-        if ($dev_level === 'trial') {
-            return 'trial';
+        if ($dev_level === 'bonus') {
+            return 'bonus';
         } elseif ($dev_level === 'plus') {
             return 'active';
         } elseif ($dev_level === 'cancelled') {
@@ -1058,17 +1111,15 @@ function ippgi_get_subscription_status($user_id = null) {
         return 'terminated';
     }
 
-    // Check Trial status (Level 3)
-    if (ippgi_user_has_trial($user_id)) {
-        return 'trial';
-    }
-
-    // Check for bonus access first
+    // Check for bonus access first (includes new user 7-day bonus)
     $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
     if ($bonus_active) {
         $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
-        if (!empty($end_date) && strtotime($end_date) > time()) {
-            return 'bonus';
+        if (!empty($end_date)) {
+            $end_time = strtotime($end_date . ' ' . wp_timezone_string());
+            if ($end_time > current_time('timestamp')) {
+                return 'bonus';
+            }
         }
     }
 

@@ -316,9 +316,9 @@ function ippgi_can_user_view_announcement($post_id) {
             return is_user_logged_in();
 
         case 'subscriber':
-            // In dev mode, check if level is trial or plus
+            // In dev mode, check if level is bonus or plus
             if ($is_dev_mode) {
-                return in_array($dev_level, ['trial', 'plus']);
+                return in_array($dev_level, ['bonus', 'plus']);
             }
 
             // Check if user is a paid member using Simple Membership

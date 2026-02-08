@@ -1287,7 +1287,7 @@
                 return;
             }
 
-            // Check if user has premium membership (Trial or Plus)
+            // Check if user has premium membership (Bonus or Plus)
             if (!ippgiData.hasPremium) {
                 // Logged in but no premium - redirect to subscribe page
                 window.location.href = ippgiData.subscribeUrl;

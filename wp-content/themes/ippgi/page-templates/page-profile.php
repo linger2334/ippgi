@@ -74,53 +74,12 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                 <div class="profile-section__body">
                     <p class="profile-section__label"><?php esc_html_e('Subscription status:', 'ippgi'); ?></p>
 
-                    <?php if ($subscription_status === 'trial') : ?>
-                        <!-- Trial Period -->
-                        <p class="profile-section__value"><?php esc_html_e('Trial Period', 'ippgi'); ?></p>
-                        <p class="profile-section__value">
-                            <?php printf(esc_html__('Your trial period ends on %s', 'ippgi'), esc_html($subscription_end_date)); ?>
-                        </p>
-
-                    <?php elseif ($subscription_status === 'bonus') : ?>
-                        <!-- Referral Bonus Access -->
-                        <?php $bonus_end_date = ippgi_get_bonus_access_end_date($current_user->ID); ?>
-                        <p class="profile-section__value"><?php esc_html_e('Referral Bonus', 'ippgi'); ?></p>
-                        <p class="profile-section__value">
-                            <?php printf(esc_html__('Your bonus access ends on %s', 'ippgi'), esc_html($bonus_end_date)); ?>
-                        </p>
-                        <p class="profile-section__hint">
-                            <?php esc_html_e('You are using bonus days earned from referrals. Subscribe to continue access after bonus expires.', 'ippgi'); ?>
-                        </p>
-                        <div class="profile-section__action">
-                            <a href="<?php echo esc_url(home_url('/subscribe')); ?>" class="profile-btn">
-                                <?php esc_html_e('Subscribe', 'ippgi'); ?>
-                                <span>&gt;</span>
-                            </a>
-                        </div>
-
-                    <?php elseif ($subscription_status === 'active') : ?>
-                        <!-- Active Subscription -->
+                    <?php if ($subscription_status === 'active') : ?>
+                        <!-- 1. Active Subscription (not cancelled) -->
                         <p class="profile-section__value"><?php esc_html_e('Active', 'ippgi'); ?></p>
                         <p class="profile-section__value">
                             <?php printf(esc_html__('Next billing date: %s', 'ippgi'), esc_html($subscription_end_date)); ?>
                         </p>
-                        <?php
-                        // Show accumulated bonus days if any
-                        $unused_bonus = ippgi_get_unused_bonus_days($current_user->ID);
-                        if ($unused_bonus > 0) :
-                        ?>
-                        <p class="profile-section__bonus">
-                            <?php printf(
-                                esc_html(_n(
-                                    'Referral bonus: %d day available (will be used after subscription ends)',
-                                    'Referral bonus: %d days available (will be used after subscription ends)',
-                                    $unused_bonus,
-                                    'ippgi'
-                                )),
-                                $unused_bonus
-                            ); ?>
-                        </p>
-                        <?php endif; ?>
                         <div class="profile-section__action">
                             <a href="#" class="profile-btn" id="cancel-subscription-btn">
                                 <?php esc_html_e('Cancel Subscription', 'ippgi'); ?>
@@ -129,31 +88,14 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                         </div>
 
                     <?php elseif ($subscription_status === 'cancelled') : ?>
-                        <!-- Cancelled but not expired -->
+                        <!-- 2. Cancelled but not expired -->
                         <p class="profile-section__value"><?php esc_html_e('Cancelled', 'ippgi'); ?></p>
                         <p class="profile-section__value">
                             <?php printf(esc_html__('Your subscription ends on %s', 'ippgi'), esc_html($subscription_end_date)); ?>
                         </p>
-                        <?php
-                        // Show accumulated bonus days if any
-                        $unused_bonus = ippgi_get_unused_bonus_days($current_user->ID);
-                        if ($unused_bonus > 0) :
-                        ?>
-                        <p class="profile-section__bonus">
-                            <?php printf(
-                                esc_html(_n(
-                                    'Referral bonus: %d day available (will extend access after subscription ends)',
-                                    'Referral bonus: %d days available (will extend access after subscription ends)',
-                                    $unused_bonus,
-                                    'ippgi'
-                                )),
-                                $unused_bonus
-                            ); ?>
-                        </p>
-                        <?php endif; ?>
 
                     <?php else : ?>
-                        <!-- Terminated / No subscription -->
+                        <!-- 3. No subscription or expired (bonus, terminated, etc.) -->
                         <p class="profile-section__value"><?php esc_html_e('Terminated', 'ippgi'); ?></p>
                         <p class="profile-section__value">
                             <?php esc_html_e('Your subscription has ended. To continue access, please click the Subscribe button below.', 'ippgi'); ?>
@@ -165,6 +107,36 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                             </a>
                         </div>
                     <?php endif; ?>
+
+                    <?php
+                    // Calculate remaining bonus days
+                    // If using bonus access: calculate days from now to end date
+                    // Otherwise: show unused accumulated bonus days
+                    $remaining_bonus_days = 0;
+                    if ($subscription_status === 'bonus') {
+                        // Currently using bonus access - calculate remaining days
+                        $bonus_end = get_user_meta($current_user->ID, 'ippgi_bonus_access_end', true);
+                        if ($bonus_end) {
+                            // Use WordPress timezone-aware functions
+                            $end_time = strtotime($bonus_end . ' ' . wp_timezone_string());
+                            $now = current_time('timestamp');
+                            if ($end_time > $now) {
+                                $remaining_bonus_days = ceil(($end_time - $now) / DAY_IN_SECONDS);
+                            }
+                        }
+                    } else {
+                        // Not using bonus - show accumulated unused days
+                        $remaining_bonus_days = ippgi_get_unused_bonus_days($current_user->ID);
+                    }
+                    ?>
+                    <div class="profile-bonus-section">
+                        <div class="profile-bonus-section__divider"></div>
+                        <h3 class="profile-bonus-section__title"><?php esc_html_e('Remaining Bonus Days', 'ippgi'); ?></h3>
+                        <p class="profile-bonus-section__number"><?php echo intval($remaining_bonus_days); ?></p>
+                        <p class="profile-bonus-section__desc">
+                            <?php esc_html_e('Earn Bonus Days by signing up, participating in site activities, or inviting friends, They are automatically applied after your subscription ends to extend access to premium content.(e.g., 7 days remaining after a March 31 expiration extends access to April 7).', 'ippgi'); ?>
+                        </p>
+                    </div>
                 </div>
             </div>
 

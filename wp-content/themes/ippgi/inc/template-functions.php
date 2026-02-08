@@ -317,14 +317,6 @@ function ippgi_get_next_billing_date() {
 }
 
 /**
- * Get trial end date (placeholder)
- */
-function ippgi_get_trial_end_date() {
-    // This will be implemented with Simple Membership integration
-    return date_i18n(get_option('date_format'), strtotime('+7 days'));
-}
-
-/**
  * Add custom body classes
  */
 function ippgi_body_classes($classes) {
@@ -395,44 +387,14 @@ function ippgi_get_subscribe_url() {
 }
 
 /**
- * Check if user is subscribed (has Plus or Trial membership)
+ * Check if user is subscribed (has Plus membership)
  * Note: ippgi_user_has_plus() is defined in inc/membership.php
  */
 function ippgi_is_user_subscribed($user_id = null) {
     if (function_exists('ippgi_user_has_plus')) {
         return ippgi_user_has_plus($user_id);
     }
-    if (function_exists('ippgi_user_has_trial')) {
-        return ippgi_user_has_trial($user_id);
-    }
     return false;
-}
-
-/**
- * Check if user is on trial
- */
-function ippgi_user_is_trial($user_id = null) {
-    if (!$user_id) {
-        $user_id = get_current_user_id();
-    }
-
-    if (!$user_id) {
-        return false;
-    }
-
-    // Check Simple Membership Plugin
-    if (class_exists('SwpmMemberUtils')) {
-        $member = SwpmMemberUtils::get_user_by_user_name(get_userdata($user_id)->user_login);
-        if ($member) {
-            $membership_level = SwpmMemberUtils::get_member_field_by_id($member->member_id, 'membership_level');
-            // Assuming level 3 is Trial
-            return intval($membership_level) === 3;
-        }
-    }
-
-    // Fallback: check user meta
-    $subscription_level = get_user_meta($user_id, 'ippgi_subscription_level', true);
-    return $subscription_level === 'trial';
 }
 
 /**

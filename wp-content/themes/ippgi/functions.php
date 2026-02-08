@@ -36,7 +36,7 @@ define('IPPGI_THEME_URI', get_template_directory_uri());
  * IMPORTANT: Set to false in production!
  */
 define('IPPGI_DEV_MODE', false);
-define('IPPGI_DEV_MEMBERSHIP_LEVEL', 'plus'); // Options: 'guest', 'basic', 'trial', 'plus', 'cancelled'
+define('IPPGI_DEV_MEMBERSHIP_LEVEL', 'plus'); // Options: 'guest', 'basic', 'bonus', 'plus', 'cancelled'
 
 /**
  * Theme Setup
@@ -207,6 +207,45 @@ add_action('wp_footer', function() {
     <script>
     document.getElementById('payment-success-continue').addEventListener('click', function() {
         document.getElementById('payment-success-modal').style.display = 'none';
+    });
+    </script>
+    <?php
+}, 99);
+
+/**
+ * Show registration success modal for new users (7-day bonus welcome).
+ */
+add_action('wp_footer', function() {
+    if (!is_user_logged_in()) {
+        return;
+    }
+
+    $user_id = get_current_user_id();
+    $registration_success = get_user_meta($user_id, 'ippgi_registration_just_completed', true);
+
+    if (!$registration_success) {
+        return;
+    }
+
+    // Clear the flag so it only shows once
+    delete_user_meta($user_id, 'ippgi_registration_just_completed');
+    ?>
+    <div class="registration-success-overlay" id="registration-success-modal">
+        <div class="registration-success-card">
+            <h2 class="registration-success-card__title"><?php esc_html_e('Congratulations!', 'ippgi'); ?></h2>
+            <p class="registration-success-card__desc">
+                <?php esc_html_e("You've joined PPGI.CN as a member and now have access to 7 days of free Plus access, unlocking comprehensive PPGI price data.", 'ippgi'); ?>
+            </p>
+            <p class="registration-success-card__desc">
+                <?php esc_html_e("When your bonus period ends, you can upgrade to a paid Plus subscription or continue using the Basic plan — it's up to you.", 'ippgi'); ?>
+            </p>
+        </div>
+    </div>
+    <script>
+    document.getElementById('registration-success-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
     });
     </script>
     <?php
