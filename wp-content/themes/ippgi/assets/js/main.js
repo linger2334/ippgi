@@ -1555,8 +1555,10 @@
                     : subscribeUrl;
 
                 // Extract product name from product_spec (format: "categoryId_width_thickness_材料名称")
+                // Only show product name for HRC and AL (they have consistent naming)
+                // For PPGI, GI, GL, CRC Hard - only show dimensions (they have mixed Chinese/English names)
                 var displayDimensions = item.dimensions;
-                if (item.product_spec) {
+                if (item.product_spec && (currentType === 'hrc' || currentType === 'aluminum')) {
                     var specParts = item.product_spec.split('_');
                     if (specParts.length >= 4) {
                         // Get the last part (product name)

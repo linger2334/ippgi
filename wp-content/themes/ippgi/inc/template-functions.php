@@ -241,8 +241,14 @@ function ippgi_get_user_favorites($user_id = null) {
             if (count($spec_parts) >= 4) {
                 $width = $spec_parts[1];
                 $thickness = $spec_parts[2];
-                $product_name = end($spec_parts);
-                $display_spec = $thickness . '*' . $width . ' ' . $product_name;
+                // Only show product name for HRC and AL (they have consistent naming)
+                // For PPGI, GI, GL, CRC - only show dimensions (they have mixed Chinese/English names)
+                if (in_array($type, ['hrc', 'al', 'aluminum'], true)) {
+                    $product_name = end($spec_parts);
+                    $display_spec = $thickness . '*' . $width . ' ' . $product_name;
+                } else {
+                    $display_spec = $thickness . '*' . $width;
+                }
             }
 
             $result[] = [

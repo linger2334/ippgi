@@ -60,10 +60,12 @@ if ($product_spec) {
     }
 }
 
-// Build display dimensions: "厚度*宽度 材料名称" (consistent with prices page)
+// Build display dimensions
+// Only show product name for HRC and AL (they have consistent naming)
+// For PPGI, GI, GL, CRC - only show dimensions (they have mixed Chinese/English names)
 $short_spec = $matched_thickness && $matched_width ? ($matched_thickness . '*' . $matched_width) : $product_spec;
 $display_dimensions = $short_spec;
-if ($product_name_from_spec) {
+if ($product_name_from_spec && in_array($material_code, ['hrc', 'aluminum'], true)) {
     $display_dimensions = $short_spec . ' ' . $product_name_from_spec;
 }
 
@@ -1152,8 +1154,14 @@ window.ippgiPriceDetail = {
 
         // Get product info from page data
         var productSpec = detail.productSpec || '';
+        var materialCode = detail.materialCode || '';
         var specParts = productSpec.split('_');
-        var productName = specParts.length >= 4 ? specParts[specParts.length - 1] : '';
+        // Only show product name for HRC and AL (they have consistent naming)
+        // For PPGI, GI, GL, CRC - hide product name (they have mixed Chinese/English names)
+        var productName = '';
+        if ((materialCode === 'hrc' || materialCode === 'aluminum') && specParts.length >= 4) {
+            productName = specParts[specParts.length - 1];
+        }
         var thickness = specParts.length >= 3 ? specParts[2] : '';
         var width = specParts.length >= 2 ? specParts[1] : '';
         var dimensionStr = thickness && width ? (thickness + '*' + width) : '';
