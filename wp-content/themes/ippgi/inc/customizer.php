@@ -239,6 +239,40 @@ function ippgi_customize_register($wp_customize) {
         ]);
     }
 
+    // ========================================
+    // Product Display Names Section
+    // ========================================
+    $wp_customize->add_section('ippgi_product_names_section', [
+        'title'       => __('Product Display Names', 'ippgi'),
+        'description' => __('Customize the product names shown throughout the site. Leave empty to use the default value.', 'ippgi'),
+        'panel'       => 'ippgi_settings',
+        'priority'    => 50,
+    ]);
+
+    // Product names with defaults and full names
+    $product_settings = [
+        'ppgi'     => ['default' => 'PPGI', 'full' => 'Pre-painted Galvanized Iron'],
+        'gi'       => ['default' => 'GI', 'full' => 'Galvanized Steel'],
+        'gl'       => ['default' => 'GL', 'full' => 'Galvalume Steel'],
+        'hrc'      => ['default' => 'HRC', 'full' => 'Hot Rolled Coil'],
+        'crc'      => ['default' => 'CRC Hard', 'full' => 'Cold Rolled Hard Coil'],
+        'aluminum' => ['default' => 'AL', 'full' => 'Aluminum Sheet'],
+    ];
+
+    foreach ($product_settings as $type => $info) {
+        $wp_customize->add_setting("ippgi_product_name_{$type}", [
+            'default'           => $info['default'],
+            'sanitize_callback' => 'sanitize_text_field',
+        ]);
+
+        $wp_customize->add_control("ippgi_product_name_{$type}", [
+            'label'       => $info['full'],
+            'description' => sprintf(__('Default: %s', 'ippgi'), $info['default']),
+            'section'     => 'ippgi_product_names_section',
+            'type'        => 'text',
+        ]);
+    }
+
 }
 add_action('customize_register', 'ippgi_customize_register');
 

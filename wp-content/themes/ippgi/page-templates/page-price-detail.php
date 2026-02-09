@@ -23,13 +23,14 @@ if (empty($material_code)) {
 $product_spec = isset($_GET['spec']) ? sanitize_text_field($_GET['spec']) : '';
 
 // Material data mapping
+// 'code' = display name (customizable), 'api_category' = fixed API category name
 $materials = [
-    'gi'       => ['name' => __('Galvanized Steel', 'ippgi'), 'code' => 'GI'],
-    'gl'       => ['name' => __('Galvalume Steel', 'ippgi'), 'code' => 'GL'],
-    'ppgi'     => ['name' => __('Pre-painted Galvanized Iron', 'ippgi'), 'code' => 'PPGI'],
-    'hrc'      => ['name' => __('Hot Rolled Coil', 'ippgi'), 'code' => 'HRC'],
-    'crc'      => ['name' => __('Cold Rolled Hard Coil', 'ippgi'), 'code' => 'CRC Hard'],
-    'aluminum' => ['name' => __('Aluminum Sheet', 'ippgi'), 'code' => 'AL'],
+    'gi'       => ['name' => __('Galvanized Steel', 'ippgi'), 'code' => ippgi_get_product_display_name('gi'), 'api_category' => 'GI'],
+    'gl'       => ['name' => __('Galvalume Steel', 'ippgi'), 'code' => ippgi_get_product_display_name('gl'), 'api_category' => 'GL'],
+    'ppgi'     => ['name' => __('Pre-painted Galvanized Iron', 'ippgi'), 'code' => ippgi_get_product_display_name('ppgi'), 'api_category' => 'PPGI'],
+    'hrc'      => ['name' => __('Hot Rolled Coil', 'ippgi'), 'code' => ippgi_get_product_display_name('hrc'), 'api_category' => 'HRC'],
+    'crc'      => ['name' => __('Cold Rolled Hard Coil', 'ippgi'), 'code' => ippgi_get_product_display_name('crc'), 'api_category' => 'CRC Hard'],
+    'aluminum' => ['name' => __('Aluminum Sheet', 'ippgi'), 'code' => ippgi_get_product_display_name('aluminum'), 'api_category' => 'AL'],
 ];
 
 $current_material = isset($materials[$material_code]) ? $materials[$material_code] : $materials['ppgi'];
@@ -358,7 +359,7 @@ window.ippgiPriceDetail = {
     productSpec: <?php echo json_encode($product_spec); ?>,
     categoryId: <?php echo json_encode($category_id); ?>,
     materialName: <?php echo json_encode($current_material['code']); ?>,
-    category: <?php echo json_encode($current_material['code']); ?>,
+    category: <?php echo json_encode($current_material['api_category']); ?>,
     canViewHistory: <?php echo json_encode(ippgi_user_can_view_history()); ?>
 };
 

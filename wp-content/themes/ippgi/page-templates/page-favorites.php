@@ -17,12 +17,12 @@ $favorites = ippgi_get_user_favorites();
 
 // Material types for filter
 $material_types = [
-    'ppgi' => 'PPGI',
-    'gi' => 'GI',
-    'gl' => 'GL',
-    'al' => 'AL',
-    'crc_hard' => 'CRC Hard',
-    'hrc' => 'HRC',
+    'ppgi' => ippgi_get_product_display_name('ppgi'),
+    'gi' => ippgi_get_product_display_name('gi'),
+    'gl' => ippgi_get_product_display_name('gl'),
+    'al' => ippgi_get_product_display_name('aluminum'),
+    'crc_hard' => ippgi_get_product_display_name('crc'),
+    'hrc' => ippgi_get_product_display_name('hrc'),
 ];
 
 get_header();

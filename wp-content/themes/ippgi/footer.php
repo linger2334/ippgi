@@ -12,12 +12,12 @@
         <!-- Products Section with Back to Top -->
         <div class="site-footer__products-section">
             <div class="site-footer__products">
-                <a href="#" class="site-footer__product-link" data-category="PPGI"><?php esc_html_e('PPGI', 'ippgi'); ?></a>
-                <a href="#" class="site-footer__product-link" data-category="GI"><?php esc_html_e('GI', 'ippgi'); ?></a>
-                <a href="#" class="site-footer__product-link" data-category="GL"><?php esc_html_e('GL', 'ippgi'); ?></a>
-                <a href="#" class="site-footer__product-link" data-category="AL"><?php esc_html_e('AL', 'ippgi'); ?></a>
-                <a href="#" class="site-footer__product-link" data-category="CRC_HARD"><?php esc_html_e('CRC Hard', 'ippgi'); ?></a>
-                <a href="#" class="site-footer__product-link" data-category="HRC"><?php esc_html_e('HRC', 'ippgi'); ?></a>
+                <a href="#" class="site-footer__product-link" data-category="PPGI"><?php echo esc_html(ippgi_get_product_display_name('ppgi')); ?></a>
+                <a href="#" class="site-footer__product-link" data-category="GI"><?php echo esc_html(ippgi_get_product_display_name('gi')); ?></a>
+                <a href="#" class="site-footer__product-link" data-category="GL"><?php echo esc_html(ippgi_get_product_display_name('gl')); ?></a>
+                <a href="#" class="site-footer__product-link" data-category="AL"><?php echo esc_html(ippgi_get_product_display_name('aluminum')); ?></a>
+                <a href="#" class="site-footer__product-link" data-category="CRC_HARD"><?php echo esc_html(ippgi_get_product_display_name('crc')); ?></a>
+                <a href="#" class="site-footer__product-link" data-category="HRC"><?php echo esc_html(ippgi_get_product_display_name('hrc')); ?></a>
             </div>
             <button type="button" class="site-footer__back-to-top" aria-label="<?php esc_attr_e('Back to top', 'ippgi'); ?>">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">

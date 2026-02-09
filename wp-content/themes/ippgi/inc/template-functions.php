@@ -216,14 +216,14 @@ function ippgi_get_user_favorites($user_id = null) {
 
     // Material type mapping
     $material_types = [
-        'gi' => ['name' => __('GI', 'ippgi'), 'type' => 'gi'],
-        'gl' => ['name' => __('GL', 'ippgi'), 'type' => 'gl'],
-        'ppgi' => ['name' => __('PPGI', 'ippgi'), 'type' => 'ppgi'],
-        'hrc' => ['name' => __('HRC', 'ippgi'), 'type' => 'hrc'],
-        'crc_hard' => ['name' => __('CRC Hard', 'ippgi'), 'type' => 'crc_hard'],
-        'crc' => ['name' => __('CRC Hard', 'ippgi'), 'type' => 'crc_hard'],
-        'al' => ['name' => __('AL', 'ippgi'), 'type' => 'al'],
-        'aluminum' => ['name' => __('AL', 'ippgi'), 'type' => 'al'],
+        'gi' => ['name' => ippgi_get_product_display_name('gi'), 'type' => 'gi'],
+        'gl' => ['name' => ippgi_get_product_display_name('gl'), 'type' => 'gl'],
+        'ppgi' => ['name' => ippgi_get_product_display_name('ppgi'), 'type' => 'ppgi'],
+        'hrc' => ['name' => ippgi_get_product_display_name('hrc'), 'type' => 'hrc'],
+        'crc_hard' => ['name' => ippgi_get_product_display_name('crc'), 'type' => 'crc_hard'],
+        'crc' => ['name' => ippgi_get_product_display_name('crc'), 'type' => 'crc_hard'],
+        'al' => ['name' => ippgi_get_product_display_name('aluminum'), 'type' => 'al'],
+        'aluminum' => ['name' => ippgi_get_product_display_name('aluminum'), 'type' => 'al'],
     ];
 
     $result = [];

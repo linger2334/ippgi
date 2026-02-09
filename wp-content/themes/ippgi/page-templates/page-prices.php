@@ -37,37 +37,37 @@ $current_width = isset($_GET['width']) ? sanitize_text_field($_GET['width']) : '
 // Note: widths are fallback only, actual widths come from cached price data
 $product_types = [
     'ppgi' => [
-        'name' => 'PPGI',
+        'name' => ippgi_get_product_display_name('ppgi'),
         'full_name' => 'Pre-painted Galvanized Iron',
         'widths' => [1000, 1200],
         'attributes_template' => 'Thickness: %s; Width: %s; Coating Weight: Z80-180g/m2 (for PPGI) or AZ50-150g/m2 (for PPGL); Coating Type: PE/PVDF, 10-25um topcoat + 5-10um primer; Grade: DX51D; Surface: Color coated (RAL colors), 2/1 coating structure; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Roofing, cladding.',
     ],
     'gi' => [
-        'name' => 'GI',
+        'name' => ippgi_get_product_display_name('gi'),
         'full_name' => 'Galvanized Steel',
         'widths' => [1000, 1200, 1219, 1250],
         'attributes_template' => 'Thickness: %s; Width: %s; Coating Weight: Z40-275g/m2; Grade: DX51D+Z, SGCC; Surface: Regular spangle, minimum spangle, zero spangle; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Construction, appliances, automotive.',
     ],
     'gl' => [
-        'name' => 'GL',
+        'name' => ippgi_get_product_display_name('gl'),
         'full_name' => 'Galvalume Steel',
         'widths' => [1000, 1200],
         'attributes_template' => 'Thickness: %s; Width: %s; Coating Weight: AZ50-150g/m2 (55%% Al, 43.4%% Zn, 1.6%% Si); Grade: DX51D+AZ; Surface: Anti-fingerprint available; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Roofing, cladding, HVAC.',
     ],
     'hrc' => [
-        'name' => 'HRC',
+        'name' => ippgi_get_product_display_name('hrc'),
         'full_name' => 'Hot Rolled Coil',
         'widths' => [1010, 1500],
         'attributes_template' => 'Thickness: %s; Width: %s; Grade: Q235B, SS400, SPHC; Surface: Pickled and oiled (P&O) available; Coil ID: 508/610mm; Weight: 5-25 tons/coil. Applications: Structural, machinery, tubes.',
     ],
     'crc' => [
-        'name' => 'CRC Hard',
+        'name' => ippgi_get_product_display_name('crc'),
         'full_name' => 'Cold Rolled Hard Coil',
         'widths' => [1000, 1200],
         'attributes_template' => 'Thickness: %s; Width: %s; Grade: SPCC, DC01, ST12; Surface: Bright finish; Hardness: Full hard; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Forming, stamping, appliances.',
     ],
     'aluminum' => [
-        'name' => 'AL',
+        'name' => ippgi_get_product_display_name('aluminum'),
         'full_name' => 'Aluminum Sheet',
         'widths' => [1000],
         'attributes_template' => 'Thickness: %s; Width: %s; Alloy: 1050, 1060, 1100, 3003, 5052; Temper: H14, H24, O; Surface: Mill finish, brushed; Coil ID: 508mm; Weight: 1-3 tons/coil. Applications: Decoration, insulation, packaging.',
