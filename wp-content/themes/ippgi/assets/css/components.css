@@ -157,8 +157,8 @@
 
 .article-card__image-link {
     flex-shrink: 0;
-    width: 100px;
-    height: 75px;
+    width: 200px;
+    height: 112px;
 }
 
 .article-card__image {
@@ -195,6 +195,7 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.4;
+    text-wrap: wrap; /* Override h3's default text-wrap: balance in Chrome */
 }
 
 .article-card__title a {
@@ -1318,6 +1319,7 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    text-wrap: wrap; /* Override h2's default text-wrap: balance in Chrome */
 }
 
 .search-result-card__date {
@@ -2543,6 +2545,7 @@
     color: #333333;
     line-height: 1.3;
     margin: 0 0 var(--spacing-sm) 0;
+    text-wrap: wrap; /* Override h1's default text-wrap: balance in Chrome */
 }
 
 .single-post__date {
@@ -2659,6 +2662,7 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    text-wrap: wrap; /* Override h2's default text-wrap: balance in Chrome */
 }
 
 .blog-card__date {

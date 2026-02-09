@@ -358,8 +358,8 @@
 /* Desktop: larger image and font sizes */
 @media (min-width: 768px) {
     .article-card__image-link {
-        width: 140px;
-        height: 100px;
+        width: 280px;
+        height: 150px;
     }
 
     .article-card__title {
