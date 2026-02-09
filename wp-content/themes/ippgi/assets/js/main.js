@@ -794,11 +794,13 @@
 
         const closeBtn = upgradePrompt.querySelector('.upgrade-prompt__close');
         const actionBtn = upgradePrompt.querySelector('.upgrade-prompt__action');
+        const DISMISS_KEY = 'ippgi_upgrade_dismissed_at';
+        const ONE_DAY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
         closeBtn?.addEventListener('click', function() {
             upgradePrompt.hidden = true;
-            // Remember dismissal for this session
-            sessionStorage.setItem('ippgi_upgrade_dismissed', '1');
+            // Remember dismissal timestamp for 24 hours
+            localStorage.setItem(DISMISS_KEY, Date.now().toString());
         });
 
         actionBtn?.addEventListener('click', function() {
@@ -808,9 +810,16 @@
             }
         });
 
-        // Check if already dismissed this session
-        if (sessionStorage.getItem('ippgi_upgrade_dismissed')) {
-            upgradePrompt.hidden = true;
+        // Check if dismissed within the last 24 hours
+        const dismissedAt = localStorage.getItem(DISMISS_KEY);
+        if (dismissedAt) {
+            const elapsed = Date.now() - parseInt(dismissedAt, 10);
+            if (elapsed < ONE_DAY_MS) {
+                upgradePrompt.hidden = true;
+            } else {
+                // Expired, remove the old timestamp
+                localStorage.removeItem(DISMISS_KEY);
+            }
         }
     }
 
