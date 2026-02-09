@@ -15,7 +15,7 @@
                 <a href="#" class="site-footer__product-link" data-category="PPGI"><?php esc_html_e('PPGI', 'ippgi'); ?></a>
                 <a href="#" class="site-footer__product-link" data-category="GI"><?php esc_html_e('GI', 'ippgi'); ?></a>
                 <a href="#" class="site-footer__product-link" data-category="GL"><?php esc_html_e('GL', 'ippgi'); ?></a>
-                <a href="#" class="site-footer__product-link" data-category="AL"><?php esc_html_e('Aluminum Sheet', 'ippgi'); ?></a>
+                <a href="#" class="site-footer__product-link" data-category="AL"><?php esc_html_e('AL', 'ippgi'); ?></a>
                 <a href="#" class="site-footer__product-link" data-category="CRC_HARD"><?php esc_html_e('CRC Hard', 'ippgi'); ?></a>
                 <a href="#" class="site-footer__product-link" data-category="HRC"><?php esc_html_e('HRC', 'ippgi'); ?></a>
             </div>

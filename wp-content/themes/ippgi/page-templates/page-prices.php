@@ -21,6 +21,7 @@ if (isset($_GET['type'])) {
         'GL'       => 'gl',
         'HRC'      => 'hrc',
         'CRC Hard' => 'crc',
+        'CRC_HARD' => 'crc',
         'AL'       => 'aluminum',
     ];
     $raw_category = sanitize_text_field($_GET['category']);
@@ -66,7 +67,7 @@ $product_types = [
         'attributes_template' => 'Thickness: %s; Width: %s; Grade: SPCC, DC01, ST12; Surface: Bright finish; Hardness: Full hard; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Forming, stamping, appliances.',
     ],
     'aluminum' => [
-        'name' => 'Aluminum',
+        'name' => 'AL',
         'full_name' => 'Aluminum Sheet',
         'widths' => [1000],
         'attributes_template' => 'Thickness: %s; Width: %s; Alloy: 1050, 1060, 1100, 3003, 5052; Temper: H14, H24, O; Surface: Mill finish, brushed; Coil ID: 508mm; Weight: 1-3 tons/coil. Applications: Decoration, insulation, packaging.',

@@ -20,7 +20,7 @@ $material_types = [
     'ppgi' => 'PPGI',
     'gi' => 'GI',
     'gl' => 'GL',
-    'al' => __('Aluminum Sheet', 'ippgi'),
+    'al' => 'AL',
     'crc_hard' => 'CRC Hard',
     'hrc' => 'HRC',
 ];

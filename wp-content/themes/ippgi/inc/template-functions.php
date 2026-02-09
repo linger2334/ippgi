@@ -222,8 +222,8 @@ function ippgi_get_user_favorites($user_id = null) {
         'hrc' => ['name' => __('HRC', 'ippgi'), 'type' => 'hrc'],
         'crc_hard' => ['name' => __('CRC Hard', 'ippgi'), 'type' => 'crc_hard'],
         'crc' => ['name' => __('CRC Hard', 'ippgi'), 'type' => 'crc_hard'],
-        'al' => ['name' => __('Aluminum Sheet', 'ippgi'), 'type' => 'al'],
-        'aluminum' => ['name' => __('Aluminum Sheet', 'ippgi'), 'type' => 'al'],
+        'al' => ['name' => __('AL', 'ippgi'), 'type' => 'al'],
+        'aluminum' => ['name' => __('AL', 'ippgi'), 'type' => 'al'],
     ];
 
     $result = [];
