@@ -1726,3 +1726,230 @@ function ippgi_admin_notices() {
     }
 }
 add_action('admin_notices', 'ippgi_admin_notices');
+
+/**
+ * ============================================================================
+ * Admin: Bonus Days Management on User Profile Page
+ * ============================================================================
+ */
+
+/**
+ * Add bonus days management section to user profile page
+ */
+function ippgi_admin_user_bonus_section($user) {
+    // Only show to administrators
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+
+    $user_id = $user->ID;
+    $unused_bonus_days = ippgi_get_unused_bonus_days($user_id);
+    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    $bonus_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+    $bonus_logs = get_user_meta($user_id, 'ippgi_bonus_admin_logs', true) ?: [];
+
+    // Calculate remaining days if bonus is active
+    $remaining_days = 0;
+    if ($bonus_active && $bonus_end) {
+        $end_time = strtotime($bonus_end . ' ' . wp_timezone_string());
+        $now = current_time('timestamp');
+        if ($end_time > $now) {
+            $remaining_days = ceil(($end_time - $now) / DAY_IN_SECONDS);
+        }
+    }
+    ?>
+    <h2><?php esc_html_e('Bonus Days Management', 'ippgi'); ?></h2>
+    <table class="form-table" role="presentation">
+        <tr>
+            <th scope="row"><?php esc_html_e('Bonus Status', 'ippgi'); ?></th>
+            <td>
+                <?php if ($bonus_active): ?>
+                    <span style="color: #46b450; font-weight: bold;">● <?php esc_html_e('Active', 'ippgi'); ?></span>
+                    <p class="description">
+                        <?php
+                        printf(
+                            esc_html__('Expires: %s (%d days remaining)', 'ippgi'),
+                            esc_html($bonus_end),
+                            $remaining_days
+                        );
+                        ?>
+                    </p>
+                <?php else: ?>
+                    <span style="color: #999;">○ <?php esc_html_e('Inactive', 'ippgi'); ?></span>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row"><?php esc_html_e('Accumulated Bonus Days', 'ippgi'); ?></th>
+            <td>
+                <strong style="font-size: 18px;"><?php echo intval($unused_bonus_days); ?></strong>
+                <span><?php esc_html_e('days', 'ippgi'); ?></span>
+                <p class="description">
+                    <?php esc_html_e('These days will be automatically activated when subscription expires.', 'ippgi'); ?>
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row">
+                <label for="ippgi_add_bonus_days"><?php esc_html_e('Add Bonus Days', 'ippgi'); ?></label>
+            </th>
+            <td>
+                <input type="number" name="ippgi_add_bonus_days" id="ippgi_add_bonus_days"
+                       min="1" max="365" value="" class="small-text" style="width: 80px;">
+                <span><?php esc_html_e('days', 'ippgi'); ?></span>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row">
+                <label for="ippgi_bonus_reason"><?php esc_html_e('Reason', 'ippgi'); ?></label>
+            </th>
+            <td>
+                <input type="text" name="ippgi_bonus_reason" id="ippgi_bonus_reason"
+                       value="" class="regular-text" placeholder="<?php esc_attr_e('e.g., Customer support compensation', 'ippgi'); ?>">
+                <p class="description">
+                    <?php esc_html_e('Required. This will be logged for tracking purposes.', 'ippgi'); ?>
+                </p>
+            </td>
+        </tr>
+    </table>
+    <p class="description" style="margin-top: 10px;">
+        <?php esc_html_e('Note: If user has an active subscription, bonus days will be accumulated and automatically activated after subscription expires. If user has no subscription, bonus days will be activated immediately.', 'ippgi'); ?>
+    </p>
+
+    <?php if (!empty($bonus_logs)): ?>
+    <h3><?php esc_html_e('Recent Bonus Logs', 'ippgi'); ?></h3>
+    <table class="widefat striped" style="max-width: 800px;">
+        <thead>
+            <tr>
+                <th><?php esc_html_e('Date', 'ippgi'); ?></th>
+                <th><?php esc_html_e('Days', 'ippgi'); ?></th>
+                <th><?php esc_html_e('Reason', 'ippgi'); ?></th>
+                <th><?php esc_html_e('Added By', 'ippgi'); ?></th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            // Show last 10 logs, newest first
+            $recent_logs = array_slice(array_reverse($bonus_logs), 0, 10);
+            foreach ($recent_logs as $log):
+            ?>
+            <tr>
+                <td><?php echo esc_html($log['date'] ?? '-'); ?></td>
+                <td><?php echo esc_html($log['days'] ?? '-'); ?></td>
+                <td><?php echo esc_html($log['reason'] ?? '-'); ?></td>
+                <td><?php echo esc_html($log['admin'] ?? '-'); ?></td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <?php wp_nonce_field('ippgi_bonus_admin_action', 'ippgi_bonus_admin_nonce'); ?>
+    <?php
+}
+add_action('show_user_profile', 'ippgi_admin_user_bonus_section');
+add_action('edit_user_profile', 'ippgi_admin_user_bonus_section');
+
+/**
+ * Handle bonus days form submission
+ */
+function ippgi_admin_save_user_bonus($user_id) {
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+
+    // Verify nonce
+    if (!isset($_POST['ippgi_bonus_admin_nonce']) ||
+        !wp_verify_nonce($_POST['ippgi_bonus_admin_nonce'], 'ippgi_bonus_admin_action')) {
+        return;
+    }
+
+    // Get form data
+    $days_to_add = isset($_POST['ippgi_add_bonus_days']) ? intval($_POST['ippgi_add_bonus_days']) : 0;
+    $reason = isset($_POST['ippgi_bonus_reason']) ? sanitize_text_field($_POST['ippgi_bonus_reason']) : '';
+
+    // Validate
+    if ($days_to_add <= 0 || $days_to_add > 365) {
+        return;
+    }
+
+    if (empty($reason)) {
+        return;
+    }
+
+    // Check if user has active subscription
+    $has_subscription = ippgi_has_active_subscription($user_id);
+
+    // Add bonus days based on subscription status
+    if ($has_subscription) {
+        // Has subscription → accumulate for later
+        $current_unused = ippgi_get_unused_bonus_days($user_id);
+        update_user_meta($user_id, 'ippgi_unused_bonus_days', $current_unused + $days_to_add);
+        $activated = false;
+    } else {
+        // No subscription → activate immediately
+        ippgi_activate_bonus_access($user_id, $days_to_add);
+        $activated = true;
+    }
+
+    // Log the action
+    $logs = get_user_meta($user_id, 'ippgi_bonus_admin_logs', true) ?: [];
+    $logs[] = [
+        'date' => current_time('Y-m-d H:i:s'),
+        'days' => $days_to_add,
+        'reason' => $reason,
+        'admin' => wp_get_current_user()->user_login,
+        'activated' => $activated,
+    ];
+    update_user_meta($user_id, 'ippgi_bonus_admin_logs', $logs);
+
+    // Set success notice
+    set_transient('ippgi_bonus_admin_notice_' . get_current_user_id(), [
+        'type' => 'success',
+        'days' => $days_to_add,
+        'activated' => $activated,
+    ], 30);
+
+    // Also log to error_log for debugging
+    error_log(sprintf(
+        'IPPGI: Admin %s added %d bonus days to user %d. Reason: %s. Activated: %s',
+        wp_get_current_user()->user_login,
+        $days_to_add,
+        $user_id,
+        $reason,
+        $activate_immediately ? 'yes' : 'no'
+    ));
+}
+add_action('personal_options_update', 'ippgi_admin_save_user_bonus');
+add_action('edit_user_profile_update', 'ippgi_admin_save_user_bonus');
+
+/**
+ * Display admin notice after adding bonus days
+ */
+function ippgi_bonus_admin_notice() {
+    $notice = get_transient('ippgi_bonus_admin_notice_' . get_current_user_id());
+    if (!$notice) {
+        return;
+    }
+
+    delete_transient('ippgi_bonus_admin_notice_' . get_current_user_id());
+
+    $message = sprintf(
+        /* translators: %d: number of days */
+        __('Successfully added %d bonus days.', 'ippgi'),
+        $notice['days']
+    );
+
+    if ($notice['activated']) {
+        $message .= ' ' . __('Bonus access has been activated immediately.', 'ippgi');
+    } else {
+        $message .= ' ' . __('Days have been accumulated for later use.', 'ippgi');
+    }
+    ?>
+    <div class="notice notice-success is-dismissible">
+        <p><strong><?php esc_html_e('IPPGI:', 'ippgi'); ?></strong> <?php echo esc_html($message); ?></p>
+    </div>
+    <?php
+}
+add_action('admin_notices', 'ippgi_bonus_admin_notice');

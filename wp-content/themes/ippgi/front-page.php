@@ -20,7 +20,6 @@ get_header();
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
                         </svg>
                         <?php esc_html_e('MyPrices', 'ippgi'); ?>
-                        <span class="my-prices__category" id="current-category">PPGI</span>
                     </h2>
                 </div>
                 <p class="my-prices__disclaimer">
@@ -46,7 +45,6 @@ get_header();
                             </div>
                         </div>
                     </div>
-                    <div class="price-carousel__dots" id="price-carousel-dots"></div>
                 </div>
 
                 <div class="my-prices__footer">
