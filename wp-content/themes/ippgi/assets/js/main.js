@@ -1067,12 +1067,12 @@
             rows.forEach(row => {
                 const changeClass = row.change > 0 ? 'up' : (row.change < 0 ? 'down' : 'neutral');
                 const changeSign = row.change > 0 ? '+' : '';
-                const changeDisplay = row.change !== 0 ? changeSign + Math.round(row.change) : '0';
+                const changeDisplay = row.change !== 0 ? changeSign + row.change.toFixed(2) : '0.00';
 
                 html += '<tr>';
                 html += '<td><span class="price-table__product">' + row.product + '</span></td>';
                 html += '<td><span class="price-table__dimensions">' + row.dimensions + '</span></td>';
-                html += '<td><span class="price-table__price">$' + Math.round(row.price).toLocaleString() + '</span></td>';
+                html += '<td><span class="price-table__price price-table__price--' + changeClass + '">$' + row.price.toFixed(2) + '</span></td>';
                 html += '<td><span class="price-table__change price-table__change--' + changeClass + '">' + changeDisplay + '</span></td>';
                 html += '</tr>';
             });
@@ -1570,7 +1570,7 @@
                 html +=
                     '<tr>' +
                     '<td>' + escapeHtml(displayDimensions) + '</td>' +
-                    '<td>$' + formatNumber(price) + '</td>' +
+                    '<td class="prices-table__price--' + changeClass + '">$' + formatNumber(price) + '</td>' +
                     '<td class="prices-table__change--' + changeClass + '">' + changeText + '</td>' +
                     '<td>' +
                     '<a href="' + escapeHtml(detailUrl) + '" class="prices-table__view-btn">' +

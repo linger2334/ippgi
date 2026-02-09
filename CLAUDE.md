@@ -488,6 +488,9 @@ Body: cancel_at_period_end=true
 
 3. **收藏列表**
    - 三等分布局：产品名称 | 规格 | 心形按钮
+   - 规格显示规则：
+     - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`
+     - **HRC, AL**：显示 `厚度*宽度 产品名称`
    - 内容居中显示，文字太长自动换行
    - 心形按钮点击可取消收藏（AJAX 请求）
    - 取消收藏后条目滑出动画移除
@@ -651,7 +654,9 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 7. **价格表格**
    - 表头：Dimensions(mm) | Latest($) | Change($) | Historical
    - 蓝色表头背景（#e2f5fb）
-   - Dimensions 列显示：`厚度*宽度 材料名称`（如 `0.4*1200 民用镀锌`）
+   - Dimensions 列显示规则：
+     - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`（如 `0.4*1200`）
+     - **HRC, AL**：显示 `厚度*宽度 产品名称`（如 `2.0*1010 热卷`）
    - Change 列根据涨跌显示不同颜色
    - Historical 列显示 "View >" 按钮，跳转到价格详情页
 
@@ -689,7 +694,10 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 2. **产品信息表格**
    - 蓝色表头（#e7f5fb）：Product | Dimensions(mm) | Favorite
-   - 数据行：产品代码（粗体） | 规格（`厚度*宽度 材料名称`） | 心形收藏按钮
+   - 数据行：产品代码（粗体） | 规格 | 心形收藏按钮
+   - 规格显示规则：
+     - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`
+     - **HRC, AL**：显示 `厚度*宽度 产品名称`
    - 带边框样式
 
 3. **收藏功能**
@@ -1111,6 +1119,90 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   1. `ippgi_get_paypal_next_billing_date()` - PayPal UTC 字符串 → `setTimezone(wp_timezone())`
   2. `ippgi_get_stripe_next_billing_date()` - Stripe Unix 时间戳 → `DateTime('@' . $ts)` + `setTimezone(wp_timezone())`
   3. `ippgi_estimate_next_billing_date()` - SWPM 数据库日期 → `DateTime` + `setTimezone(wp_timezone())`
+
+#### 34. 产品名称显示逻辑统一 ✅
+- **背景**：部分产品类别的产品名称存在中英文混合（如 PPGI 的 "彩涂"、GI 的 "民用镀锌"），显示不统一
+- **规则**：
+  - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`（如 `0.4*1200`）
+  - **HRC, AL**：显示完整内容，包含产品名称（如 `2.0*1010 热卷`）
+- **影响页面**：
+  1. **价格列表页 `/prices`**：Dimensions(mm) 列
+  2. **价格详情页 `/price-detail`**：产品信息表格、图表标题、曲线滑动提示框
+  3. **收藏页 `/favorites`**：产品规格中间列
+- **代码位置**：
+  - `/assets/js/main.js`：价格列表页表格渲染逻辑（`currentType === 'hrc' || currentType === 'aluminum'` 判断）
+  - `/page-templates/page-price-detail.php`：PHP 构建 `$display_dimensions`，JavaScript 构建 crosshair tooltip 的 `productName`
+  - `/inc/template-functions.php`：`ippgi_get_user_favorites()` 函数中构建 `$display_spec`
+
+#### 35. 升级提示 24 小时关闭记忆 ✅
+- **需求**：升级提示关闭后，24 小时内不再显示（跨页面生效）
+- **实现**：
+  - 从 `sessionStorage` 改为 `localStorage` 存储关闭时间戳
+  - 存储键：`ippgi_upgrade_dismissed_at`
+  - 页面加载时检查：若距离上次关闭不足 24 小时则隐藏提示
+  - 超过 24 小时后自动清除旧时间戳，重新显示提示
+- **代码位置**：`/assets/js/main.js` 中的 `initUpgradePrompt()` 函数
+
+#### 36. 升级提示关闭按钮重新设计 ✅
+- **需求**：根据 Figma 设计稿重新设计关闭按钮
+- **样式**：
+  - 白色圆形背景（28px × 28px）
+  - 灰色边框（1px #888）
+  - X 图标使用 SVG（14px，stroke #666）
+  - 位置：右上角，部分超出提示框边界（`top: -12px; right: -8px`）
+  - 悬停效果：背景变为浅灰色（#f5f5f5）
+- **代码位置**：
+  - `/template-parts/upgrade-prompt.php`：按钮 HTML（SVG 图标）
+  - `/assets/css/components.css`：`.upgrade-prompt__close` 样式
+
+#### 37. 文章标题换行修复 ✅
+- **问题**：Chrome 新版默认对 h1-h6 应用 `text-wrap: balance`，导致标题提前换行，右侧留白过多
+- **修复**：对受影响的标题元素添加 `text-wrap: wrap` 覆盖默认行为
+- **影响元素**：
+  - `.article-card__title`（首页 Market Insights）
+  - `.blog-card__title`（博客列表页）
+  - `.search-result-card__title`（搜索结果页）
+  - `.single-post__title`（文章详情页）
+- **代码位置**：`/assets/css/components.css`
+
+#### 38. 价格显示统一为 2 位小数 ✅
+- **需求**：所有价格显示统一为 2 位小数格式（如 `$650.25`）
+- **影响位置**：
+  1. **首页价格列表**：Latest 列、Change 列
+  2. **价格列表页 `/prices`**：Latest 列、Change 列（已有）
+  3. **价格详情页 `/price-detail`**：
+     - Real-Time Data 区域（6个字段：主价格、涨跌值、Avg、WoW、MoM、YoY）
+     - 图表气球标签（最高点、最低点）
+     - 滑动坐标点提示框价格
+- **实现**：
+  - 首页：`row.price.toFixed(2)` 和 `row.change.toFixed(2)`
+  - 价格详情页：新增 `formatPrice(num)` 辅助函数，统一使用 `num.toFixed(2)`
+- **代码位置**：
+  - `/assets/js/main.js`：首页价格列表渲染
+  - `/page-templates/page-price-detail.php`：价格详情页 JavaScript
+
+#### 39. 图表气球标签宽度调整 ✅
+- **问题**：价格改为 2 位小数后，气球标签内容过长导致显示不全
+- **修复**：调整气球样式使其自适应内容宽度
+- **样式调整**：
+  - 宽度：从固定 `30px` 改为 `min-width: 36px` + `padding: 0 8px`
+  - 高度：从 `36px` 改为 `24px`
+  - 形状：从圆形 `border-radius: 50%` 改为药丸形 `border-radius: 12px`
+  - 新增：`white-space: nowrap` 防止文字换行
+- **代码位置**：`/assets/css/components.css` 中的 `.chart-balloon__text`
+
+#### 40. Latest 列与 Change 列颜色同步 ✅
+- **需求**：Latest 列颜色跟随 Change 列变化（涨跌时同步变色）
+- **影响页面**：
+  1. **首页价格列表**：Latest 列添加 `price-table__price--{up/down/neutral}` 类
+  2. **价格列表页 `/prices`**：Latest 列添加 `prices-table__price--{up/down/neutral}` 类
+- **颜色规则**：
+  - 上涨（up）：绿色 `#22c55e` / `var(--color-success)`
+  - 下跌（down）：红色 `#ef4444` / `var(--color-danger)`
+  - 无变化（neutral）：保持默认颜色
+- **代码位置**：
+  - `/assets/js/main.js`：表格渲染逻辑
+  - `/assets/css/components.css`：新增 `.price-table__price--up/down` 和 `.prices-table__price--up/down` 样式
 
 ---
 

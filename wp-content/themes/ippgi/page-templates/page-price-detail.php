@@ -438,6 +438,12 @@ window.ippgiPriceDetail = {
         });
     }
 
+    // Format price with 2 decimal places
+    function formatPrice(num) {
+        if (typeof num !== 'number' || isNaN(num)) return '0.00';
+        return num.toFixed(2);
+    }
+
     function updateRealtimeDisplay(r, isTax) {
         var price = isTax ? (r.lastpriceTax_usd || 0) : (r.lastprice_usd || 0);
         var avgPrice = isTax ? (r.priceTax_usd || 0) : (r.price_usd || 0);
@@ -452,7 +458,7 @@ window.ippgiPriceDetail = {
 
         // Main price
         var priceEl = document.getElementById('detail-price');
-        if (priceEl) priceEl.textContent = '$' + Math.round(price).toLocaleString();
+        if (priceEl) priceEl.textContent = '$' + formatPrice(price);
 
         // Change
         var changeWrap = document.getElementById('detail-change-wrap');
@@ -462,12 +468,12 @@ window.ippgiPriceDetail = {
             changeWrap.className = 'detail-realtime__change' +
                 (change < 0 ? ' is-down' : (change > 0 ? ' is-up' : ''));
         }
-        if (changeEl) changeEl.textContent = '$' + Math.round(change).toLocaleString();
+        if (changeEl) changeEl.textContent = '$' + formatPrice(change);
         if (changePctEl) changePctEl.textContent = changePct + '%';
 
         // Avg
         var avgEl = document.getElementById('detail-avg');
-        if (avgEl) avgEl.textContent = '$' + Math.round(avgPrice).toLocaleString();
+        if (avgEl) avgEl.textContent = '$' + formatPrice(avgPrice);
 
         // WoW / MoM / YoY
         updateStatValue('detail-wow', wow);
@@ -485,7 +491,7 @@ window.ippgiPriceDetail = {
         var el = document.getElementById(id);
         if (!el) return;
         if (val !== null && val !== 0) {
-            el.textContent = '$' + Math.round(val).toLocaleString();
+            el.textContent = '$' + formatPrice(val);
             el.className = 'detail-realtime__stat-value' +
                 (val < 0 ? ' is-down' : (val > 0 ? ' is-up' : ''));
         } else {
@@ -707,7 +713,7 @@ window.ippgiPriceDetail = {
         function createBalloon(idx) {
             var px = (idx / (prices.length - 1)) * w;
             var py = h - ((prices[idx] - minPrice) / priceRange) * h;
-            var label = Math.round(prices[idx]);
+            var label = formatPrice(prices[idx]);
 
             // Create balloon element
             var balloon = document.createElement('div');
@@ -1232,7 +1238,7 @@ window.ippgiPriceDetail = {
             if (infoboxTime) infoboxTime.textContent = timeStr;
             if (infoboxName) infoboxName.textContent = productName;
             if (infoboxSpec) infoboxSpec.textContent = dimensionStr;
-            if (infoboxPrice) infoboxPrice.textContent = '$' + Math.round(price);
+            if (infoboxPrice) infoboxPrice.textContent = '$' + formatPrice(price);
 
             // Position infobox - keep within chart bounds
             var infoboxWidth = infobox.offsetWidth || 200;

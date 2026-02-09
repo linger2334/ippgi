@@ -295,6 +295,14 @@
     color: var(--color-text-muted);
 }
 
+.price-table__price--up {
+    color: var(--color-success);
+}
+
+.price-table__price--down {
+    color: var(--color-danger);
+}
+
 /* ==========================================================================
    Forms
    ========================================================================== */
@@ -2071,6 +2079,14 @@
 
 .price-table__change--neutral {
     color: var(--color-text-muted);
+}
+
+.price-table__price--up {
+    color: var(--color-success);
+}
+
+.price-table__price--down {
+    color: var(--color-danger);
 }
 
 /* ==========================================================================
@@ -4507,6 +4523,14 @@ html:has(.edit-profile-page-body) {
     color: #888 !important;
 }
 
+.prices-table__price--up {
+    color: #22c55e !important;
+}
+
+.prices-table__price--down {
+    color: #ef4444 !important;
+}
+
 /* View Button */
 .prices-table__view-btn {
     display: inline-flex;
@@ -4950,13 +4974,15 @@ html:has(.edit-profile-page-body) {
     color: #fff;
     font-size: 10px;
     font-weight: bold;
-    width: 30px;
-    height: 36px;
+    min-width: 36px;
+    height: 24px;
+    padding: 0 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: 12px;
     line-height: 1;
+    white-space: nowrap;
 }
 
 .chart-balloon__arrow {
