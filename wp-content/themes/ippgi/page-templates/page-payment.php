@@ -33,10 +33,11 @@ $price = $is_yearly ? $yearly_price : $monthly_price;
 $period = $is_yearly ? 'year' : 'month';
 
 // Payment button IDs (SWPM shortcode IDs)
-$stripe_monthly_id = 126;
-$stripe_yearly_id = 127;
-$paypal_monthly_id = 123;
-$paypal_yearly_id = 124;
+// TODO: Update these IDs after creating PayPal buttons in SWPM admin
+$stripe_monthly_id = 173;
+$stripe_yearly_id = 174;
+$paypal_monthly_id = 168;
+$paypal_yearly_id = 169;
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
