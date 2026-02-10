@@ -32,7 +32,7 @@
         <?php else : ?>
             <ul class="mobile-menu-dropdown__list">
                 <li class="mobile-menu-dropdown__item">
-                    <a href="<?php echo esc_url(home_url('/prices')); ?>" class="mobile-menu-dropdown__link">
+                    <a href="#" class="mobile-menu-dropdown__link js-prices-link" data-requires-premium="true">
                         <?php esc_html_e('Prices & Trends', 'ippgi'); ?>
                     </a>
                 </li>

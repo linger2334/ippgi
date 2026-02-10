@@ -1290,6 +1290,7 @@
         const priceTableContainer = document.getElementById('price-table-container');
         const readMoreBtn = document.getElementById('prices-read-more');
         const footerProductLinks = document.querySelectorAll('.site-footer__product-link[data-category]');
+        const pricesLinks = document.querySelectorAll('.js-prices-link');
 
         /**
          * Navigate to appropriate page based on user status
@@ -1346,6 +1347,14 @@
                 e.preventDefault();
                 var category = this.getAttribute('data-category');
                 navigateToPrices(category);
+            });
+        });
+
+        // Generic prices links (e.g., hamburger menu "Prices & Trends")
+        pricesLinks.forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                navigateToPrices('PPGI');
             });
         });
     }

@@ -23,7 +23,7 @@
     <?php else : ?>
         <ul class="header-nav__list">
             <li class="header-nav__item">
-                <a href="<?php echo esc_url(home_url('/prices')); ?>" class="header-nav__link">
+                <a href="#" class="header-nav__link js-prices-link">
                     <?php esc_html_e('Prices & Trends', 'ippgi'); ?>
                 </a>
             </li>
