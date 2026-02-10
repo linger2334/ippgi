@@ -33,12 +33,12 @@
                 </a>
             </li>
             <li class="header-nav__item">
-                <a href="<?php echo esc_url(home_url('/favorites')); ?>" class="header-nav__link">
+                <a href="<?php echo esc_url(home_url('/favorites')); ?>" class="header-nav__link js-require-login" data-href="<?php echo esc_url(home_url('/favorites')); ?>">
                     <?php esc_html_e('My favorites', 'ippgi'); ?>
                 </a>
             </li>
             <li class="header-nav__item">
-                <a href="<?php echo esc_url(home_url('/invite')); ?>" class="header-nav__link">
+                <a href="<?php echo esc_url(home_url('/invite')); ?>" class="header-nav__link js-require-login" data-href="<?php echo esc_url(home_url('/invite')); ?>">
                     <?php esc_html_e('Share & Earn', 'ippgi'); ?>
                 </a>
             </li>

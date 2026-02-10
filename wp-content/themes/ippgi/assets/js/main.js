@@ -21,6 +21,7 @@
         initSmoothScroll();
         initFavoriteButtons();
         initLoginModal();
+        initRequireLoginLinks();
         initAnnouncementBanner();
         initSearchOverlay();
         initDatePicker();
@@ -227,7 +228,7 @@
         const loginTriggers = document.querySelectorAll('#login-trigger, #login-trigger-mobile');
         const loginModal = document.getElementById('login-modal');
 
-        if (loginTriggers.length === 0) return;
+        if (loginTriggers.length === 0 && !loginModal) return;
 
         const backdrop = loginModal?.querySelector('.login-modal__backdrop');
         const closeBtn = loginModal?.querySelector('.login-modal__close');
@@ -246,12 +247,13 @@
         }
 
         function openModal() {
-            if (!loginModal) return;
+            if (!loginModal) return false;
             loginModal.hidden = false;
             document.body.style.overflow = 'hidden';
             // Focus first focusable element
             const firstInput = loginModal.querySelector('button, input, a');
             if (firstInput) firstInput.focus();
+            return true;
         }
 
         function closeModal() {
@@ -286,6 +288,53 @@
             if (e.key === 'Escape' && loginModal && !loginModal.hidden) {
                 closeModal();
             }
+        });
+
+        // Expose global function for showing login prompt
+        // On PC: shows modal, on mobile: redirects to login page
+        window.ippgiShowLogin = function() {
+            if (isMobile()) {
+                window.location.href = getLoginUrl();
+            } else {
+                if (!openModal()) {
+                    // Fallback if modal doesn't exist
+                    window.location.href = getLoginUrl();
+                }
+            }
+        };
+    }
+
+    /**
+     * Initialize links that require login
+     * On PC: shows login modal if not logged in
+     * On mobile: redirects to login page if not logged in
+     */
+    function initRequireLoginLinks() {
+        const requireLoginLinks = document.querySelectorAll('.js-require-login');
+
+        if (requireLoginLinks.length === 0) return;
+
+        requireLoginLinks.forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                // Check if user is logged in (ippgiData is set in PHP)
+                if (typeof ippgiData !== 'undefined' && ippgiData.isLoggedIn) {
+                    // User is logged in, allow normal navigation
+                    return;
+                }
+
+                // User is not logged in, prevent default navigation
+                e.preventDefault();
+
+                // Show login (modal on PC, redirect on mobile)
+                if (typeof window.ippgiShowLogin === 'function') {
+                    window.ippgiShowLogin();
+                } else {
+                    // Fallback: redirect to login page
+                    window.location.href = (typeof ippgiData !== 'undefined' && ippgiData.loginUrl)
+                        ? ippgiData.loginUrl
+                        : '/login';
+                }
+            });
         });
     }
 
@@ -1301,8 +1350,12 @@
 
             // Check if user is logged in
             if (!ippgiData.isLoggedIn) {
-                // Not logged in - redirect to login page
-                window.location.href = ippgiData.loginUrl;
+                // Not logged in - show login (modal on PC, redirect on mobile)
+                if (typeof window.ippgiShowLogin === 'function') {
+                    window.ippgiShowLogin();
+                } else {
+                    window.location.href = ippgiData.loginUrl;
+                }
                 return;
             }
 

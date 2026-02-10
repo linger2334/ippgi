@@ -1271,6 +1271,63 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - `/template-parts/login-modal.php`：模态框模板
   - `/assets/css/components.css`：`.btn--google` 和 `.login-modal__signup-link` 样式
 
+#### 46. PC 端支付页面左右布局 ✅
+- **需求**：PC 端使用左右布局，移动端保持上下布局
+- **Figma 设计**：左侧黑色背景显示价格，右侧白色背景显示表单
+- **实现**：
+  1. 重构 `page-payment.php` 页面结构，添加 `.payment-layout` 容器
+  2. 左侧面板（`.payment-layout__left`）：渐变背景，显示订阅价格信息
+  3. 右侧面板（`.payment-layout__right`）：白色背景，显示支付表单
+  4. 添加响应式样式：移动端上下布局，PC 端（≥1024px）左右布局
+- **样式特点**：
+  - PC 端：flex 布局，左侧固定宽度，右侧自适应
+  - 移动端：block 布局，上下排列
+  - 左侧面板：渐变背景（深蓝到浅蓝），白色文字
+  - 右侧面板：浅灰背景，居中卡片
+- **代码位置**：
+  - `/page-templates/page-payment.php`：页面结构
+  - `/assets/css/components.css`：`.payment-layout`、`.payment-layout__left`、`.payment-layout__right` 样式
+
+#### 47. PC 端登录逻辑统一 ✅
+- **问题**：PC 端登录行为不一致
+  - 点击右上角 LOGIN 按钮：弹出登录模态框
+  - 点击其他需要登录的按钮（如 My favorites、Share & Earn）：跳转到单独的 `/login` 页面
+- **修复**：统一为弹出模态框
+- **实现方案**：
+  1. 创建全局函数 `window.ippgiShowLogin()`：
+     - 移动端（<1024px）：跳转到 `/login` 页面
+     - PC 端（≥1024px）：弹出登录模态框
+  2. 修改 `navigateToPrices()` 函数，使用 `ippgiShowLogin()` 替代直接跳转
+  3. 给需要登录态的链接添加 `js-require-login` 类和 `data-href` 属性
+  4. 添加 `initRequireLoginLinks()` 函数拦截这些链接的点击事件
+- **受影响的链接**：
+  - 桌面端导航：My favorites、Share & Earn
+  - 移动端菜单：My favorites、Share & Earn
+  - 首页价格表及相关跳转链接
+- **代码位置**：
+  - `/assets/js/main.js`：`ippgiShowLogin()`、`initRequireLoginLinks()` 函数
+  - `/template-parts/header-desktop.php`：添加 `js-require-login` 类
+  - `/template-parts/header-mobile.php`：添加 `js-require-login` 类
+
+#### 48. 价格相关链接权限检查确认 ✅
+- **确认内容**：PC 端和移动端，登录用户但无高级会员权限时的跳转行为
+- **受影响链接**：
+  - Prices & Trends（`.js-prices-link`）
+  - 首页价格表容器点击
+  - Read More 按钮
+  - Footer 底部 6 个产品价格链接（`data-category`）
+- **行为确认**：
+  - 未登录 → 弹出登录模态框（PC）或跳转登录页（移动）
+  - 已登录但无 Premium → 跳转到订阅页面 `/subscribe`
+  - 有 Premium（Plus 或 Bonus）→ 正常跳转到价格页面
+- **代码逻辑**（`navigateToPrices()` 函数）：
+  ```javascript
+  if (!ippgiData.hasPremium) {
+      window.location.href = ippgiData.subscribeUrl;
+      return;
+  }
+  ```
+
 ---
 
 ### Phase 2 - 待实现
