@@ -1328,6 +1328,30 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   }
   ```
 
+#### 49. PC 端鼠标悬停效果 ✅
+- **需求**：PC 端为可交互元素添加鼠标悬停效果，增强用户体验
+- **效果设计**（参考 Figma）：
+  - 浅灰背景：`#f1f1f1`
+  - 1px 边框：`#a7a7a7`（使用 `inset box-shadow` 实现）
+  - 3D 阴影：`4px 4px 8px rgba(0, 0, 0, 0.5)`（黑色模糊渐变）
+  - 浮起动效：`transform: translateY(-2px/-3px)` + `transition 0.2s ease`
+- **应用元素**：
+  1. **首页价格列表行**（`.price-table tbody tr`）：浮起 2px
+  2. **首页 Market Insights 文章卡片**（`.article-card`）：浮起 3px
+  3. **博客列表页卡片**（`.blog-card`）：浮起 3px
+- **附加修改**：博客卡片分割线从 `2px solid #e0e0e0` 改为 `1px solid var(--color-border-light)`，与首页文章卡片一致
+- **代码位置**：`/assets/css/responsive.css` 中的 `@media (min-width: 1024px)` 区块
+- **CSS 示例**：
+  ```css
+  .price-table tbody tr:hover {
+      background-color: #f1f1f1;
+      box-shadow:
+          inset 0 0 0 1px #a7a7a7,
+          4px 4px 8px rgba(0, 0, 0, 0.5);
+      transform: translateY(-2px);
+  }
+  ```
+
 ---
 
 ### Phase 2 - 待实现

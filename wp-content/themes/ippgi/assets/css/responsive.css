@@ -177,6 +177,53 @@
         padding-top: calc(40px + var(--header-height-desktop) + var(--spacing-sm)) !important;
         padding-bottom: var(--spacing-xl);
     }
+
+    /* Price table row hover effect */
+    .price-table tbody tr {
+        transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform 0.2s ease;
+        cursor: pointer;
+    }
+
+    .price-table tbody tr:hover {
+        background-color: #f1f1f1;
+        box-shadow:
+            inset 0 0 0 1px #a7a7a7,
+            4px 4px 8px rgba(0, 0, 0, 0.5);
+        position: relative;
+        transform: translateY(-2px);
+    }
+
+    .price-table tbody tr:hover td {
+        border-bottom-color: transparent;
+    }
+
+    /* Article card hover effect */
+    .article-card {
+        transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform 0.2s ease;
+        cursor: pointer;
+    }
+
+    .article-card:hover {
+        background-color: #f1f1f1;
+        box-shadow:
+            inset 0 0 0 1px #a7a7a7,
+            4px 4px 8px rgba(0, 0, 0, 0.5);
+        transform: translateY(-3px);
+    }
+
+    /* Blog card hover effect */
+    .blog-card {
+        transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform 0.2s ease;
+        cursor: pointer;
+    }
+
+    .blog-card:hover {
+        background-color: #f1f1f1;
+        box-shadow:
+            inset 0 0 0 1px #a7a7a7,
+            4px 4px 8px rgba(0, 0, 0, 0.5);
+        transform: translateY(-3px);
+    }
 }
 
 /* ==========================================================================
