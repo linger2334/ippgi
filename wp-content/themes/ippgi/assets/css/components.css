@@ -5356,6 +5356,23 @@ html:has(.edit-profile-page-body) {
     background-color: #f5f5f5;
 }
 
+/* Payment Layout - Mobile: stacked, PC: side by side */
+.payment-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.payment-layout__left {
+    flex-shrink: 0;
+}
+
+.payment-layout__right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
 /* Header with gradient */
 .payment-header {
     background: linear-gradient(180deg, #4a4a4a 0%, #1a1a1a 100%);
@@ -5706,5 +5723,187 @@ html:has(.edit-profile-page-body) {
 
     .payment-method {
         flex: 1;
+    }
+}
+
+/* PC Layout: Side by side */
+@media (min-width: 1024px) {
+    .payment-layout {
+        flex-direction: row;
+    }
+
+    .payment-layout__left {
+        width: 50%;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .payment-layout__left .payment-header {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--spacing-2xl);
+        background: #000;
+    }
+
+    .payment-layout__left .payment-header__content {
+        max-width: none;
+        text-align: center;
+    }
+
+    .payment-layout__left .payment-header__subtitle {
+        font-size: 1.5rem;
+        color: #a2a2a2;
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .payment-layout__left .payment-header__amount {
+        font-size: 3.5rem;
+        color: #bdbdbd;
+    }
+
+    .payment-layout__left .payment-header__period {
+        font-size: 1.75rem;
+        color: #9f9f9f;
+    }
+
+    .payment-layout__right {
+        width: 50%;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #f8f8f8 0%, #f0f0f0 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .payment-layout__right .payment-card-wrapper {
+        margin-top: 0;
+        padding: var(--spacing-2xl);
+        width: 100%;
+        max-width: 540px;
+    }
+
+    .payment-layout__right .payment-card {
+        background: transparent;
+        border-radius: 0;
+        min-height: auto;
+        padding: 0;
+    }
+
+    /* Larger email field for PC */
+    .payment-layout__right .payment-email-field {
+        height: 70px;
+        padding: 0 var(--spacing-lg);
+        border-radius: var(--radius-lg);
+        background: #f1f1f1;
+        border: 3px solid #b5b5b5;
+    }
+
+    .payment-layout__right .payment-email-field__label {
+        font-size: 1.5rem;
+        color: #777;
+        min-width: 70px;
+    }
+
+    .payment-layout__right .payment-email-field__value {
+        font-size: 1.1rem;
+        color: #7b7b7b;
+    }
+
+    /* Larger payment method for PC */
+    .payment-layout__right .payment-methods {
+        flex-direction: column;
+    }
+
+    .payment-layout__right .payment-method {
+        height: 70px;
+        padding: 0 var(--spacing-lg);
+        border-radius: var(--radius-lg);
+        border: 3px solid #b6b6b6;
+        flex: none;
+    }
+
+    .payment-layout__right .payment-method--selected,
+    .payment-layout__right .payment-method:has(input:checked) {
+        border-color: var(--color-primary);
+    }
+
+    .payment-layout__right .payment-method__radio {
+        width: 24px;
+        height: 24px;
+    }
+
+    .payment-layout__right .payment-method__radio::after {
+        width: 12px;
+        height: 12px;
+    }
+
+    .payment-layout__right .payment-method__icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .payment-layout__right .payment-method__icon svg {
+        width: 30px;
+        height: 30px;
+    }
+
+    .payment-layout__right .payment-method__name {
+        font-size: 1.25rem;
+        color: #7e7e7e;
+    }
+
+    /* Larger subscribe button for PC */
+    .payment-layout__right .swpm-button-container .stripe-button-el,
+    .payment-layout__right .swpm-button-container button.stripe-button-el,
+    .payment-layout__right .payment-buttons-area .stripe-button-el {
+        height: 70px !important;
+        font-size: 1.5rem !important;
+        line-height: 70px !important;
+        border-radius: var(--radius-lg) !important;
+    }
+
+    .payment-layout__right .swpm-button-container .stripe-button-el span::after,
+    .payment-layout__right .payment-buttons-area .stripe-button-el span::after {
+        font-size: 1.5rem !important;
+    }
+
+    /* PayPal button height adjustment */
+    .payment-layout__right .swpm-button-container .swpm-paypal-subscription-button-wrapper {
+        min-height: 70px;
+    }
+
+    /* Larger terms text for PC */
+    .payment-layout__right .payment-terms__text {
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+
+    .payment-layout__right .payment-terms__links {
+        gap: var(--spacing-lg);
+    }
+
+    .payment-layout__right .payment-terms__links a {
+        font-size: 1rem;
+    }
+
+    /* Section titles */
+    .payment-layout__right .payment-section__title {
+        font-size: 1.25rem;
+        margin-bottom: var(--spacing-lg);
+    }
+
+    /* Section spacing */
+    .payment-layout__right .payment-section {
+        margin-bottom: var(--spacing-2xl);
+    }
+
+    .payment-layout__right .payment-buttons-area {
+        margin-top: var(--spacing-3xl);
+        margin-bottom: var(--spacing-xl);
     }
 }
