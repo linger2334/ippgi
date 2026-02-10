@@ -106,6 +106,14 @@ function ippgi_enqueue_scripts() {
         'isLoggedIn'    => is_user_logged_in(),
         'hasPremium'    => ippgi_user_can_view_history(),
         'isFrontPage'   => is_front_page(),
+        'productNames'  => [
+            'PPGI'     => ippgi_get_product_display_name('ppgi'),
+            'GI'       => ippgi_get_product_display_name('gi'),
+            'GL'       => ippgi_get_product_display_name('gl'),
+            'HRC'      => ippgi_get_product_display_name('hrc'),
+            'CRC_HARD' => ippgi_get_product_display_name('crc'),
+            'AL'       => ippgi_get_product_display_name('aluminum'),
+        ],
         'strings'       => [
             'loading'   => __('Loading...', 'ippgi'),
             'error'     => __('An error occurred. Please try again.', 'ippgi'),

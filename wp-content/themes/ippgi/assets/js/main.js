@@ -1029,6 +1029,11 @@
                 return '';
             }
 
+            // Get custom product display name
+            const productName = (window.ippgiData && window.ippgiData.productNames && window.ippgiData.productNames[category])
+                ? window.ippgiData.productNames[category]
+                : category;
+
             // Build table HTML
             const result = categoryData.data.result;
             let rows = [];
@@ -1045,7 +1050,7 @@
                     const change = item.riseAndFall || item.riseAndFall_usd || item.change || 0;
 
                     rows.push({
-                        product: category,
+                        product: productName,
                         dimensions: dimensions,
                         price: priceUsd,
                         change: change
@@ -1191,9 +1196,13 @@
             // Update global current category
             currentPriceCategory = displayCategories[currentIndex];
 
-            // Update category label
+            // Update category label with custom product display name
             if (categoryLabel) {
-                categoryLabel.textContent = displayCategories[currentIndex];
+                const category = displayCategories[currentIndex];
+                const productName = (window.ippgiData && window.ippgiData.productNames && window.ippgiData.productNames[category])
+                    ? window.ippgiData.productNames[category]
+                    : category;
+                categoryLabel.textContent = productName;
             }
 
             // Update timestamp
