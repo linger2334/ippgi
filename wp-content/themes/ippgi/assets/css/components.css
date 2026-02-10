@@ -900,93 +900,178 @@
 .login-modal__content {
     position: relative;
     background: var(--color-bg-light);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-xl);
-    width: 100%;
-    max-width: 400px;
+    border-radius: 16px;
+    padding: 60px 50px 50px;
+    width: 90%;
+    max-width: 340px;
+    min-height: 450px;
     box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
 }
 
 .login-modal__close {
     position: absolute;
-    top: var(--spacing-md);
-    right: var(--spacing-md);
-    background: none;
+    top: -12px;
+    right: -12px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #b0b0b0;
     border: none;
+    border-radius: 50%;
     cursor: pointer;
-    color: var(--color-text-muted);
-    padding: var(--spacing-xs);
+    color: #fff;
+    padding: 0;
 }
 
 .login-modal__close:hover {
-    color: var(--color-text-primary);
+    background: #999;
+    color: #fff;
+}
+
+.login-modal__close svg {
+    width: 18px;
+    height: 18px;
 }
 
 .login-modal__title {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
+    font-size: 22px;
+    font-weight: var(--font-weight-bold);
     text-align: center;
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: 60px;
+    color: #737373;
 }
 
 .login-modal__body {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 50px;
+    flex: 1;
 }
 
 .login-modal__signup {
     text-align: center;
-    margin-top: var(--spacing-md);
-    font-size: var(--font-size-sm);
+    margin-top: 40px;
+    font-size: 16px;
+    color: #9b9b9b;
+    font-weight: var(--font-weight-bold);
 }
 
-.login-modal__signup a {
-    color: var(--color-primary);
+.login-modal__signup a,
+.login-modal__signup-link {
+    color: #4fcbeb;
     font-weight: var(--font-weight-medium);
 }
 
 .login-modal__terms {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
+    font-size: 13px;
+    color: #bbb;
     text-align: center;
     margin: 0;
+    line-height: 1.6;
+    font-weight: var(--font-weight-bold);
 }
 
 .login-modal__terms a {
-    color: var(--color-link);
-    text-decoration: underline;
+    color: #b5b5b5;
+    text-decoration: none;
 }
 
-/* Hide Simple Membership default login form, only show Google login */
-.login-modal .swpm-login-form,
-.login-modal .swpm-login-widget-form,
+/* Hide Simple Membership default login form elements, only show Google login */
+.login-modal .swpm-login-widget-form > table,
+.login-modal .swpm-login-form-inner,
+.login-modal .swpm-username-label,
 .login-modal .swpm-username-input,
+.login-modal .swpm-password-label,
 .login-modal .swpm-password-input,
 .login-modal .swpm-remember-me,
 .login-modal .swpm-login-submit,
 .login-modal .swpm-forgot-password,
-.login-modal .swpm-join-us-link {
+.login-modal .swpm-join-us-link,
+.login-modal .swpm-login-widget-action-msg,
+.login-modal .swpm-before-login-form-section,
+.login-modal .swpm-after-login-form-section {
     display: none !important;
 }
 
-/* Style the Google login button from SMP addon */
-.login-modal .swpm-google-login-button,
-.login-modal .swpm-social-login-google {
+/* Hide the "Or" separator from social login section */
+.login-modal .swpm_sl_login_section_header {
+    display: none !important;
+}
+
+/* Style the Google login button from SWPM Social Login addon */
+.login-modal .swpm_sl_login_buttons_section {
+    display: block !important;
+}
+
+.login-modal .swpm_sl_login_buttons_wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.login-modal .swpm_sl_login_btn {
     display: flex !important;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-md);
     width: 100%;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background-color: var(--color-bg-light);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    font-weight: var(--font-weight-medium);
+    height: 56px;
+    padding: 0 var(--spacing-xl);
+    background-color: #fff;
+    border: 2px solid #bdbdbd;
+    border-radius: 28px;
+    font-size: 16px;
+    font-weight: var(--font-weight-normal);
+    color: #8e8e8e;
     cursor: pointer;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
-.login-modal .swpm-google-login-button:hover,
-.login-modal .swpm-social-login-google:hover {
-    background-color: var(--color-bg-gray);
+.login-modal .swpm_sl_login_btn:hover {
+    background-color: #f8f8f8;
+    border-color: #bbb;
+}
+
+.login-modal .swpm_sl_login_btn_icon {
+    width: 24px;
+    height: 24px;
+}
+
+.login-modal .swpm_sl_login_btn_text {
+    font-size: 16px;
+    color: #8e8e8e;
+}
+
+/* Style for direct link Google login button */
+.login-modal .btn--google {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    width: 100%;
+    height: 56px;
+    padding: 0 var(--spacing-xl);
+    background-color: #fff;
+    border: 2px solid #bdbdbd;
+    border-radius: 28px;
+    font-size: 16px;
+    font-weight: var(--font-weight-normal);
+    color: #8e8e8e;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.login-modal .btn--google:hover {
+    background-color: #f8f8f8;
+    border-color: #bbb;
+    color: #8e8e8e;
+}
+
+.login-modal .btn--google svg {
+    flex-shrink: 0;
 }
 
 /* ==========================================================================

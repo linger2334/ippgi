@@ -94,17 +94,56 @@
 
     .header-login-btn {
         display: inline-flex;
-        padding: var(--spacing-sm) var(--spacing-lg);
-        background: rgba(255, 255, 255, 0.15);
-        border-radius: var(--radius-md);
-        color: var(--color-text-white);
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-medium);
+        align-items: center;
+        justify-content: center;
+        min-width: 89px;
+        height: 38px;
+        padding: 0 var(--spacing-lg);
+        background: #21c9f3;
+        border: 1px solid #00baea;
+        border-radius: 0;
+        color: #fff;
+        font-size: 16px;
+        font-weight: var(--font-weight-semibold);
+        cursor: pointer;
+        transition: background var(--transition-fast), color var(--transition-fast);
     }
 
     .header-login-btn:hover {
-        background: rgba(255, 255, 255, 0.25);
-        color: var(--color-text-white);
+        background: #1ab8e0;
+        color: #fff;
+    }
+
+    /* Login Modal - Desktop */
+    .login-modal__content {
+        max-width: 380px;
+        min-height: 500px;
+        padding: 70px 55px 55px;
+    }
+
+    .login-modal__title {
+        font-size: 24px;
+        margin-bottom: 70px;
+    }
+
+    .login-modal .swpm_sl_login_btn,
+    .login-modal .btn--google {
+        height: 64px;
+        font-size: 18px;
+    }
+
+    .login-modal .swpm_sl_login_btn_icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .login-modal .swpm_sl_login_btn_text {
+        font-size: 18px;
+    }
+
+    .login-modal .btn--google svg {
+        width: 28px;
+        height: 28px;
     }
 
     /* Logo */

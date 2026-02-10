@@ -1204,6 +1204,73 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - `/assets/js/main.js`：表格渲染逻辑
   - `/assets/css/components.css`：新增 `.price-table__price--up/down` 和 `.prices-table__price--up/down` 样式
 
+#### 41. 首页产品名称动态显示 ✅
+- **问题**：后台修改 Product Display Names 后，首页 MyPrices 价格列表的 Products 列不更新
+- **原因**：JavaScript 使用硬编码的分类键（PPGI、GI 等），未使用后台自定义名称
+- **修复**：
+  1. 在 `enqueue.php` 中添加 `productNames` 映射到 `ippgiData`
+  2. 更新 `main.js` 中 `buildPriceTableHTML()` 函数使用自定义名称
+  3. 更新 `updateLabels()` 函数使轮播标签也使用自定义名称
+- **代码位置**：
+  - `/inc/enqueue.php`：`productNames` 数据传递
+  - `/assets/js/main.js`：`buildPriceTableHTML()` 和 `updateLabels()` 函数
+
+#### 42. Prices & Trends 导航权限检查 ✅
+- **需求**：PC 端和移动端导航菜单的 "Prices & Trends" 链接添加权限检查逻辑
+- **跳转规则**：
+  - 未登录 → 登录页面 `/login/`
+  - 已登录但无高级权限 → 订阅页面 `/subscribe/`
+  - 有高级会员权限 → 价格列表页 `/prices/`
+- **实现方式**：
+  1. 给链接添加 `js-prices-link` 类，`href` 设为 `#`
+  2. JavaScript 中复用 `navigateToPrices()` 函数处理点击事件
+- **代码位置**：
+  - `/template-parts/header-mobile.php`：移动端汉堡菜单
+  - `/template-parts/header-desktop.php`：PC 端导航菜单
+  - `/assets/js/main.js`：`initPriceTableClick()` 函数中添加 `.js-prices-link` 处理
+
+#### 43. PC 端 LOGIN 按钮修复 ✅
+- **问题**：PC 端 header 中的 LOGIN 按钮透明，只能看到边框
+- **原因**：背景色设置为 `rgba(255, 255, 255, 0.15)` 在白色背景上不可见
+- **修复**：根据 Figma 设计稿重新实现按钮样式
+- **新样式**：
+  - 背景色：`#21c9f3`（青色）
+  - 边框：`1px solid #00baea`
+  - 文字颜色：白色
+  - 尺寸：`min-width: 89px; height: 38px`
+  - 悬停效果：`background: #1ab8e0`
+- **代码位置**：`/assets/css/responsive.css` 中的 `.header-login-btn`
+
+#### 44. 登录模态框重新设计 ✅
+- **问题**：登录模态框样式与 Figma 设计稿不符
+- **Figma 设计**：竖向矩形（高度大于宽度，约 611px × 466px）
+- **修复内容**：
+  1. **模态框尺寸**：
+     - 移动端：`max-width: 340px; min-height: 450px; padding: 60px 50px 50px`
+     - 桌面端：`max-width: 380px; min-height: 500px; padding: 70px 55px 55px`
+  2. **标题样式**：`22-24px`，颜色 `#737373`，`margin-bottom: 60-70px`
+  3. **关闭按钮**：灰色圆形背景 `#b0b0b0`，定位在模态框右上角外侧
+  4. **Google 登录按钮**：药丸形状，`border-radius: 28px`，2px 边框，高度 56-64px
+  5. **底部条款文字**：13px，颜色 `#bbb`
+- **代码位置**：
+  - `/assets/css/components.css`：`.login-modal__*` 样式
+  - `/assets/css/responsive.css`：桌面端覆盖样式
+
+#### 45. Google 登录功能修复 ✅
+- **问题**：点击 Google 登录按钮无响应
+- **原因**：
+  1. 原代码使用不存在的 `[swpm_google_login]` shortcode
+  2. SWPM Social Login 插件通过 `swpm_after_login_form_output` 过滤器添加按钮
+- **修复方案**：使用直接链接方式启动 Google OAuth 流程
+- **实现**：
+  1. 检测 SWPM Social Login 是否启用 Google 登录
+  2. 如果启用，渲染直接链接 `?swpm_social_login=google`
+  3. 如果未启用，回退到 SWPM 登录表单
+- **Sign up 链接**：保留 "Don't have an account? Sign up" 文字，但 Sign up 使用 `<span>` 不做跳转
+- **代码位置**：
+  - `/template-parts/login-modal.php`：模态框模板
+  - `/assets/css/components.css`：`.btn--google` 和 `.login-modal__signup-link` 样式
+
 ---
 
 ### Phase 2 - 待实现
