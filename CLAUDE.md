@@ -65,10 +65,11 @@
 **订阅到期处理流程**（`ippgi_on_subscription_expired`）：
 1. 验证用户当前是 Plus (4)
 2. 清除 SWPM 的 `subscr_id`（订阅已结束）
-3. 检查是否有累积奖励天数：
-   - 有 → 激活奖励天数（保持 Plus 访问权限）
-   - 无 → 降级为 Basic (2)
-4. 清除订阅相关 user meta
+3. 先保障会员等级降为 Basic (2)（仅在当前等级不是 2 时写库）
+4. 检查是否有累积奖励天数：
+   - 有 → 立即激活奖励访问（不改 SWPM 等级）
+   - 无 → 维持 Basic (2)
+5. 清除订阅相关 user meta
 
 ### SWPM 支付按钮 ID
 
@@ -347,9 +348,9 @@ Body: cancel_at_period_end=true
 
 | 用户状态 | 获得奖励时的行为 |
 |---------|---------------|
-| 有活跃订阅 | 奖励天数累积到 `ippgi_unused_bonus_days`，订阅结束后自动生效 |
+| 有活跃付费访问（含已取消但未到期） | 奖励天数累积到 `ippgi_unused_bonus_days`，付费访问结束后自动生效 |
 | 正在使用奖励天数 | 直接延长当前奖励到期日期 |
-| 无订阅、无奖励访问 | 立即激活奖励天数，临时升级为 Plus |
+| 无订阅、无奖励访问 | 立即激活奖励访问（不修改 SWPM 会员等级） |
 
 **自动激活触发点**：
 1. **订阅到期**：SWPM 降级用户 → `ippgi_on_membership_level_change` 检测到从 Plus 降级 → 自动激活累积的奖励天数
@@ -399,7 +400,7 @@ Body: cancel_at_period_end=true
 - `ippgi_process_referral()` - 处理推荐逻辑（成功后才标记已处理）
 - `ippgi_award_referral_bonus()` - 累积或激活奖励天数
 - `ippgi_has_active_subscription()` - 检查是否有活跃的 PayPal/Stripe 订阅
-- `ippgi_activate_bonus_access()` - 激活奖励天数为 Plus 访问权限
+- `ippgi_activate_bonus_access()` - 激活奖励访问（只写 bonus 元数据，不改 SWPM 等级）
 - `ippgi_check_bonus_access_expired()` - 处理奖励到期（续期或保障为 Basic，避免无效写库）
 - `ippgi_get_unused_bonus_days()` - 获取未使用的奖励天数
 - `ippgi_get_bonus_access_end_date()` - 获取奖励访问到期日期
@@ -1122,7 +1123,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **PayPal 流程**：
   1. 用户点击取消订阅 → 保存结束日期到 `ippgi_subscription_end_date`
   2. PayPal 立即发送 IPN → 检测到是 PayPal 且还没到期 → 只清除 subscr_id，保留 Plus 权限
-  3. 每日定时任务检查 → 发现已过期 → 降级或激活奖励天数
+  3. 每日定时任务检查 → 发现已过期 → 先保障降级到 Basic，再按需激活奖励访问
 - **Stripe 流程**：
   1. 用户点击取消订阅 → 保存结束日期，Stripe 设置 `cancel_at_period_end=true`
   2. 计费周期真正结束时 Stripe 发送 webhook → 检测到是 Stripe → 直接降级

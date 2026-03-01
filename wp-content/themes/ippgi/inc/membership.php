@@ -423,19 +423,24 @@ function ippgi_on_subscription_expired($ipn_data) {
         ['member_id' => $member_id]
     );
 
+    // Always downgrade to Basic first when subscription truly expires.
+    // Bonus access is a separate permission layer and must not keep level 4.
+    $target_level = 2;
+    if ((int) $current_level !== $target_level) {
+        $wpdb->update(
+            "{$wpdb->prefix}swpm_members_tbl",
+            ['membership_level' => $target_level],
+            ['member_id' => $member_id]
+        );
+    }
+
     // Check if user has bonus days to activate
     $bonus_days = ippgi_get_unused_bonus_days($user_id);
     if ($bonus_days > 0) {
-        error_log(sprintf('IPPGI: User %d has %d bonus days, activating', $user_id, $bonus_days));
+        error_log(sprintf('IPPGI: User %d has %d bonus days, activating after downgrade to Basic', $user_id, $bonus_days));
         ippgi_activate_bonus_access($user_id);
     } else {
-        // No bonus days, downgrade to Basic (2)
-        error_log(sprintf('IPPGI: User %d has no bonus days, downgrading to Basic', $user_id));
-        $wpdb->update(
-            "{$wpdb->prefix}swpm_members_tbl",
-            ['membership_level' => 2],
-            ['member_id' => $member_id]
-        );
+        error_log(sprintf('IPPGI: User %d has no bonus days, kept at Basic', $user_id));
     }
 
     // Clear subscription-related meta
@@ -607,19 +612,24 @@ function ippgi_check_expired_cancelled_subscriptions() {
             ['member_id' => $member_id]
         );
 
+        // Always downgrade to Basic first when subscription truly expires.
+        // Bonus access is a separate permission layer and must not keep level 4.
+        $target_level = 2;
+        if ((int) $current_level !== $target_level) {
+            $wpdb->update(
+                "{$wpdb->prefix}swpm_members_tbl",
+                ['membership_level' => $target_level],
+                ['member_id' => $member_id]
+            );
+        }
+
         // Check for bonus days
         $bonus_days = ippgi_get_unused_bonus_days($user->ID);
         if ($bonus_days > 0) {
-            error_log(sprintf('IPPGI: User %d has %d bonus days, activating', $user->ID, $bonus_days));
+            error_log(sprintf('IPPGI: User %d has %d bonus days, activating after downgrade to Basic', $user->ID, $bonus_days));
             ippgi_activate_bonus_access($user->ID);
         } else {
-            // Downgrade to Basic (2)
-            error_log(sprintf('IPPGI: User %d has no bonus days, downgrading to Basic', $user->ID));
-            $wpdb->update(
-                "{$wpdb->prefix}swpm_members_tbl",
-                ['membership_level' => 2],
-                ['member_id' => $member_id]
-            );
+            error_log(sprintf('IPPGI: User %d has no bonus days, kept at Basic', $user->ID));
         }
 
         // Clear subscription-related meta
@@ -905,7 +915,8 @@ function ippgi_has_active_subscription($user_id = null) {
 }
 
 /**
- * Activate bonus access for user (upgrade to Plus temporarily using bonus days)
+ * Activate bonus access for user using bonus days.
+ * Note: This does not modify SWPM membership_level.
  *
  * @param int $user_id User ID
  * @param int $days Optional. Number of days to activate. If not provided, uses ippgi_unused_bonus_days meta.
@@ -1970,7 +1981,7 @@ function ippgi_admin_user_bonus_section($user) {
         </tr>
     </table>
     <p class="description" style="margin-top: 10px;">
-        <?php esc_html_e('Note: If user has an active subscription, bonus days will be accumulated and automatically activated after subscription expires. If user has no subscription, bonus days will be activated immediately.', 'ippgi'); ?>
+        <?php esc_html_e('Note: If user has active paid access (including cancelled-but-not-expired subscriptions), bonus days will be accumulated and activated after paid access ends. Otherwise, bonus days will be activated immediately.', 'ippgi'); ?>
     </p>
 
     <?php if (!empty($bonus_logs)): ?>
@@ -2035,12 +2046,14 @@ function ippgi_admin_save_user_bonus($user_id) {
         return;
     }
 
-    // Check if user has active subscription
+    // Treat "cancelled but still within paid access period" as deferred activation as well.
     $has_subscription = ippgi_has_active_subscription($user_id);
+    $has_cancelled_paid_access = ippgi_user_has_plus($user_id) && ippgi_is_subscription_cancelled($user_id);
+    $should_accumulate = $has_subscription || $has_cancelled_paid_access;
 
     // Add bonus days based on subscription status
-    if ($has_subscription) {
-        // Has subscription → accumulate for later
+    if ($should_accumulate) {
+        // Has active subscription OR cancelled-but-still-paid access → accumulate for later
         $current_unused = ippgi_get_unused_bonus_days($user_id);
         update_user_meta($user_id, 'ippgi_unused_bonus_days', $current_unused + $days_to_add);
         $activated = false;
@@ -2075,7 +2088,7 @@ function ippgi_admin_save_user_bonus($user_id) {
         $days_to_add,
         $user_id,
         $reason,
-        $activate_immediately ? 'yes' : 'no'
+        $activated ? 'yes' : 'no'
     ));
 }
 add_action('personal_options_update', 'ippgi_admin_save_user_bonus');
