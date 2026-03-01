@@ -63,6 +63,7 @@ class IPPGI_Prices_Scheduler {
 
         // Add custom cron schedule
         add_filter('cron_schedules', array($this, 'add_cron_schedules'));
+
     }
 
     /**
@@ -175,12 +176,20 @@ class IPPGI_Prices_Scheduler {
         $clear_results = $this->cache_manager->clear_all_caches();
 
         error_log(sprintf(
-            'IPPGI Prices: Cleared caches - Price list: %s, Real-time prices: %d',
+            'IPPGI Prices: Cleared caches - Price list: %s, Real-time prices: %d, Exchange rate: %s',
             $clear_results['price_list'] ? 'yes' : 'no',
-            $clear_results['realtime_prices_count']
+            $clear_results['realtime_prices_count'],
+            !empty($clear_results['exchange_rate']) ? 'yes' : 'no'
         ));
 
-        // Step 2: Actively fetch new price list data
+        // Step 2: Force refresh exchange rate together with hourly price refresh.
+        $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate(null, true);
+        error_log(sprintf(
+            'IPPGI Prices: Refreshed exchange rate for hourly task: %.4f CNY per USD',
+            $exchange_rate
+        ));
+
+        // Step 3: Actively fetch new price list data
         $price_list_result = $this->api_client->fetch_price_list(true);
 
         if (is_wp_error($price_list_result)) {
@@ -208,6 +217,7 @@ class IPPGI_Prices_Scheduler {
             'hour' => $hour,
             'execution_time' => $execution_time,
             'cache_cleared' => $clear_results,
+            'exchange_rate' => $exchange_rate,
             'price_list_fetched' => !is_wp_error($price_list_result),
         ));
     }

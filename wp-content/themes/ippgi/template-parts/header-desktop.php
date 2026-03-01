@@ -43,8 +43,8 @@
                 </a>
             </li>
             <li class="header-nav__item">
-                <a href="<?php echo esc_url(home_url('/contact')); ?>" class="header-nav__link">
-                    <?php esc_html_e('Contact Us', 'ippgi'); ?>
+                <a href="<?php echo esc_url(home_url('/about')); ?>" class="header-nav__link">
+                    <?php esc_html_e('About Us', 'ippgi'); ?>
                 </a>
             </li>
         </ul>

@@ -53,10 +53,32 @@ get_header();
                 <div class="favorites-list" id="favorites-list">
                     <?php if (!empty($favorites)) : ?>
                         <?php foreach ($favorites as $favorite) : ?>
-                            <div class="favorites-item" data-type="<?php echo esc_attr($favorite['type'] ?? ''); ?>">
+                            <?php
+                            $favorite_type = $favorite['type'] ?? '';
+                            $favorite_id = $favorite['id'] ?? '';
+                            $favorite_parts = explode('-', $favorite_id, 2);
+                            $favorite_spec = $favorite_parts[1] ?? '';
+                            $detail_type_map = [
+                                'crc_hard' => 'crc',
+                                'al' => 'aluminum',
+                            ];
+                            $detail_type = $detail_type_map[$favorite_type] ?? $favorite_type;
+                            $detail_url = add_query_arg(
+                                array_filter([
+                                    'type' => $detail_type,
+                                    'spec' => $favorite_spec,
+                                ]),
+                                home_url('/price-detail/')
+                            );
+                            ?>
+                            <div class="favorites-item"
+                                 data-type="<?php echo esc_attr($favorite_type); ?>"
+                                 data-detail-url="<?php echo esc_url($detail_url); ?>"
+                                 role="link"
+                                 tabindex="0">
                                 <span class="favorites-item__name"><?php echo esc_html($favorite['name']); ?></span>
                                 <span class="favorites-item__spec"><?php echo esc_html($favorite['spec'] ?? ''); ?></span>
-                                <button type="button" class="favorites-item__heart" data-price-id="<?php echo esc_attr($favorite['id']); ?>" aria-label="<?php esc_attr_e('Remove from favorites', 'ippgi'); ?>">
+                                <button type="button" class="favorites-item__heart" data-price-id="<?php echo esc_attr($favorite_id); ?>" aria-label="<?php esc_attr_e('Remove from favorites', 'ippgi'); ?>">
                                     <svg width="28" height="28" viewBox="0 0 24 24" fill="#333" stroke="#333" stroke-width="1">
                                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                                     </svg>
@@ -162,6 +184,32 @@ get_header();
             // Close selector
             closeSelector();
         });
+    });
+
+    // Item click - navigate to price detail page
+    favoritesList?.addEventListener('click', function(e) {
+        if (e.target.closest('.favorites-item__heart')) return;
+
+        const favoriteItem = e.target.closest('.favorites-item');
+        if (!favoriteItem) return;
+
+        const detailUrl = favoriteItem.dataset.detailUrl;
+        if (detailUrl) {
+            window.location.href = detailUrl;
+        }
+    });
+
+    // Keyboard support for item navigation
+    favoritesList?.addEventListener('keydown', function(e) {
+        const favoriteItem = e.target.closest('.favorites-item');
+        if (!favoriteItem || e.target.closest('.favorites-item__heart')) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+
+        e.preventDefault();
+        const detailUrl = favoriteItem.dataset.detailUrl;
+        if (detailUrl) {
+            window.location.href = detailUrl;
+        }
     });
 
     // Heart button click - toggle favorite

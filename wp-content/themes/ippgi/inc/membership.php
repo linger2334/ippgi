@@ -10,7 +10,7 @@
  *
  * Bonus Access:
  * - 新用户注册获得 7 天 bonus access
- * - 邀请奖励获得 3 天 bonus access
+ * - 邀请奖励获得 7 天 bonus access
  * - 所有赠送天数统一由 bonus 机制管理
  *
  * @package IPPGI
@@ -60,6 +60,31 @@ function ippgi_get_user_membership_level($user_id = null) {
 }
 
 /**
+ * Check whether bonus access is currently active (by end date).
+ */
+function ippgi_is_bonus_access_active($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    if (!$user_id) {
+        return false;
+    }
+
+    $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+    if (empty($end_date)) {
+        return false;
+    }
+
+    $end_time = strtotime($end_date . ' ' . wp_timezone_string());
+    if (!$end_time) {
+        return false;
+    }
+
+    return $end_time > current_time('timestamp');
+}
+
+/**
  * Check if user has Plus membership (Level 4) or active bonus access
  */
 function ippgi_user_has_plus($user_id = null) {
@@ -76,13 +101,9 @@ function ippgi_user_has_plus($user_id = null) {
         return true;
     }
 
-    // Check for active bonus access
-    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
-    if ($bonus_active) {
-        $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
-        if (!empty($end_date) && strtotime($end_date) > time()) {
-            return true;
-        }
+    // Check for active bonus access by end date (not by boolean flag).
+    if (ippgi_is_bonus_access_active($user_id)) {
+        return true;
     }
 
     return false;
@@ -176,8 +197,14 @@ function ippgi_register_swpm_hooks() {
     // Hook into subscription cancelled (订阅到期：续费失败终止、取消后到期)
     add_action('swpm_subscription_payment_cancelled', 'ippgi_on_subscription_expired', 10, 1);
 
+    // Hook into Stripe subscription updated webhook (cancel_at_period_end sync)
+    add_action('swpm_stripe_subscription_updated', 'ippgi_on_stripe_subscription_updated', 10, 1);
+
     // Hook into registration complete (新用户注册)
     add_action('swpm_registration_complete', 'ippgi_on_swpm_registration', 10, 1);
+
+    // SWPM/Social Login actual frontend registration hook (contains full member data)
+    add_action('swpm_front_end_registration_complete_user_data', 'ippgi_on_swpm_registration', 10, 1);
 }
 add_action('init', 'ippgi_register_swpm_hooks');
 
@@ -233,7 +260,7 @@ function ippgi_on_payment_success($ipn_data) {
     error_log(sprintf('IPPGI: Processing payment success for user %d (member %d)', $user_id, $member_id));
 
     // If user is currently using bonus access, save remaining days for later
-    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    $bonus_active = ippgi_is_bonus_access_active($user_id);
     if ($bonus_active) {
         $bonus_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
         if ($bonus_end) {
@@ -247,8 +274,7 @@ function ippgi_on_payment_success($ipn_data) {
                 error_log(sprintf('IPPGI: Saved %d remaining bonus days for user %d (total unused: %d)', $remaining_days, $user_id, $existing_unused + $remaining_days));
             }
         }
-        // Clear bonus access status (now using paid subscription)
-        delete_user_meta($user_id, 'ippgi_bonus_access_active');
+        // Clear bonus access period (now using paid subscription)
         delete_user_meta($user_id, 'ippgi_bonus_access_start');
         delete_user_meta($user_id, 'ippgi_bonus_access_end');
         wp_clear_scheduled_hook('ippgi_check_bonus_access_expired', [$user_id]);
@@ -420,6 +446,93 @@ function ippgi_on_subscription_expired($ipn_data) {
 }
 
 /**
+ * Sync Stripe cancellation state from webhook updates.
+ *
+ * Handles customer.subscription.updated so Profile page can immediately show
+ * "Cancelled" and end date when user cancels from Stripe dashboard.
+ *
+ * @param object|array $event_data Stripe webhook event object/array
+ */
+function ippgi_on_stripe_subscription_updated($event_data) {
+    $event_type = '';
+    $subscription = null;
+
+    if (is_array($event_data)) {
+        $event_type = $event_data['type'] ?? '';
+        if (isset($event_data['data']['object']) && is_array($event_data['data']['object'])) {
+            $subscription = (object) $event_data['data']['object'];
+        }
+    } elseif (is_object($event_data)) {
+        $event_type = isset($event_data->type) ? $event_data->type : '';
+        if (isset($event_data->data->object) && is_object($event_data->data->object)) {
+            $subscription = $event_data->data->object;
+        }
+    }
+
+    if ($event_type !== 'customer.subscription.updated' || !$subscription) {
+        return;
+    }
+
+    $subscr_id = isset($subscription->id) ? (string) $subscription->id : '';
+    if ($subscr_id === '' || strpos($subscr_id, 'sub_') !== 0) {
+        return;
+    }
+
+    // Find the linked SWPM member profile by Stripe subscription id.
+    if (!class_exists('SwpmMemberUtils')) {
+        return;
+    }
+    $swpm_member = SwpmMemberUtils::get_user_by_subsriber_id($subscr_id);
+    if (!$swpm_member || empty($swpm_member->user_name)) {
+        error_log(sprintf('IPPGI: Stripe updated webhook could not find member for subscription %s', $subscr_id));
+        return;
+    }
+
+    $wp_user = get_user_by('login', $swpm_member->user_name);
+    if (!$wp_user) {
+        error_log(sprintf('IPPGI: Stripe updated webhook could not find WP user for subscription %s', $subscr_id));
+        return;
+    }
+
+    $user_id = (int) $wp_user->ID;
+    $cancel_at_period_end = !empty($subscription->cancel_at_period_end);
+
+    if ($cancel_at_period_end) {
+        $period_end = isset($subscription->current_period_end) ? (int) $subscription->current_period_end : 0;
+        $end_date = '';
+        if ($period_end > 0) {
+            $end_dt = new DateTime('@' . $period_end);
+            $end_dt->setTimezone(wp_timezone());
+            $end_date = $end_dt->format('F j, Y');
+        }
+
+        update_user_meta($user_id, 'ippgi_subscription_cancelled', true);
+        update_user_meta($user_id, 'ippgi_subscription_cancelled_date', current_time('mysql'));
+        if ($end_date !== '') {
+            update_user_meta($user_id, 'ippgi_subscription_end_date', $end_date);
+        }
+
+        error_log(sprintf(
+            'IPPGI: Synced Stripe cancellation state for user %d (sub: %s, end: %s)',
+            $user_id,
+            $subscr_id,
+            $end_date !== '' ? $end_date : 'N/A'
+        ));
+    } else {
+        // Subscription resumed before period end: clear local cancelled flags.
+        delete_user_meta($user_id, 'ippgi_subscription_cancelled');
+        delete_user_meta($user_id, 'ippgi_subscription_cancelled_date');
+        delete_user_meta($user_id, 'ippgi_subscription_end_date');
+
+        error_log(sprintf('IPPGI: Cleared Stripe cancellation state for user %d (sub: %s)', $user_id, $subscr_id));
+    }
+
+    // Keep next billing cache in sync with latest cancellation status.
+    $cache_key = 'ippgi_next_billing_' . md5($subscr_id);
+    delete_transient($cache_key);
+}
+
+/**
  * Check and process expired cancelled subscriptions
  *
  * This function handles the case where:
@@ -554,26 +667,46 @@ function ippgi_on_swpm_registration($member_data) {
     error_log('IPPGI: swpm_registration_complete triggered');
     error_log('IPPGI: Registration data: ' . print_r($member_data, true));
 
-    // Get WordPress user
+    // Get WordPress user (support both core SWPM and social-login payloads)
     $wp_user = null;
     if (!empty($member_data['email'])) {
         $wp_user = get_user_by('email', $member_data['email']);
     }
+    if (!$wp_user && !empty($member_data['user_name'])) {
+        $wp_user = get_user_by('login', $member_data['user_name']);
+    }
 
-    // Give new user 7 days bonus access (replaces Trial mechanism)
-    if ($wp_user) {
-        // Activate 7 days bonus access immediately
+    if (!$wp_user) {
+        error_log('IPPGI: Could not resolve WP user in registration hook');
+        return;
+    }
+
+    // Idempotency guard: avoid duplicate grant if multiple registration hooks fire.
+    $bonus_granted = get_user_meta($wp_user->ID, 'ippgi_registration_bonus_granted', true);
+    if (!$bonus_granted) {
+        // Give new user 7 days bonus access (replaces Trial mechanism)
         ippgi_activate_bonus_access($wp_user->ID, 7);
+        update_user_meta($wp_user->ID, 'ippgi_registration_bonus_granted', current_time('mysql'));
         error_log(sprintf('IPPGI: Granted 7 days bonus access to new user %d', $wp_user->ID));
 
         // Set registration success flag for showing welcome modal
         update_user_meta($wp_user->ID, 'ippgi_registration_just_completed', true);
+    } else {
+        error_log(sprintf('IPPGI: Registration bonus already granted for user %d, skipping duplicate grant', $wp_user->ID));
     }
 
-    // Check if referred - award referrer bonus
-    if (isset($_COOKIE['ippgi_referral'])) {
+    // Check if referred - award referrer bonus (idempotent guard for duplicate hook firing)
+    $referral_processed = get_user_meta($wp_user->ID, 'ippgi_registration_referral_processed', true);
+    if (!$referral_processed && isset($_COOKIE['ippgi_referral'])) {
         $referral_code = sanitize_text_field($_COOKIE['ippgi_referral']);
-        ippgi_process_referral($referral_code, $member_data);
+        $referral_success = ippgi_process_referral($referral_code, $member_data);
+        if ($referral_success) {
+            update_user_meta($wp_user->ID, 'ippgi_registration_referral_processed', current_time('mysql'));
+        } else {
+            error_log(sprintf('IPPGI: Referral processing failed for new user %d (code: %s)', $wp_user->ID, $referral_code));
+        }
+    } elseif ($referral_processed) {
+        error_log(sprintf('IPPGI: Registration referral already processed for user %d, skipping duplicate processing', $wp_user->ID));
     }
 }
 
@@ -583,41 +716,93 @@ function ippgi_on_swpm_registration($member_data) {
 function ippgi_process_referral($referral_code, $member_data) {
     global $wpdb;
 
+    if ('' === trim((string) $referral_code)) {
+        error_log('IPPGI: Referral code is empty, skipping');
+        return false;
+    }
+
     // Find user with this referral code
     $referrer = $wpdb->get_var($wpdb->prepare(
         "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'ippgi_invite_code' AND meta_value = %s",
         $referral_code
     ));
 
-    if ($referrer) {
-        // Increment referral count
-        $current_count = (int) get_user_meta($referrer, 'ippgi_referral_count', true);
-        update_user_meta($referrer, 'ippgi_referral_count', $current_count + 1);
-
-        // Store who referred the new user
-        if (isset($member_data['user_name'])) {
-            $new_user = get_user_by('login', $member_data['user_name']);
-            if ($new_user) {
-                update_user_meta($new_user->ID, 'ippgi_referred_by', $referrer);
-            }
-        }
-
-        // Award 3 days of Plus membership to the referrer
-        ippgi_award_referral_bonus($referrer, 3);
-
-        // Log the referral
-        error_log(sprintf('IPPGI: Referral processed. Referrer ID: %d, New user: %s', $referrer, $member_data['user_name'] ?? 'unknown'));
+    if (!$referrer) {
+        error_log(sprintf('IPPGI: Referral code not found: %s', $referral_code));
+        return false;
     }
+
+    // Resolve newly registered WP user for invite history tracking.
+    $new_user = null;
+    if (!empty($member_data['user_name'])) {
+        $new_user = get_user_by('login', $member_data['user_name']);
+    }
+    if (!$new_user && !empty($member_data['email'])) {
+        $new_user = get_user_by('email', $member_data['email']);
+    }
+
+    // Prevent self-referral.
+    if ($new_user && (int) $new_user->ID === (int) $referrer) {
+        error_log(sprintf('IPPGI: Self-referral blocked for user %d', $referrer));
+        return false;
+    }
+
+    // Increment referral count
+    $current_count = (int) get_user_meta($referrer, 'ippgi_referral_count', true);
+    update_user_meta($referrer, 'ippgi_referral_count', $current_count + 1);
+
+    // Store who referred the new user (used by invitation history list).
+    if ($new_user) {
+        update_user_meta($new_user->ID, 'ippgi_referred_by', $referrer);
+    } else {
+        error_log('IPPGI: Could not resolve new user for referral history');
+    }
+
+    // Award 7 days of Plus membership to the referrer
+    $awarded = ippgi_award_referral_bonus($referrer, 7);
+    if (!$awarded) {
+        error_log(sprintf('IPPGI: Referral bonus award failed for referrer %d', $referrer));
+        return false;
+    }
+
+    // Log the referral
+    error_log(sprintf(
+        'IPPGI: Referral processed. Referrer ID: %d, New user: %s',
+        $referrer,
+        $member_data['user_name'] ?? ($member_data['email'] ?? 'unknown')
+    ));
+
+    return true;
 }
 
 /**
  * Save referral code in cookie
  */
 function ippgi_save_referral_cookie() {
-    if (isset($_GET['ref']) && !isset($_COOKIE['ippgi_referral'])) {
-        $referral_code = sanitize_text_field($_GET['ref']);
-        setcookie('ippgi_referral', $referral_code, time() + (30 * DAY_IN_SECONDS), '/');
+    if (!isset($_GET['ref'])) {
+        return;
     }
+
+    $referral_code = sanitize_text_field(wp_unslash($_GET['ref']));
+    if ('' === $referral_code) {
+        return;
+    }
+
+    $expires = time() + (30 * DAY_IN_SECONDS);
+    if (PHP_VERSION_ID >= 70300) {
+        setcookie('ippgi_referral', $referral_code, [
+            'expires' => $expires,
+            'path' => '/',
+            'secure' => is_ssl(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        setcookie('ippgi_referral', $referral_code, $expires, '/', '', is_ssl(), true);
+    }
+
+    // Make it available immediately in current request context.
+    $_COOKIE['ippgi_referral'] = $referral_code;
 }
 add_action('init', 'ippgi_save_referral_cookie');
 
@@ -634,10 +819,10 @@ add_action('init', 'ippgi_save_referral_cookie');
  * - Non-subscriber: Bonus days give temporary Plus access
  *
  * @param int $user_id The WordPress user ID of the referrer
- * @param int $bonus_days Number of days to add (default: 3)
+ * @param int $bonus_days Number of days to add (default: 7)
  * @return bool True on success, false on failure
  */
-function ippgi_award_referral_bonus($user_id, $bonus_days = 3) {
+function ippgi_award_referral_bonus($user_id, $bonus_days = 7) {
     $wp_user = get_user_by('id', $user_id);
     if (!$wp_user) {
         error_log(sprintf('IPPGI: Cannot award referral bonus - WP user %d not found', $user_id));
@@ -649,7 +834,7 @@ function ippgi_award_referral_bonus($user_id, $bonus_days = 3) {
 
     // Check current state
     $has_active_subscription = ippgi_has_active_subscription($user_id);
-    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    $bonus_active = ippgi_is_bonus_access_active($user_id);
 
     if ($has_active_subscription) {
         // User has active subscription - just accumulate bonus days for later use
@@ -740,7 +925,7 @@ function ippgi_activate_bonus_access($user_id, $days = null) {
     }
 
     // Check if already using bonus access - extend instead of replace
-    $is_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    $is_active = ippgi_is_bonus_access_active($user_id);
     if ($is_active) {
         // Extend existing bonus access
         $current_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
@@ -771,7 +956,6 @@ function ippgi_activate_bonus_access($user_id, $days = null) {
 
     update_user_meta($user_id, 'ippgi_bonus_access_start', $start_date);
     update_user_meta($user_id, 'ippgi_bonus_access_end', $end_date);
-    update_user_meta($user_id, 'ippgi_bonus_access_active', true);
 
     // Clear unused bonus days if we used them
     if ($clear_unused) {
@@ -784,9 +968,6 @@ function ippgi_activate_bonus_access($user_id, $days = null) {
         if ($wp_user) {
             $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
             if ($swpm_member) {
-                // Store original level for potential restoration
-                update_user_meta($user_id, 'ippgi_original_membership_level', $swpm_member->membership_level);
-
                 global $wpdb;
                 $wpdb->update(
                     $wpdb->prefix . 'swpm_members_tbl',
@@ -812,23 +993,22 @@ function ippgi_activate_bonus_access($user_id, $days = null) {
  * @param int $user_id User ID
  */
 function ippgi_check_bonus_access_expired($user_id) {
-    $is_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
-    if (!$is_active) {
+    $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
+    if (empty($end_date)) {
         return;
     }
 
-    $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
-    if (empty($end_date) || strtotime($end_date) > time()) {
+    $end_time = strtotime($end_date . ' ' . wp_timezone_string());
+    if (!$end_time || $end_time > current_time('timestamp')) {
         return; // Not expired yet
     }
 
     // Check if user now has active subscription (they might have subscribed during bonus period)
     if (ippgi_has_active_subscription($user_id)) {
-        // Clear bonus access flags but don't downgrade
-        delete_user_meta($user_id, 'ippgi_bonus_access_active');
+        // Clear bonus access period but don't downgrade
         delete_user_meta($user_id, 'ippgi_bonus_access_start');
         delete_user_meta($user_id, 'ippgi_bonus_access_end');
-        error_log(sprintf('IPPGI: User %d subscribed during bonus period, clearing bonus flags', $user_id));
+        error_log(sprintf('IPPGI: User %d subscribed during bonus period, clearing bonus period metadata', $user_id));
         return;
     }
 
@@ -848,36 +1028,34 @@ function ippgi_check_bonus_access_expired($user_id) {
         return;
     }
 
-    // No subscription, no new bonus days - downgrade user to original level
-    $original_level = get_user_meta($user_id, 'ippgi_original_membership_level', true);
-    if (empty($original_level)) {
-        $original_level = 2; // Default to Basic
-    }
+    // No subscription, no new bonus days - downgrade to Basic (2).
+    $target_level = 2;
 
     if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
         $wp_user = get_user_by('id', $user_id);
         if ($wp_user) {
             $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
             if ($swpm_member) {
-                global $wpdb;
-                $wpdb->update(
-                    $wpdb->prefix . 'swpm_members_tbl',
-                    ['membership_level' => $original_level],
-                    ['member_id' => $swpm_member->member_id],
-                    ['%d'],
-                    ['%d']
-                );
+                $current_level = (int) $swpm_member->membership_level;
+                if ($current_level !== $target_level) {
+                    global $wpdb;
+                    $wpdb->update(
+                        $wpdb->prefix . 'swpm_members_tbl',
+                        ['membership_level' => $target_level],
+                        ['member_id' => $swpm_member->member_id],
+                        ['%d'],
+                        ['%d']
+                    );
+                }
             }
         }
     }
 
-    // Clear bonus access flags
-    delete_user_meta($user_id, 'ippgi_bonus_access_active');
+    // Clear bonus access period metadata
     delete_user_meta($user_id, 'ippgi_bonus_access_start');
     delete_user_meta($user_id, 'ippgi_bonus_access_end');
-    delete_user_meta($user_id, 'ippgi_original_membership_level');
 
-    error_log(sprintf('IPPGI: Bonus access expired for user %d, downgraded to level %d', $user_id, $original_level));
+    error_log(sprintf('IPPGI: Bonus access expired for user %d, ensured membership level %d', $user_id, $target_level));
 }
 add_action('ippgi_check_bonus_access_expired', 'ippgi_check_bonus_access_expired');
 
@@ -905,8 +1083,7 @@ function ippgi_get_bonus_access_end_date($user_id = null) {
         $user_id = get_current_user_id();
     }
 
-    $is_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
-    if (!$is_active) {
+    if (!ippgi_is_bonus_access_active($user_id)) {
         return null;
     }
 
@@ -962,10 +1139,10 @@ function ippgi_track_referral_bonus($user_id, $days, $type) {
 }
 
 /**
- * Handle referral bonus expiration - downgrade user back to original level
+ * Handle referral bonus expiration - downgrade user to a specified level.
  *
  * @param int $user_id User ID
- * @param int $original_level Original membership level ID
+ * @param int $original_level Target membership level ID
  */
 function ippgi_handle_referral_bonus_expired($user_id, $original_level) {
     if (!ippgi_is_swpm_active() || !class_exists('SwpmMemberUtils')) {
@@ -998,9 +1175,6 @@ function ippgi_handle_referral_bonus_expired($user_id, $original_level) {
         ['%d'],
         ['%d']
     );
-
-    // Clean up
-    delete_user_meta($user_id, 'ippgi_original_membership_level');
 
     error_log(sprintf('IPPGI: Referral bonus expired for user %d, downgraded to level %d', $user_id, $original_level));
 }
@@ -1112,15 +1286,8 @@ function ippgi_get_subscription_status($user_id = null) {
     }
 
     // Check for bonus access first (includes new user 7-day bonus)
-    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
-    if ($bonus_active) {
-        $end_date = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
-        if (!empty($end_date)) {
-            $end_time = strtotime($end_date . ' ' . wp_timezone_string());
-            if ($end_time > current_time('timestamp')) {
-                return 'bonus';
-            }
-        }
+    if (ippgi_is_bonus_access_active($user_id)) {
+        return 'bonus';
     }
 
     // Check for active subscription
@@ -1744,7 +1911,7 @@ function ippgi_admin_user_bonus_section($user) {
 
     $user_id = $user->ID;
     $unused_bonus_days = ippgi_get_unused_bonus_days($user_id);
-    $bonus_active = get_user_meta($user_id, 'ippgi_bonus_access_active', true);
+    $bonus_active = ippgi_is_bonus_access_active($user_id);
     $bonus_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
     $bonus_logs = get_user_meta($user_id, 'ippgi_bonus_admin_logs', true) ?: [];
 

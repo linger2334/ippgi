@@ -66,9 +66,11 @@ function ippgi_customize_register($wp_customize) {
 
     // Social links
     $social_networks = [
-        'twitter'  => __('Twitter/X URL', 'ippgi'),
+        'facebook' => __('Facebook URL', 'ippgi'),
         'linkedin' => __('LinkedIn URL', 'ippgi'),
-        'wechat'   => __('WeChat ID', 'ippgi'),
+        'twitter'  => __('Twitter/X URL', 'ippgi'),
+        'instagram' => __('Instagram URL', 'ippgi'),
+        'pinterest' => __('Pinterest URL', 'ippgi'),
     ];
 
     foreach ($social_networks as $network => $label) {

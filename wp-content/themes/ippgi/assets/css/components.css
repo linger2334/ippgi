@@ -157,8 +157,8 @@
 
 .article-card__image-link {
     flex-shrink: 0;
-    width: 200px;
-    height: 112px;
+    width: 132px;
+    height: 83px;
 }
 
 .article-card__image {
@@ -1873,7 +1873,7 @@
     border-radius: var(--border-radius-sm);
     color: var(--color-text-muted);
     cursor: pointer;
-    display: flex;
+    display: none !important;
     align-items: center;
     justify-content: center;
     opacity: 0;
@@ -1899,7 +1899,7 @@
 .my-prices {
     background: var(--color-bg-light);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
+    padding: var(--spacing-md) 0;
     box-shadow: var(--shadow-sm);
 }
 
@@ -2660,6 +2660,35 @@
     text-wrap: wrap; /* Override h1's default text-wrap: balance in Chrome */
 }
 
+/* Keep page/section titles using normal wrapping instead of balanced wrapping. */
+.page-title,
+.archive-header__title,
+.page-banner__title,
+.search-results-header__title,
+.subscribe-hero__title,
+.subscribe-header__title,
+.pricing-card__title,
+.my-prices__title,
+.section__title,
+.promo-banner__title,
+.login-card__title,
+.legal-header__title,
+.error-404__title,
+.error-404__subtitle,
+.profile-page__title,
+.profile-bonus-section__title,
+.edit-profile-page__title,
+.invite-page__title,
+.invite-history__title,
+.favorites-header__title,
+.material-selector__title,
+.prices-page-header__title,
+.key-attributes__title,
+.premium-gate__title,
+.payment-section__title {
+    text-wrap: wrap;
+}
+
 .single-post__date {
     font-size: 16px;
     color: #d6d6d6;
@@ -2700,6 +2729,7 @@
     color: #929292;
     margin: 0 0 var(--spacing-xs);
     line-height: 1.3;
+    text-wrap: wrap; /* Override h1's default text-wrap: balance in Chrome */
 }
 
 .blog-header__subtitle {
@@ -2733,8 +2763,8 @@
 
 .blog-card__image {
     flex-shrink: 0;
-    width: 120px;
-    height: 80px;
+    width: 132px;
+    height: 83px;
     border-radius: var(--radius-md);
     overflow: hidden;
     background: #f0f0f0;
@@ -2824,17 +2854,50 @@
 .legal-content {
     color: #8e8e8e;
     font-size: 18px;
-    line-height: 1.6;
+    line-height: 1.7;
+    font-family: var(--font-family-base);
+}
+
+.legal-content h1,
+.legal-content h2,
+.legal-content h3,
+.legal-content h4,
+.legal-content h5,
+.legal-content h6 {
+    color: #6f6f6f;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.35;
+    margin: var(--spacing-lg) 0 var(--spacing-md);
+    text-wrap: wrap;
+}
+
+.legal-content h1 {
+    font-size: 28px;
 }
 
 .legal-content h2 {
-    font-size: 20px;
-    font-weight: var(--font-weight-semibold);
-    color: #8e8e8e;
-    margin: var(--spacing-lg) 0 var(--spacing-md);
+    font-size: 24px;
 }
 
-.legal-content h2:first-child {
+.legal-content h3 {
+    font-size: 21px;
+}
+
+.legal-content h4 {
+    font-size: 19px;
+}
+
+.legal-content h5,
+.legal-content h6 {
+    font-size: 18px;
+}
+
+.legal-content h1:first-child,
+.legal-content h2:first-child,
+.legal-content h3:first-child,
+.legal-content h4:first-child,
+.legal-content h5:first-child,
+.legal-content h6:first-child {
     margin-top: 0;
 }
 
@@ -2843,13 +2906,28 @@
 }
 
 .legal-content ul,
-.legal-content ol {
+.legal-content ol,
+.legal-content .wp-block-list {
     margin: 0 0 var(--spacing-md);
-    padding-left: var(--spacing-lg);
+    padding-left: 1.5em;
+}
+
+.legal-content ul,
+.legal-content .wp-block-list {
+    list-style: disc outside;
+}
+
+.legal-content ol {
+    list-style: decimal outside;
 }
 
 .legal-content li {
     margin-bottom: var(--spacing-xs);
+}
+
+.legal-content li > ul,
+.legal-content li > ol {
+    margin-top: var(--spacing-xs);
 }
 
 .legal-content a {
@@ -3564,9 +3642,9 @@ html:has(.edit-profile-page-body) {
 .payment-success-card {
     background: linear-gradient(180deg, #7ecde8 0%, #fff 55%);
     border-radius: 16px;
-    padding: 24px 32px 20px;
+    padding: 24px 20px 20px;
     text-align: center;
-    width: 80%;
+    width: min(90vw, 300px);
     max-width: 300px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
@@ -3592,13 +3670,25 @@ html:has(.edit-profile-page-body) {
     font-weight: 400;
     color: #515557;
     line-height: 1.3;
-    margin: 0 0 16px;
+    margin: 0 0 10px;
     text-align: left;
 }
 
+.payment-success-card__desc--emphasis {
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.payment-success-card__desc:last-of-type {
+    margin-bottom: 16px;
+}
+
 .payment-success-card__btn {
-    display: block;
-    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 210px);
+    box-sizing: border-box;
     padding: 12px 24px;
     background: #1e98d7;
     color: #cae6f5;
@@ -3608,6 +3698,7 @@ html:has(.edit-profile-page-body) {
     border-radius: 13px;
     cursor: pointer;
     transition: background 0.2s ease;
+    white-space: nowrap;
 }
 
 .payment-success-card__btn:hover {
@@ -4096,6 +4187,12 @@ html:has(.edit-profile-page-body) {
     padding: var(--spacing-md) 0;
     border-bottom: 1px solid #d7d7d7;
     gap: 0;
+    cursor: pointer;
+}
+
+.favorites-item:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
 }
 
 .favorites-item__name {
@@ -4271,6 +4368,7 @@ html:has(.edit-profile-page-body) {
     color: #868686;
     line-height: 1.3;
     margin-bottom: var(--spacing-sm);
+    text-wrap: wrap; /* Override h1's default text-wrap: balance in Chrome */
 }
 
 .prices-page-header__disclaimer {

@@ -93,25 +93,7 @@
     }
 
     .header-login-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 89px;
-        height: 38px;
-        padding: 0 var(--spacing-lg);
-        background: #21c9f3;
-        border: 1px solid #00baea;
-        border-radius: 0;
-        color: #fff;
-        font-size: 16px;
-        font-weight: var(--font-weight-semibold);
-        cursor: pointer;
-        transition: background var(--transition-fast), color var(--transition-fast);
-    }
-
-    .header-login-btn:hover {
-        background: #1ab8e0;
-        color: #fff;
+        display: none;
     }
 
     /* Login Modal - Desktop */
@@ -444,8 +426,13 @@
 /* Desktop: larger image and font sizes */
 @media (min-width: 768px) {
     .article-card__image-link {
-        width: 280px;
-        height: 150px;
+        width: 192px;
+        height: 122px;
+    }
+
+    .blog-card__image {
+        width: 192px;
+        height: 122px;
     }
 
     .article-card__title {

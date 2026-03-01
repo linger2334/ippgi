@@ -372,36 +372,9 @@ window.ippgiPriceDetail = {
 
     var restUrl = <?php echo json_encode(rest_url('ippgi-prices/v1/')); ?>;
 
-    // Get appropriate date based on Beijing time (UTC+8)
-    // Before 9:00 AM: use yesterday's date
-    // 9:00 AM and after: use today's date
-    function getApiDate() {
-        var now = new Date();
-        var utcHours = now.getUTCHours();
-        var beijingHours = (utcHours + 8) % 24;
-
-        // Calculate Beijing date
-        var beijingDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-
-        // If before 9:00 AM Beijing time, use yesterday's date
-        if (beijingHours < 9) {
-            beijingDate.setDate(beijingDate.getDate() - 1);
-        }
-
-        // Format as YYYY-MM-DD
-        var year = beijingDate.getUTCFullYear();
-        var month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0');
-        var day = String(beijingDate.getUTCDate()).padStart(2, '0');
-
-        return year + '-' + month + '-' + day;
-    }
-
-    var dateStr = getApiDate();
-
     var url = restUrl + 'price?' +
         'productSpec=' + encodeURIComponent(detail.productSpec) +
-        '&categoryId=' + encodeURIComponent(detail.categoryId) +
-        '&date=' + encodeURIComponent(dateStr);
+        '&categoryId=' + encodeURIComponent(detail.categoryId);
 
     fetch(url)
         .then(function(res) {
@@ -444,6 +417,16 @@ window.ippgiPriceDetail = {
         return num.toFixed(2);
     }
 
+    function formatUsd(num) {
+        return '$' + formatPrice(num);
+    }
+
+    function formatSignedUsd(num) {
+        if (typeof num !== 'number' || isNaN(num)) return '$0.00';
+        var sign = num > 0 ? '+' : (num < 0 ? '-' : '');
+        return sign + '$' + formatPrice(Math.abs(num));
+    }
+
     function updateRealtimeDisplay(r, isTax) {
         var price = isTax ? (r.lastpriceTax_usd || 0) : (r.lastprice_usd || 0);
         var avgPrice = isTax ? (r.priceTax_usd || 0) : (r.price_usd || 0);
@@ -458,7 +441,7 @@ window.ippgiPriceDetail = {
 
         // Main price
         var priceEl = document.getElementById('detail-price');
-        if (priceEl) priceEl.textContent = '$' + formatPrice(price);
+        if (priceEl) priceEl.textContent = formatUsd(price);
 
         // Change
         var changeWrap = document.getElementById('detail-change-wrap');
@@ -468,12 +451,12 @@ window.ippgiPriceDetail = {
             changeWrap.className = 'detail-realtime__change' +
                 (change < 0 ? ' is-down' : (change > 0 ? ' is-up' : ''));
         }
-        if (changeEl) changeEl.textContent = '$' + formatPrice(change);
+        if (changeEl) changeEl.textContent = formatSignedUsd(change);
         if (changePctEl) changePctEl.textContent = changePct + '%';
 
         // Avg
         var avgEl = document.getElementById('detail-avg');
-        if (avgEl) avgEl.textContent = '$' + formatPrice(avgPrice);
+        if (avgEl) avgEl.textContent = formatUsd(avgPrice);
 
         // WoW / MoM / YoY
         updateStatValue('detail-wow', wow);
@@ -491,7 +474,7 @@ window.ippgiPriceDetail = {
         var el = document.getElementById(id);
         if (!el) return;
         if (val !== null && val !== 0) {
-            el.textContent = '$' + formatPrice(val);
+            el.textContent = formatSignedUsd(val);
             el.className = 'detail-realtime__stat-value' +
                 (val < 0 ? ' is-down' : (val > 0 ? ' is-up' : ''));
         } else {

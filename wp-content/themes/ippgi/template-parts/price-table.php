@@ -75,16 +75,15 @@ $prices = apply_filters('ippgi_price_table_data', $sample_prices);
         <tbody>
             <?php foreach ($prices as $price) : ?>
                 <?php
+                $change_value = (float) $price['change'];
                 $change_class = 'neutral';
-                $change_prefix = '';
-                if ($price['change'] > 0) {
+                $change_prefix = '$';
+                if ($change_value > 0) {
                     $change_class = 'up';
                     $change_prefix = '+$';
-                } elseif ($price['change'] < 0) {
+                } elseif ($change_value < 0) {
                     $change_class = 'down';
-                    $change_prefix = '$';
-                } else {
-                    $change_prefix = '$';
+                    $change_prefix = '-$';
                 }
                 ?>
                 <tr>
@@ -99,7 +98,7 @@ $prices = apply_filters('ippgi_price_table_data', $sample_prices);
                     </td>
                     <td data-label="<?php esc_attr_e('Change($)', 'ippgi'); ?>">
                         <span class="price-table__change price-table__change--<?php echo esc_attr($change_class); ?>">
-                            <?php echo esc_html($change_prefix . $price['change']); ?>
+                            <?php echo esc_html($change_prefix . number_format(abs($change_value), 2)); ?>
                         </span>
                     </td>
                 </tr>

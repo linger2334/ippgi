@@ -44,7 +44,6 @@ if (class_exists('SWPM_SL_Utils') && method_exists('SWPM_SL_Utils', 'get_setting
 
             <p class="login-modal__signup">
                 <?php esc_html_e("Don't have an account?", 'ippgi'); ?>
-                <span class="login-modal__signup-link"><?php esc_html_e('Sign up', 'ippgi'); ?></span>
             </p>
         </div>
 
@@ -52,7 +51,7 @@ if (class_exists('SWPM_SL_Utils') && method_exists('SWPM_SL_Utils', 'get_setting
             <?php
             printf(
                 /* translators: %1$s: terms link, %2$s: privacy link */
-                esc_html__('By continuing, you agree to PPGI Price\'s %1$s and %2$s.', 'ippgi'),
+                esc_html__('By continuing, you agree to iPPGI Price\'s %1$s and %2$s.', 'ippgi'),
                 '<a href="' . esc_url(home_url('/terms')) . '">' . esc_html__('Terms&Conditions', 'ippgi') . '</a>',
                 '<a href="' . esc_url(home_url('/privacy')) . '">' . esc_html__('Privacy Policy', 'ippgi') . '</a>'
             );

@@ -24,7 +24,7 @@
 <div class="top-bar">
     <div class="container">
         <div class="top-bar__inner">
-            <a href="<?php echo esc_url(home_url('/contact')); ?>" class="top-bar__support">
+            <a href="<?php echo esc_url(home_url('/about')); ?>" class="top-bar__support">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                     <polyline points="22,6 12,13 2,6"></polyline>
@@ -50,12 +50,21 @@
                         <?php esc_html_e('LOGIN', 'ippgi'); ?>
                     </button>
                 <?php else : ?>
+                    <?php
+                    $current_user = wp_get_current_user();
+                    $user_label = $current_user->display_name ?: $current_user->user_login;
+                    if (function_exists('mb_strimwidth')) {
+                        $user_label = mb_strimwidth($user_label, 0, 18, '...', 'UTF-8');
+                    } elseif (strlen($user_label) > 18) {
+                        $user_label = substr($user_label, 0, 15) . '...';
+                    }
+                    ?>
                     <a href="<?php echo esc_url(ippgi_get_profile_url()); ?>" class="top-bar__user">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        <span><?php echo esc_html(wp_get_current_user()->display_name ?: wp_get_current_user()->user_login); ?>...</span>
+                        <span><?php echo esc_html($user_label); ?></span>
                     </a>
                 <?php endif; ?>
             </div>

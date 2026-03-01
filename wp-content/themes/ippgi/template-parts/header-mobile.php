@@ -47,8 +47,8 @@
                     </a>
                 </li>
                 <li class="mobile-menu-dropdown__item">
-                    <a href="<?php echo esc_url(home_url('/contact')); ?>" class="mobile-menu-dropdown__link">
-                        <?php esc_html_e('Contact Us', 'ippgi'); ?>
+                    <a href="<?php echo esc_url(home_url('/about')); ?>" class="mobile-menu-dropdown__link">
+                        <?php esc_html_e('About Us', 'ippgi'); ?>
                     </a>
                 </li>
                 <li class="mobile-menu-dropdown__item">

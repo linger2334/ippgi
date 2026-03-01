@@ -155,14 +155,6 @@
     opacity: 0.8;
 }
 
-/* Hide top bar login on desktop, show header login instead */
-@media (min-width: 1024px) {
-    .top-bar__login,
-    .top-bar__user {
-        display: none;
-    }
-}
-
 /* ==========================================================================
    Site Header (PPGI.CN title bar - transparent background)
    ========================================================================== */
@@ -486,7 +478,7 @@
 
 /* Back to Top Button */
 .site-footer__back-to-top {
-    display: flex;
+    display: none !important;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -870,4 +862,3 @@
     background-color: var(--color-bg-gray);
     color: var(--color-text-primary);
 }
-

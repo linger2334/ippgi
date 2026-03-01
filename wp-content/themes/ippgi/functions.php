@@ -14,10 +14,11 @@ if (!defined('ABSPATH')) {
 // Development: use file modification time for auto cache busting
 // Production: use fixed version number
 if (defined('WP_DEBUG') && WP_DEBUG) {
-    // Auto version based on latest CSS file modification time
+    // Auto version based on latest asset file modification time
     $css_files = glob(get_template_directory() . '/assets/css/*.css');
+    $js_files = glob(get_template_directory() . '/assets/js/*.js');
     $latest_time = 0;
-    foreach ($css_files as $file) {
+    foreach (array_merge($css_files ?: [], $js_files ?: []) as $file) {
         $mtime = filemtime($file);
         if ($mtime > $latest_time) {
             $latest_time = $mtime;
@@ -79,6 +80,10 @@ function ippgi_setup() {
         'flex-height' => true,
         'flex-width'  => true,
     ]);
+
+    // Load theme styles inside Gutenberg editor to align preview with frontend typography.
+    add_theme_support('editor-styles');
+    add_editor_style('assets/css/editor-style.css');
 
     // Set content width
     if (!isset($content_width)) {
@@ -143,6 +148,37 @@ add_action('template_redirect', function() {
         exit;
     }
 });
+
+/**
+ * Protect prices pages:
+ * - Guest users -> login page
+ * - Logged-in users without Plus/bonus -> subscribe page
+ */
+add_action('template_redirect', function() {
+    $is_prices_page = is_page_template('page-templates/page-prices.php') || is_page('prices');
+    $is_price_detail_page = is_page_template('page-templates/page-price-detail.php') || is_page('price-detail');
+
+    if (!$is_prices_page && !$is_price_detail_page) {
+        return;
+    }
+
+    if (!is_user_logged_in()) {
+        global $wp;
+        $request_path = isset($wp->request) ? ('/' . ltrim($wp->request, '/')) : '/';
+        $current_url = home_url($request_path);
+        if (!empty($_SERVER['QUERY_STRING'])) {
+            $current_url .= '?' . wp_unslash($_SERVER['QUERY_STRING']);
+        }
+        $login_url = add_query_arg('redirect_to', $current_url, ippgi_get_login_url());
+        wp_redirect($login_url);
+        exit;
+    }
+
+    if (!ippgi_user_has_plus()) {
+        wp_redirect(ippgi_get_subscribe_url());
+        exit;
+    }
+}, 5);
 
 /**
  * Set PayPal SDK locale based on WordPress language setting
@@ -231,18 +267,30 @@ add_action('wp_footer', function() {
     // Clear the flag so it only shows once
     delete_user_meta($user_id, 'ippgi_registration_just_completed');
     ?>
-    <div class="registration-success-overlay" id="registration-success-modal">
-        <div class="registration-success-card">
-            <h2 class="registration-success-card__title"><?php esc_html_e('Congratulations!', 'ippgi'); ?></h2>
-            <p class="registration-success-card__desc">
-                <?php esc_html_e("You've joined PPGI.CN as a member and now have access to 7 days of free Plus access, unlocking comprehensive PPGI price data.", 'ippgi'); ?>
+    <div class="payment-success-overlay" id="registration-success-modal">
+        <div class="payment-success-card">
+            <div class="payment-success-card__icon">
+                <svg width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="15" fill="#6abf40"/>
+                    <path d="M9 16L14 21L23 12" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h2 class="payment-success-card__title"><?php esc_html_e('Congratulations!', 'ippgi'); ?></h2>
+            <p class="payment-success-card__desc payment-success-card__desc--emphasis">
+                <?php esc_html_e('Enjoy 7 days of Plus.', 'ippgi'); ?>
             </p>
-            <p class="registration-success-card__desc">
-                <?php esc_html_e("When your bonus period ends, you can upgrade to a paid Plus subscription or continue using the Basic plan — it's up to you.", 'ippgi'); ?>
+            <p class="payment-success-card__desc">
+                <?php esc_html_e('Full price data unlocked. Upgrade or stay Basic after.', 'ippgi'); ?>
             </p>
+            <button type="button" class="payment-success-card__btn" id="registration-success-continue">
+                <?php esc_html_e('Continue to iPPGI', 'ippgi'); ?>
+            </button>
         </div>
     </div>
     <script>
+    document.getElementById('registration-success-continue').addEventListener('click', function() {
+        document.getElementById('registration-success-modal').style.display = 'none';
+    });
     document.getElementById('registration-success-modal').addEventListener('click', function(e) {
         if (e.target === this) {
             this.style.display = 'none';

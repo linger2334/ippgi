@@ -1,7 +1,7 @@
 <?php
 /**
  * Cache Manager Class
- * Manages transient cache for price data
+ * Manages transient cache for price and exchange-rate data
  *
  * @package IPPGI_Prices
  */
@@ -20,7 +20,7 @@ class IPPGI_Prices_Cache_Manager {
 
     /**
      * Cache expiration time (0 = never expires)
-     * Cache is cleared by scheduled tasks at 00:00 and 09:00-17:00
+     * Cache is cleared by the hourly refresh task at 09:00-17:00
      */
     const CACHE_EXPIRATION = 0;
 
@@ -70,11 +70,10 @@ class IPPGI_Prices_Cache_Manager {
      * Get real-time price from cache
      *
      * @param string $product_spec Full productSpec (e.g., "1482328115005964290_1000_0.11_彩涂")
-     * @param string $date Date in YYYY-MM-DD format
      * @return array|false Price data or false if not cached
      */
-    public function get_realtime_price($product_spec, $date) {
-        $cache_key = $this->get_realtime_cache_key($product_spec, $date);
+    public function get_realtime_price($product_spec) {
+        $cache_key = $this->get_realtime_cache_key($product_spec);
         return get_transient($cache_key);
     }
 
@@ -82,12 +81,11 @@ class IPPGI_Prices_Cache_Manager {
      * Set real-time price cache
      *
      * @param string $product_spec Full productSpec
-     * @param string $date Date in YYYY-MM-DD format
      * @param array  $data Price data
      * @return bool True on success, false on failure
      */
-    public function set_realtime_price($product_spec, $date, $data) {
-        $cache_key = $this->get_realtime_cache_key($product_spec, $date);
+    public function set_realtime_price($product_spec, $data) {
+        $cache_key = $this->get_realtime_cache_key($product_spec);
         return set_transient($cache_key, $data, self::CACHE_EXPIRATION);
     }
 
@@ -95,11 +93,10 @@ class IPPGI_Prices_Cache_Manager {
      * Clear real-time price cache
      *
      * @param string $product_spec Full productSpec
-     * @param string $date Date in YYYY-MM-DD format
      * @return bool True on success, false on failure
      */
-    public function clear_realtime_price($product_spec, $date) {
-        $cache_key = $this->get_realtime_cache_key($product_spec, $date);
+    public function clear_realtime_price($product_spec) {
+        $cache_key = $this->get_realtime_cache_key($product_spec);
         return delete_transient($cache_key);
     }
 
@@ -125,14 +122,20 @@ class IPPGI_Prices_Cache_Manager {
     }
 
     /**
-     * Clear all caches (price list + all real-time prices)
+     * Clear all caches (price list + all real-time prices + exchange rate)
      *
      * @return array Results of clearing operations
      */
     public function clear_all_caches() {
+        $exchange_rate_cleared = false;
+        if (class_exists('IPPGI_Prices_Currency_Converter')) {
+            $exchange_rate_cleared = IPPGI_Prices_Currency_Converter::clear_cache();
+        }
+
         $results = array(
             'price_list' => $this->clear_price_list(),
             'realtime_prices_count' => $this->clear_all_realtime_prices(),
+            'exchange_rate' => $exchange_rate_cleared,
         );
 
         return $results;
@@ -142,11 +145,10 @@ class IPPGI_Prices_Cache_Manager {
      * Generate cache key for real-time price
      *
      * @param string $product_spec Full productSpec
-     * @param string $date Date in YYYY-MM-DD format
      * @return string Cache key
      */
-    private function get_realtime_cache_key($product_spec, $date) {
-        return self::CACHE_PREFIX . self::REALTIME_PRICE_PREFIX . md5($product_spec . '_' . $date);
+    private function get_realtime_cache_key($product_spec) {
+        return self::CACHE_PREFIX . self::REALTIME_PRICE_PREFIX . md5($product_spec);
     }
 
     /**

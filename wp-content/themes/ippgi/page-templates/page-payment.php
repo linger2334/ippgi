@@ -145,7 +145,7 @@ $paypal_yearly_id = 169;
                         <p class="payment-terms__links">
                             <a href="<?php echo esc_url(home_url('/terms')); ?>"><?php esc_html_e('Terms & Conditions', 'ippgi'); ?></a>
                             <a href="<?php echo esc_url(home_url('/privacy')); ?>"><?php esc_html_e('Privacy Policy', 'ippgi'); ?></a>
-                            <a href="<?php echo esc_url(home_url('/contact')); ?>"><?php esc_html_e('Contact Us', 'ippgi'); ?></a>
+                            <a href="<?php echo esc_url(home_url('/about')); ?>"><?php esc_html_e('About Us', 'ippgi'); ?></a>
                         </p>
                     </div>
                 </div>

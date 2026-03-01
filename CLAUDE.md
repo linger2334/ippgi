@@ -35,16 +35,16 @@
 | 来源 | 天数 | 说明 |
 |------|------|------|
 | 新用户注册 | 7 天 | 注册时自动激活 |
-| 邀请奖励 | 3 天 | 邀请好友注册成功后获得 |
+| 邀请奖励 | 7 天 | 邀请好友注册成功后获得 |
 
 **User Meta 字段**：
 | Meta Key | 说明 |
 |---------|------|
-| `ippgi_bonus_access_active` | 是否正在使用 bonus 访问（bool） |
 | `ippgi_bonus_access_start` | bonus 访问开始时间 |
 | `ippgi_bonus_access_end` | bonus 访问到期时间 |
 | `ippgi_unused_bonus_days` | 未使用的累积奖励天数（订阅期间累积，订阅到期后激活） |
-| `ippgi_original_membership_level` | 激活 bonus 前的原始会员等级（到期后恢复） |
+| `ippgi_registration_bonus_granted` | 注册 7 天奖励发放标记（防止重复发放） |
+| `ippgi_registration_referral_processed` | 注册邀请码处理标记（防止重复发放 7 天邀请奖励） |
 
 ### SWPM Hook 集成
 
@@ -54,7 +54,9 @@
 |------|---------|---------|--------|
 | `swpm_payment_ipn_processed` | 首次支付成功、续费成功 | `ippgi_on_payment_success()` | 显示成功模态框、清除取消状态、发送欢迎邮件 |
 | `swpm_subscription_payment_cancelled` | 订阅到期（取消后到期、续费失败终止） | `ippgi_on_subscription_expired()` | 清除 subscr_id、激活奖励天数或降级为 Basic |
+| `swpm_stripe_subscription_updated` | Stripe 订阅更新（`customer.subscription.updated`） | `ippgi_on_stripe_subscription_updated()` | 同步 `cancel_at_period_end` 取消状态和到期时间 |
 | `swpm_registration_complete` | 新用户注册 | `ippgi_on_swpm_registration()` | 给予 7 天 bonus 访问、处理邀请码逻辑 |
+| `swpm_front_end_registration_complete_user_data` | 前台注册完成（含 Social Login 自动注册） | `ippgi_on_swpm_registration()` | 给予 7 天 bonus 访问、处理邀请码逻辑 |
 
 **订阅到期处理流程**（`ippgi_on_subscription_expired`）：
 1. 验证用户当前是 Plus (4)
@@ -140,6 +142,7 @@ Body: cancel_at_period_end=true
 - `ippgi_cancel_paypal_subscription($subscr_id)` - PayPal API 取消
 - `ippgi_cancel_stripe_subscription($subscr_id)` - Stripe API 取消
 - `ippgi_on_subscription_expired($ipn_data)` - 处理取消 webhook（区分 PayPal/Stripe）
+- `ippgi_on_stripe_subscription_updated($event_data)` - 同步 Stripe Dashboard 取消/恢复状态
 - `ippgi_check_expired_cancelled_subscriptions()` - 每日定时任务，处理真正过期的订阅
 - `ippgi_get_paypal_next_billing_date($subscr_id)` - 获取 PayPal 订阅结束日期
 
@@ -168,10 +171,8 @@ Body: cancel_at_period_end=true
 **Stripe 流程**（Stripe Dashboard 取消）：
 - Stripe Dashboard 提供两种取消方式：
   - **Cancel immediately**：立即发送 `customer.subscription.deleted` → 立即降级
-  - **Cancel at end of period**：先发送 `customer.subscription.updated`（SWPM 不处理），周期结束时发送 `customer.subscription.deleted` → 降级
-- 注意：Stripe Dashboard 选择"Cancel at end of period"时，网站在周期结束前**不知道**用户已标记取消，Profile 页面仍显示 Active
-- SWPM 不监听 `customer.subscription.updated` 事件，仅监听 `customer.subscription.deleted`
-- 此行为已知且可接受（用户通常通过网站取消，极少去 Stripe Dashboard 操作）
+  - **Cancel at end of period**：先发送 `customer.subscription.updated`，网站同步标记 cancelled + 到期时间；周期结束时再发送 `customer.subscription.deleted` → 降级
+- 系统已监听并转发 Stripe `customer.subscription.updated` 事件，确保用户从 Stripe 后台取消时，Profile 页面也会同步展示取消状态和结束日期
 
 ### 支付成功提示
 当用户完成 PayPal/Stripe 订阅支付后，返回网站首页会显示成功模态框。
@@ -202,6 +203,13 @@ Body: cancel_at_period_end=true
 **注意**：
 - 我们使用 `swpm_payment_ipn_processed` hook 而非 `swpm_membership_level_changed`（后者不可靠）
 - Toast 组件 `ippgiToast` 仍保留用于其他功能（收藏、复制链接等）
+- 新用户注册欢迎弹窗复用了同一套视觉组件（`payment-success-*` 样式），文案为：
+  - 标题：`Congratulations!`
+  - 第一段：`Enjoy 7 days of Plus.`（加粗）
+  - 第二段：`Full price data unlocked. Upgrade or stay Basic after.`
+  - 按钮：`Continue to iPPGI`（所有 success 弹窗统一使用较短按钮宽度，不占满整行）
+  - 段落间距：第一段到第二段间距收紧，按钮上方保留更清晰间距
+  - 响应式：按钮使用 `width: min(100%, 210px)` + `box-sizing: border-box`，在窄屏下等比收缩且不出现突变放大
 
 **Webhook 配置**：
 - PayPal：SWPM 自动创建 webhook，无需手动配置
@@ -252,7 +260,11 @@ Body: cancel_at_period_end=true
 - `page-invite.php` - 邀请好友页面
 - `page-terms.php` - 服务条款页面
 - `page-privacy.php` - 隐私政策页面
-- `page-contact.php` - 联系我们页面
+- `page-about.php` - About Us 页面（可在后台编辑正文）
+- `page-contact.php` - 旧联系页面模板（已不再用于导航入口）
+
+**路由说明**：
+- 导航与页脚入口统一使用 `/about`
 
 **核心模板**：
 - `front-page.php` - 首页模板
@@ -321,7 +333,7 @@ Body: cancel_at_period_end=true
 ## 邀请奖励系统
 
 ### 功能说明
-- 用户邀请好友注册成功后，邀请者获得 **3 天 Plus 会员** 奖励
+- 用户邀请好友注册成功后，邀请者获得 **7 天 Plus 会员** 奖励
 - 由于使用 PayPal/Stripe 订阅模式，无法修改支付平台的扣款日期
 - 因此奖励天数**单独追踪**，在订阅结束后自动生效
 
@@ -342,48 +354,49 @@ Body: cancel_at_period_end=true
 **奖励到期处理**（`ippgi_check_bonus_access_expired`）：
 - 如果用户已订阅 → 清除奖励标记，不降级
 - 如果有新累积的奖励天数 → 自动续期
-- 否则 → 降级到原始会员等级
+- 否则 → 保障为 Basic (2)（仅当当前等级不是 2 时才写库更新）
 
 ### 用户 Meta 字段
 
 | Meta Key | 说明 |
 |---------|------|
 | `ippgi_unused_bonus_days` | 未使用的累积奖励天数 |
-| `ippgi_bonus_access_active` | 是否正在使用奖励访问（bool） |
 | `ippgi_bonus_access_start` | 奖励访问开始时间 |
 | `ippgi_bonus_access_end` | 奖励访问到期时间 |
-| `ippgi_original_membership_level` | 激活奖励前的原始会员等级（到期后恢复） |
 | `ippgi_total_referral_bonus_days` | 历史累计获得的奖励天数 |
 | `ippgi_referral_bonuses` | 奖励历史记录数组 |
 | `ippgi_referral_count` | 推荐人数 |
 | `ippgi_invite_code` | 用户的邀请码 |
 | `ippgi_referred_by` | 推荐人的用户 ID |
+| `ippgi_registration_referral_processed` | 新用户注册时邀请码是否已处理 |
 
 ### Profile 页面订阅状态
 
 | 状态 | 说明 | 显示内容 |
 |-----|------|---------|
 | `active` | 活跃订阅 | 下次扣款日期 + 取消订阅按钮 |
+| `bonus` | 正在使用奖励期 | `Active` + `You are currently using your bonus days.` + `Subscribe` 按钮 |
 | `cancelled` | 已取消（未到期） | 订阅结束日期 |
 | `terminated` | 已终止（无订阅或已到期） | 订阅按钮 |
 
-**注意**：`bonus` 状态（正在使用赠送天数）在订阅状态判断中归类为 `terminated`，但用户仍有 Plus 访问权限。Profile 页面下半部分会显示 "Remaining Bonus Days" 展示剩余天数。
+**注意**：`bonus` 状态单独展示，不再归类为 `terminated`。当用户处于奖励期（新注册奖励、邀请奖励激活、后台手动加天数后激活）时，Profile 页面会显示奖励期正在使用中。
+状态判断规则：统一以 `ippgi_bonus_access_end > 当前时间` 判断奖励期是否 active；`ippgi_unused_bonus_days` 仅作为库存天数。
 
 ### 工作流程
 1. 用户访问 `/invite` 页面获取邀请链接
 2. 邀请链接格式：`https://yoursite.com/?ref=xxxxxxxx`
-3. 被邀请者点击链接，邀请码保存到 Cookie（30天有效）
+3. 被邀请者点击链接，邀请码保存到 Cookie（30天有效，新的 `?ref=` 会覆盖旧值）
 4. 被邀请者通过 SWPM 注册
-5. 系统自动奖励邀请者 3 天 Plus 会员（累积或立即激活）
+5. 系统自动奖励邀请者 7 天 Plus 会员（累积或立即激活）
 
 ### 相关函数
 - `ippgi_get_user_invite_link()` - 生成邀请链接
-- `ippgi_save_referral_cookie()` - 保存邀请码到 Cookie
-- `ippgi_process_referral()` - 处理推荐逻辑
+- `ippgi_save_referral_cookie()` - 保存邀请码到 Cookie（支持覆盖旧邀请码）
+- `ippgi_process_referral()` - 处理推荐逻辑（成功后才标记已处理）
 - `ippgi_award_referral_bonus()` - 累积或激活奖励天数
 - `ippgi_has_active_subscription()` - 检查是否有活跃的 PayPal/Stripe 订阅
 - `ippgi_activate_bonus_access()` - 激活奖励天数为 Plus 访问权限
-- `ippgi_check_bonus_access_expired()` - 处理奖励到期（降级或续期）
+- `ippgi_check_bonus_access_expired()` - 处理奖励到期（续期或保障为 Basic，避免无效写库）
 - `ippgi_get_unused_bonus_days()` - 获取未使用的奖励天数
 - `ippgi_get_bonus_access_end_date()` - 获取奖励访问到期日期
 - `ippgi_get_user_total_bonus_days()` - 获取历史累计奖励天数
@@ -746,8 +759,8 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 **数据来源**：
 - 实时数据通过 REST API `/wp-json/ippgi-prices/v1/price` 获取
-- 客户端发送：`productSpec`、`categoryId`、`date`
-- 服务器添加 `siteId` 后转发到 api.rendui.com
+- 客户端发送：`productSpec`、`categoryId`（不再传 `date`）
+- 服务器按业务日期规则补全日期（北京时间 9:00 前用昨天，9:00 及之后用今天），并添加 `siteId` 后转发到 api.rendui.com
 - 响应数据自动转换为 USD 并缓存
 
 **CSS 样式**：位于 `/assets/css/components.css`
@@ -774,14 +787,15 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 |------|------|------|
 | `productSpec` | 是 | 完整产品规格（如 `1482328115005964290_1000_0.11_彩涂`） |
 | `categoryId` | 是 | 分类 ID |
-| `date` | 否 | 日期（YYYY-MM-DD 格式，默认今天） |
+| `date` | 否 | 日期（YYYY-MM-DD 格式，默认按业务日期：9:00 前昨天，9:00 及之后今天） |
 
 **数据流程**：
-1. 客户端发送 `productSpec`、`categoryId`、`date`
-2. 服务器添加 `siteId`，检查缓存（键：`md5(productSpec + '_' + date)`）
-3. 缓存未命中则转发请求到 `api.rendui.com`
-4. 响应数据自动进行货币转换（CNY → USD）
-5. 转换后数据缓存并返回
+1. 客户端发送 `productSpec`、`categoryId`（默认不传 `date`）
+2. 服务器按业务日期规则生成请求日期，并添加 `siteId`
+3. 检查缓存（最新价缓存键：`md5(productSpec)`）
+4. 缓存未命中则转发请求到 `api.rendui.com`
+5. 响应数据自动进行货币转换（CNY → USD）
+6. 转换后数据缓存并返回
 
 **统计数据接口参数** (`/statistics`)：
 | 参数 | 必填 | 说明 |
@@ -852,8 +866,9 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 ### 09:00-17:00 每小时更新（北京时间，共9次）
 1. 清除所有缓存
-2. 从外部 API 获取最新价格数据
-3. 重新缓存数据
+2. 刷新汇率缓存（Aliyun）
+3. 从外部 API 获取最新价格数据
+4. 重新缓存数据
 
 ### 时区实现说明
 - 使用 `wp_timezone()` 和 `DateTime` 对象计算正确的 Unix 时间戳
@@ -862,27 +877,28 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 ---
 
-## 客户端日期请求逻辑
+## 客户端请求日期逻辑
 
 **适用页面**：首页价格表、价格详情页
 
 **逻辑说明**：
-- 北京时间 9:00 之前：请求参数 `date` 使用**昨天**的日期
-- 北京时间 9:00 及之后：请求参数 `date` 使用**今天**的日期
+- 客户端请求不再携带 `date` 参数
+- 首页优先使用 `sessionStorage` 的短时缓存（10 分钟）减少重复请求
 
 **原因**：
-- 9:00 之前外部 API 可能还没有今天的数据
-- 缓存中保留的是昨天 17:00 的数据
-- 确保用户始终能看到有效的价格数据
+- 日期规则统一由服务端维护，避免前后端重复逻辑
+- 由定时任务控制“最新数据”刷新时机（09:00-17:00 每小时）
+- 减少页面来回切换时的重复加载和等待
 
 **实现位置**：
-- 首页：`/assets/js/main.js` 中的 `getApiDate()` 函数
-- 价格详情页：`/page-templates/page-price-detail.php` 中的内联 `getApiDate()` 函数
+- 首页：`/assets/js/main.js` 单次请求 `/prices`（无 `date`），并将结果写入 `sessionStorage`
+- 价格详情页：`/page-templates/page-price-detail.php` 请求 `/price?productSpec=...&categoryId=...`（无 `date`）
 
 **服务端支持**：
-- `/prices/category` 端点支持 `date` 参数
-- `class-api-client.php` 中 `get_price_list($date)` 和 `fetch_price_list($force_refresh, $date)` 支持日期参数
-- 缓存键不含日期（`ippgi_prices_price_list`），依赖定时任务时机保证数据一致性
+- 服务端业务日期函数：北京时间 9:00 前用昨天，9:00 及之后用今天
+- 价格列表缓存键不含日期（`ippgi_prices_price_list`）
+- 价格详情“最新价”缓存键不含日期（`md5(productSpec)`）
+- `/prices/category` 与 `/price` 仍保留可选 `date` 参数，便于运维/调试时覆盖默认日期
 
 ---
 
@@ -894,8 +910,21 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **历史数据**：`GET https://api.rendui.com/v1/jec/rendui/prices/statistics`
 
 ### 汇率数据 API
-- **当前汇率**：中国银行官网 `https://www.boc.cn/sourcedb/whpj/`
-- **历史汇率**：欧洲央行 `https://www.frankfurter.app/`
+- **服务商**：阿里云市场（数脉 API）
+- **鉴权方式**：仅签名认证（APP Key + APP Secret，`X-Ca-*` 签名头），不再使用 APPCODE 回退
+- **当前汇率**：`GET https://tysjhlcx.market.alicloudapi.com/exchange_rate/convert`
+  - 参数：`fromCode=USD&toCode=CNY&money=1`
+- **历史汇率**：`GET https://tysjhlcx.market.alicloudapi.com/exchange_rate/history`
+  - 参数：`code=USD` + `startDate/endDate(yyyyMMdd)` 或 `month(yyyyMM)`
+- **配置项**：
+  - `IPPGI_ALIYUN_APP_KEY`、`IPPGI_ALIYUN_APP_SECRET`
+  - 建议在环境变量中注入，`wp-config.php` 读取 env 值
+  - 也可在后台配置：`外观 > 自定义 > IPPGI Settings > API Credentials`（保存到 WordPress options）
+  - 凭证读取优先级：常量（`wp-config.php`） > WordPress option > 系统环境变量
+
+**部署注意**：
+- 代码同步（git pull）只会带上“后台设置页功能”，不会带上本地数据库中的凭证值
+- 线上测试服需要重新在后台填写一次凭证，或用 `wp option update` 写入
 
 ---
 
@@ -922,7 +951,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 #### 5. 会员系统集成 ✅
 - Simple Membership Plugin 集成
 - 会员等级权限控制
-- 邀请奖励系统（3天 Plus 会员）
+- 邀请奖励系统（7天 Plus 会员）
 
 #### 6. 首页功能 ✅
 - 价格表无限循环左右滑动轮播（5秒间隔，带指示点）、Banner 轮播、Market Insights
@@ -952,7 +981,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 #### 11. 实时价格 API 重构 ✅
 - 重构数据流：客户端 → 服务器 REST API → 缓存检查 → api.rendui.com
-- 缓存键包含 `productSpec` 和 `date`（`md5(productSpec + '_' + date)`）
+- “最新价”缓存键改为仅包含 `productSpec`（`md5(productSpec)`）
 - 自动货币转换（CNY → USD），支持含税/不含税价格
 - 处理 API 响应边缘情况（如 `lastYearsDiff` 为 "-" 字符串）
 
@@ -973,11 +1002,11 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 00:00 任务仅保存数据，移除了缓存清除和获取新数据步骤
 - 保留 17:00 缓存数据供 00:00-09:00 期间使用
 
-#### 15. 客户端日期请求逻辑 ✅
-- 首页价格表和价格详情页统一实现日期计算逻辑
-- 北京时间 9:00 之前请求昨天的日期，9:00 及之后请求今天的日期
-- `/prices/category` REST API 端点新增 `date` 参数支持
-- `class-api-client.php` 的 `get_price_list()` 和 `fetch_price_list()` 支持日期参数传递
+#### 15. 客户端日期参数移除与服务端业务日期统一 ✅
+- 首页价格表和价格详情页请求不再传 `date`
+- 服务端统一决定业务日期：北京时间 9:00 之前使用昨天，9:00 及之后使用今天
+- `/prices/category` 与 `/price` 端点保留 `date` 可选参数用于调试覆盖
+- `class-api-client.php` 统一实现业务日期函数供价格列表与价格详情请求复用
 
 #### 16. 价格图表 - TD（当天）数据 ✅
 - `/statistics` REST API 端点：转发请求到 `api.rendui.com/v1/jec/rendui/prices/statistics`
@@ -1352,6 +1381,37 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   }
   ```
 
+#### 50. WP-Cron 定时任务用户修复 ✅
+- **问题**：2026 年 2 月起 WordPress 后台无法上传图片
+- **原因**：WP-Cron 在 root 的 crontab 中运行，2 月第一次触发时以 root 身份创建了 `uploads/2026/02` 目录（`root:root`），Web 服务器（`www-data`）无写入权限
+- **修复**：
+  1. 修复已有目录权限：`chown -R www-data:www-data /home/html/www/ippgi/wp-content/uploads/2026/02`
+  2. 修复日志文件权限：`chown www-data:www-data /var/log/wp-cron.log`
+  3. 将 WP-Cron 从 root crontab 迁移到 www-data crontab：`crontab -u www-data -e`
+- **根本原因**：crontab 任务以 root 身份运行，每月第一次触发时创建新月份目录继承了 root 权限
+- **预防措施**：WP-Cron 应始终以 `www-data` 用户运行，与 Web 服务器一致
+
+#### 51. Stripe Dashboard 取消状态同步 ✅
+- **问题**：用户在 Stripe Dashboard 选择 `Cancel at end of period` 后，网站在到期前无法展示 Cancelled 状态
+- **修复**：
+  1. 在 SWPM Stripe webhook 处理器中转发 `customer.subscription.updated` 事件（action: `swpm_stripe_subscription_updated`）
+  2. 主题新增 `ippgi_on_stripe_subscription_updated()`：
+     - `cancel_at_period_end=true`：写入 `ippgi_subscription_cancelled`、`ippgi_subscription_cancelled_date`、`ippgi_subscription_end_date`
+     - `cancel_at_period_end=false`：清除以上取消标记（用户恢复订阅）
+  3. 清理 `ippgi_next_billing_*` transient，确保 Profile 展示及时刷新
+- **效果**：无论在网站还是 Stripe 后台取消，Profile 页面都能同步显示取消状态与到期时间
+
+#### 52. 页脚社交图标统一与后台可配置 ✅
+- 抽取公共模板：`/template-parts/social-icons.php`，主站页脚与 Profile 简化页脚复用同一份图标代码
+- 当前展示 5 个图标（Facebook/LinkedIn/Twitter-X/Instagram/Pinterest），均为内联 SVG
+- 新增 Customizer 社交链接配置项（`外观 > 自定义 > IPPGI Settings > Footer`）：
+  - `ippgi_social_facebook`
+  - `ippgi_social_linkedin`
+  - `ippgi_social_twitter`
+  - `ippgi_social_instagram`
+  - `ippgi_social_pinterest`
+- 未配置链接时保持 `href="#"`，配置后自动使用外链并以新标签页打开
+
 ---
 
 ### Phase 2 - 待实现
@@ -1414,24 +1474,27 @@ mysql -u username -p database_name < ippgi_full_backup.sql
 
 #### 6. 配置定时任务
 ```bash
-# 添加 crontab 确保 WP-Cron 正常运行（推荐使用 PHP CLI 方式）
-* * * * * cd /path/to/wordpress && /usr/bin/php wp-cron.php >> /var/log/wp-cron.log 2>&1
+# 添加到 www-data 用户的 crontab（重要：不要用 root crontab）
+crontab -u www-data -e
+# 添加这行：
+* * * * * cd /home/html/www/ippgi && /usr/bin/php wp-cron.php >> /var/log/wp-cron.log 2>&1
 ```
 
 **说明**：
 - 每分钟执行一次，确保定时任务及时触发
 - 使用 PHP CLI 直接执行，比 curl HTTP 请求更可靠
 - 日志记录到 `/var/log/wp-cron.log`，方便调试
-- 需要将 `/path/to/wordpress` 替换为实际的 WordPress 安装目录
+- **必须使用 www-data 用户运行**，否则 root 创建的上传目录会导致 Web 服务器无法写入（已踩坑，见开发进度 #50）
 
 ---
 
 ## 开发注意事项
 - 价格数据展示是核心功能，需要考虑表格在移动端的展示方式
 - 内容权限控制需要精细到部分内容级别（同一页面部分可见）
-- **缓存策略**：缓存永不过期，由定时任务在固定时间清除（00:00 和 09:00-17:00）
+- **缓存策略**：缓存永不过期，由定时任务在 09:00-17:00 每小时清除并刷新
 - 生产环境务必关闭 `IPPGI_DEV_MODE`
-- **CSS 版本号**：开发模式下自动使用所有 CSS 文件中最新的修改时间作为版本号
+- **资源版本号**：开发模式下自动使用 `assets/css` + `assets/js` 中最新修改时间作为版本号
+- **标题换行**：页面/区块标题统一使用 `text-wrap: wrap`，避免 Chrome `text-wrap: balance` 导致两行均分留白过大
 
 ---
 
@@ -1479,6 +1542,25 @@ php import-missing-days.php
 - `.site-logo__text` - 文本 logo（无图片时显示）
 
 **注意**：WordPress 输出的 logo 图片带有内联 `width` 和 `height` 属性，CSS 中使用 `height: auto` 覆盖以确保 `max-height` 生效。
+
+---
+
+## Gutenberg 编辑器预览一致性（Privacy/Terms）
+
+为解决“后台编辑预览”和“前台发布页”排版不一致问题，主题已启用编辑器样式并新增专用 CSS：
+
+- `add_theme_support('editor-styles')`
+- `add_editor_style('assets/css/editor-style.css')`
+
+**涉及文件**：
+- `wp-content/themes/ippgi/functions.php`
+- `wp-content/themes/ippgi/assets/css/editor-style.css`
+- `wp-content/themes/ippgi/assets/css/components.css`（`.legal-content` 前台样式）
+
+**当前行为**：
+- 后台 Gutenberg 编辑器会加载与前台法律页面接近的字体、标题层级、段落间距与列表样式
+- 前台 Privacy/Terms 页面继续使用 `.legal-content` 样式渲染
+- 目标是做到“编辑器预览 ≈ 前台发布效果”，尤其是标题大小层级和 `ul/ol` 列表符号
 
 ---
 

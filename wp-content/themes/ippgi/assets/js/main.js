@@ -971,7 +971,7 @@
 
     /**
      * Initialize price carousel for homepage
-     * Fetches all 6 categories and displays PPGI, GI, GL in an infinite loop carousel
+     * Fetches all categories once and displays PPGI, GI, GL in an infinite loop carousel
      */
     function initPriceCarousel() {
         // Only run on front page
@@ -986,10 +986,13 @@
 
         if (!container) return;
 
-        // All 6 categories to fetch
+        // All 6 categories available in server payload
         const allCategories = ['PPGI', 'GI', 'GL', 'HRC', 'CRC_HARD', 'AL'];
         // Categories to display in carousel
         const displayCategories = ['PPGI', 'GI', 'GL'];
+        // Short-lived client cache to avoid repeated requests when navigating back quickly
+        const HOME_PRICES_CACHE_KEY = 'ippgi_home_prices_cache_v1';
+        const HOME_PRICES_CACHE_TTL_MS = 10 * 60 * 1000;
         let pricesData = {};
         // currentIndex is for the actual category (0, 1, 2)
         let currentIndex = 0;
@@ -1000,72 +1003,126 @@
         let isTransitioning = false;
 
         /**
-         * Get the appropriate date for API request
-         * Before 9:00 AM Beijing time: use yesterday's date
-         * After 9:00 AM Beijing time: use today's date
+         * Normalize /prices payload into legacy per-category shape used by rendering code
          */
-        function getApiDate() {
-            // Get current time in Beijing timezone (UTC+8)
-            const now = new Date();
-            const utcHours = now.getUTCHours();
-            const beijingHours = (utcHours + 8) % 24;
-
-            // Calculate Beijing date
-            let beijingDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-
-            // If before 9:00 AM Beijing time, use yesterday's date
-            if (beijingHours < 9) {
-                beijingDate.setDate(beijingDate.getDate() - 1);
+        function normalizeAllPricesResponse(result) {
+            if (!result || !result.success || !result.data || !result.data.categories) {
+                return {};
             }
 
-            // Format as YYYY-MM-DD 00:00:00
-            const year = beijingDate.getUTCFullYear();
-            const month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(beijingDate.getUTCDate()).padStart(2, '0');
+            const sourceCategories = result.data.categories;
+            const fetchedAt = result.data.fetched_at || '';
+            const normalized = {};
+            const apiCategoryMap = {
+                'CRC_HARD': 'CRC Hard'
+            };
 
-            return year + '-' + month + '-' + day + ' 00:00:00';
+            allCategories.forEach(category => {
+                const sourceKey = apiCategoryMap[category] || category;
+                const categoryData = sourceCategories[sourceKey];
+
+                if (categoryData && categoryData.result) {
+                    normalized[category] = {
+                        data: categoryData,
+                        fetchedAt: fetchedAt
+                    };
+                }
+            });
+
+            return normalized;
+        }
+
+        function readCachedPrices() {
+            try {
+                const raw = sessionStorage.getItem(HOME_PRICES_CACHE_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== 'object') return null;
+                if (!parsed.data || typeof parsed.timestamp !== 'number') return null;
+                return parsed;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function writeCachedPrices(data) {
+            try {
+                sessionStorage.setItem(HOME_PRICES_CACHE_KEY, JSON.stringify({
+                    timestamp: Date.now(),
+                    data: data
+                }));
+            } catch (error) {
+                // Ignore client cache write failures (e.g. private mode quota limits).
+            }
+        }
+
+        function isCacheFresh(cacheEntry) {
+            return !!(
+                cacheEntry &&
+                typeof cacheEntry.timestamp === 'number' &&
+                (Date.now() - cacheEntry.timestamp) < HOME_PRICES_CACHE_TTL_MS
+            );
+        }
+
+        function applyPricesData(newData) {
+            pricesData = newData || {};
+            window.ippgiPricesData = pricesData;
+
+            if (Object.keys(pricesData).length === 0) {
+                return false;
+            }
+
+            // Re-render from first slide when applying a fresh dataset.
+            currentIndex = 0;
+            trackIndex = 1;
+            renderAllSlides();
+            renderDots();
+            updateLabels();
+            startCarousel();
+            return true;
+        }
+
+        async function fetchPricesFromServer() {
+            const restUrl = ippgiData.restUrl || '/wp-json/ippgi-prices/v1/';
+            const response = await fetch(restUrl + 'prices');
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            const result = await response.json();
+            return normalizeAllPricesResponse(result);
         }
 
         /**
-         * Fetch prices for all categories
+         * Fetch prices with session cache:
+         * - Use fresh cache directly
+         * - Use stale cache as fallback while refreshing
          */
         async function fetchAllPrices() {
-            const restUrl = ippgiData.restUrl || '/wp-json/ippgi-prices/v1/';
-            const apiDate = getApiDate();
+            const cachedEntry = readCachedPrices();
+            const cachedData = cachedEntry && cachedEntry.data ? cachedEntry.data : {};
+            const hasCachedData = Object.keys(cachedData).length > 0;
+
+            if (hasCachedData) {
+                applyPricesData(cachedData);
+            }
+
+            if (hasCachedData && isCacheFresh(cachedEntry)) {
+                return;
+            }
 
             try {
-                // Fetch all 6 categories in parallel
-                const promises = allCategories.map(category =>
-                    fetch(restUrl + 'prices/category?category=' + category + '&date=' + encodeURIComponent(apiDate))
-                        .then(response => response.json())
-                );
-
-                const results = await Promise.all(promises);
-
-                results.forEach((result, index) => {
-                    if (result.success && result.data) {
-                        pricesData[allCategories[index]] = {
-                            data: result.data,
-                            fetchedAt: result.fetched_at
-                        };
-                    }
-                });
-
-                // Store in global for price detail page
-                window.ippgiPricesData = pricesData;
-
-                // Render all slides
-                if (Object.keys(pricesData).length > 0) {
-                    renderAllSlides();
-                    renderDots();
-                    updateLabels();
-                    startCarousel();
-                } else {
+                const freshData = await fetchPricesFromServer();
+                if (Object.keys(freshData).length > 0) {
+                    applyPricesData(freshData);
+                    writeCachedPrices(freshData);
+                } else if (!hasCachedData) {
                     showError('No price data available');
                 }
             } catch (error) {
                 console.error('Failed to fetch prices:', error);
-                showError('Failed to load prices');
+                if (!hasCachedData) {
+                    showError('Failed to load prices');
+                }
             }
         }
 
@@ -1095,14 +1152,17 @@
                 items.forEach(item => {
                     const thickness = item.thickness || '';
                     const dimensions = thickness + '*' + width;
-                    const priceUsd = item.lastprice || item.lastprice_usd || item.price_usd || item.price || 0;
+                    // Prefer current price fields; lastprice is historical reference.
+                    const priceUsd = item.price_usd || item.price || item.lastprice_usd || item.lastprice || 0;
                     const change = item.riseAndFall || item.riseAndFall_usd || item.change || 0;
+                    const parsedPrice = parseFloat(priceUsd);
+                    const parsedChange = parseFloat(change);
 
                     rows.push({
                         product: productName,
                         dimensions: dimensions,
-                        price: priceUsd,
-                        change: change
+                        price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+                        change: Number.isFinite(parsedChange) ? parsedChange : 0
                     });
                 });
             });
@@ -1120,8 +1180,12 @@
 
             rows.forEach(row => {
                 const changeClass = row.change > 0 ? 'up' : (row.change < 0 ? 'down' : 'neutral');
-                const changeSign = row.change > 0 ? '+' : '';
-                const changeDisplay = row.change !== 0 ? changeSign + row.change.toFixed(2) : '0.00';
+                let changeDisplay = '$0.00';
+                if (row.change > 0) {
+                    changeDisplay = '+$' + row.change.toFixed(2);
+                } else if (row.change < 0) {
+                    changeDisplay = '-$' + Math.abs(row.change).toFixed(2);
+                }
 
                 html += '<tr>';
                 html += '<td><span class="price-table__product">' + row.product + '</span></td>';
@@ -1613,7 +1677,7 @@
                     changeText = '+$' + formatNumber(change);
                 } else if (change < 0) {
                     changeClass = 'down';
-                    changeText = '$' + formatNumber(change);
+                    changeText = '-$' + formatNumber(Math.abs(change));
                 } else {
                     changeText = '$0';
                 }

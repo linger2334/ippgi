@@ -30,6 +30,7 @@ require_once IPPGI_PRICES_PLUGIN_DIR . 'includes/class-api-client.php';
 require_once IPPGI_PRICES_PLUGIN_DIR . 'includes/class-cache-manager.php';
 require_once IPPGI_PRICES_PLUGIN_DIR . 'includes/class-rest-api.php';
 require_once IPPGI_PRICES_PLUGIN_DIR . 'includes/class-historical-importer.php';
+require_once IPPGI_PRICES_PLUGIN_DIR . 'includes/class-admin.php';
 
 /**
  * Main plugin class
@@ -62,6 +63,11 @@ class IPPGI_Prices {
     public $rest_api;
 
     /**
+     * Admin instance
+     */
+    public $admin;
+
+    /**
      * Get single instance
      */
     public static function get_instance() {
@@ -87,6 +93,7 @@ class IPPGI_Prices {
         $this->api_client = new IPPGI_Prices_API_Client($this->cache_manager);
         $this->scheduler = new IPPGI_Prices_Scheduler($this->api_client, $this->cache_manager);
         $this->rest_api = new IPPGI_Prices_REST_API($this->api_client, $this->cache_manager);
+        $this->admin = new IPPGI_Prices_Admin();
 
         // Register activation/deactivation hooks
         register_activation_hook(__FILE__, array($this, 'activate'));

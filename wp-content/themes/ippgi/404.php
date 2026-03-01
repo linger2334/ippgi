@@ -35,7 +35,7 @@ get_header();
                     <ul>
                         <li><a href="<?php echo esc_url(home_url('/prices')); ?>"><?php esc_html_e('View Prices', 'ippgi'); ?></a></li>
                         <li><a href="<?php echo esc_url(get_permalink(get_option('page_for_posts'))); ?>"><?php esc_html_e('Market Insights', 'ippgi'); ?></a></li>
-                        <li><a href="<?php echo esc_url(home_url('/contact')); ?>"><?php esc_html_e('Contact Us', 'ippgi'); ?></a></li>
+                        <li><a href="<?php echo esc_url(home_url('/about')); ?>"><?php esc_html_e('About Us', 'ippgi'); ?></a></li>
                     </ul>
                 </div>
             </div>

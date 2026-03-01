@@ -26,7 +26,7 @@ if (is_user_logged_in()) {
 <main class="login-page">
     <!-- Brand Logo at top -->
     <div class="login-page__brand">
-        <span class="login-page__brand-text">PPGI.CN</span>
+        <span class="login-page__brand-text">iPPGI</span>
     </div>
 
     <!-- Login Card - large white panel -->
@@ -55,7 +55,6 @@ if (is_user_logged_in()) {
 
                 <div class="login-card__signin">
                     <span class="login-card__signin-text"><?php esc_html_e("Don't have an account?", 'ippgi'); ?></span>
-                    <a href="#" class="login-card__signin-link"><?php esc_html_e('Sign up', 'ippgi'); ?></a>
                 </div>
             </div>
         </div>
@@ -64,7 +63,7 @@ if (is_user_logged_in()) {
         <div class="login-card__footer">
             <div class="login-card__terms">
                 <p>
-                    <?php esc_html_e("By continuing, you agree to PPGI Price's", 'ippgi'); ?>
+                    <?php esc_html_e("By continuing, you agree to iPPGI Price's", 'ippgi'); ?>
                     <a href="<?php echo esc_url(home_url('/terms')); ?>"><?php esc_html_e('Terms&Conditions', 'ippgi'); ?></a>
                     <?php esc_html_e('and', 'ippgi'); ?>
                     <a href="<?php echo esc_url(home_url('/privacy')); ?>"><?php esc_html_e('Privacy Policy.', 'ippgi'); ?></a>

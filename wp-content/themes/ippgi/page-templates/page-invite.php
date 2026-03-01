@@ -40,10 +40,10 @@ get_header();
                 </div>
 
                 <p class="invite-link-section__desc">
-                    <?php esc_html_e('Share your exclusive referral link with friends! When they register, you\'ll earn 3 days of free subscription time.', 'ippgi'); ?>
+                    <?php esc_html_e('Share your exclusive referral link with friends! When they register, you\'ll earn 7 days of free subscription time.', 'ippgi'); ?>
                     <?php esc_html_e('Have questions?', 'ippgi'); ?>
-                    <a href="<?php echo esc_url(home_url('/contact')); ?>" class="invite-link-section__contact">
-                        <?php esc_html_e('Contact us', 'ippgi'); ?>
+                    <a href="<?php echo esc_url(home_url('/about')); ?>" class="invite-link-section__contact">
+                        <?php esc_html_e('About us', 'ippgi'); ?>
                     </a>.
                 </p>
             </div>

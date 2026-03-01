@@ -20,7 +20,7 @@ $subscribe_url = ippgi_get_subscribe_url();
     </button>
     <div class="upgrade-prompt__content">
         <div class="upgrade-prompt__title"><?php esc_html_e('Plus', 'ippgi'); ?></div>
-        <div class="upgrade-prompt__text"><?php esc_html_e('Full access to all product prices.', 'ippgi'); ?></div>
+        <div class="upgrade-prompt__text"><?php esc_html_e('Full access to all pricing data.', 'ippgi'); ?></div>
     </div>
     <button type="button" class="upgrade-prompt__action" data-subscribe-url="<?php echo esc_url($subscribe_url); ?>">
         <?php esc_html_e('Upgrade', 'ippgi'); ?>

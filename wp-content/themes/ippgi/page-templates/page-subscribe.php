@@ -49,42 +49,6 @@ get_header();
 
     <div class="container">
         <div class="pricing-cards pricing-cards--two-col">
-            <!-- Basic Plan (Free) -->
-            <div class="pricing-card">
-                <div class="pricing-card__header">
-                    <h2 class="pricing-card__title"><?php esc_html_e('Basic', 'ippgi'); ?></h2>
-                    <div class="pricing-card__price">
-                        <span class="pricing-card__amount-text"><?php esc_html_e('Free', 'ippgi'); ?></span>
-                    </div>
-                </div>
-                <div class="pricing-card__footer pricing-card__footer--top">
-                    <span class="btn btn--secondary btn--block"><?php esc_html_e('Current Plan', 'ippgi'); ?></span>
-                </div>
-                <ul class="pricing-card__features">
-                    <li class="pricing-card__feature">
-                        <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        <?php esc_html_e('Unlimited access to Market Insights.', 'ippgi'); ?>
-                    </li>
-                    <li class="pricing-card__feature">
-                        <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
-                        <?php esc_html_e('Unlimited access to Events.', 'ippgi'); ?>
-                    </li>
-                    <li class="pricing-card__feature">
-                        <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                        </svg>
-                        <?php esc_html_e('Full access to My Favorites.', 'ippgi'); ?>
-                    </li>
-                </ul>
-            </div>
-
             <!-- Plus Plan (Paid) -->
             <div class="pricing-card pricing-card--featured">
                 <div class="pricing-card__header">
@@ -114,8 +78,44 @@ get_header();
                         <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
                         </svg>
-                        <?php esc_html_e('Full access to all product prices.', 'ippgi'); ?>
+                        <?php esc_html_e('Full access to all pricing data.', 'ippgi'); ?>
                     </li>
+                    <li class="pricing-card__feature">
+                        <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <?php esc_html_e('Unlimited access to Market Insights.', 'ippgi'); ?>
+                    </li>
+                    <li class="pricing-card__feature">
+                        <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <?php esc_html_e('Unlimited access to Events.', 'ippgi'); ?>
+                    </li>
+                    <li class="pricing-card__feature">
+                        <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                        <?php esc_html_e('Full access to My Favorites.', 'ippgi'); ?>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Basic Plan (Free) -->
+            <div class="pricing-card">
+                <div class="pricing-card__header">
+                    <h2 class="pricing-card__title"><?php esc_html_e('Basic', 'ippgi'); ?></h2>
+                    <div class="pricing-card__price">
+                        <span class="pricing-card__amount-text"><?php esc_html_e('Free', 'ippgi'); ?></span>
+                    </div>
+                </div>
+                <div class="pricing-card__footer pricing-card__footer--top">
+                    <span class="btn btn--secondary btn--block"><?php esc_html_e('Current Plan', 'ippgi'); ?></span>
+                </div>
+                <ul class="pricing-card__features">
                     <li class="pricing-card__feature">
                         <svg class="pricing-card__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>

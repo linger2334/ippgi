@@ -209,12 +209,12 @@ class IPPGI_Prices_API_Client {
 
     /**
      * Get date parameter for API request
-     * Always use today's 00:00:00
+     * Business rule: before 09:00 use yesterday, otherwise use today.
      *
      * @return string Date in format 'YYYY-MM-DD 00:00:00'
      */
     private function get_api_date() {
-        return current_time('Y-m-d') . ' 00:00:00';
+        return $this->get_business_date()->format('Y-m-d') . ' 00:00:00';
     }
 
     /**
@@ -230,7 +230,7 @@ class IPPGI_Prices_API_Client {
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_part)) {
             return $date_part . ' 00:00:00';
         }
-        // Fallback to today
+        // Fallback to business date
         return $this->get_api_date();
     }
 
@@ -239,14 +239,16 @@ class IPPGI_Prices_API_Client {
      *
      * @param string $product_spec Full productSpec from client (e.g., "1482328115005964290_1000_0.11_彩涂")
      * @param string $category_id Category ID
-     * @param string $date Date in format YYYY-MM-DD (optional, defaults to today)
+     * @param string $date Date in format YYYY-MM-DD (optional, defaults to business date)
      * @param bool   $force_refresh Force refresh even if cached
      * @return array|WP_Error Price data or error
      */
     public function fetch_realtime_price($product_spec, $category_id, $date = '', $force_refresh = false) {
+        $use_latest_cache = empty($date);
+
         // Check cache first unless force refresh
-        if (!$force_refresh) {
-            $cached = $this->cache_manager->get_realtime_price($product_spec, $date ?: $this->get_api_date_simple());
+        if (!$force_refresh && $use_latest_cache) {
+            $cached = $this->cache_manager->get_realtime_price($product_spec);
             if (false !== $cached) {
                 return $cached;
             }
@@ -310,20 +312,39 @@ class IPPGI_Prices_API_Client {
             $data['result'] = IPPGI_Prices_Currency_Converter::convert_price_data($data['result'], $exchange_rate);
         }
 
-        // Cache the data
-        $this->cache_manager->set_realtime_price($product_spec, $date, $data);
+        // Cache only "latest" requests; custom-date queries should not overwrite latest cache.
+        if ($use_latest_cache) {
+            $this->cache_manager->set_realtime_price($product_spec, $data);
+        }
 
         return $data;
     }
 
     /**
      * Get date parameter for API request (simple format YYYY-MM-DD)
-     * Always use today's date
+     * Business rule: before 09:00 use yesterday, otherwise use today.
      *
      * @return string Date in format 'YYYY-MM-DD'
      */
     private function get_api_date_simple() {
-        return current_time('Y-m-d');
+        return $this->get_business_date()->format('Y-m-d');
+    }
+
+    /**
+     * Get business date in WP timezone.
+     * Before 09:00, use previous day to align with data availability.
+     *
+     * @return DateTimeImmutable
+     */
+    private function get_business_date() {
+        $timezone = wp_timezone();
+        $now = new DateTimeImmutable('now', $timezone);
+
+        if ((int) $now->format('H') < 9) {
+            return $now->modify('-1 day');
+        }
+
+        return $now;
     }
 
     /**
