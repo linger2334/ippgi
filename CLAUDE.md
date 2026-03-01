@@ -25,6 +25,8 @@
 
 **注意**：
 - 新用户注册时默认为 Basic，系统自动通过 bonus 机制给予 7 天 Plus 访问权限
+- bonus 激活/续期只写入 bonus 相关 meta，不会把 SWPM membership_level 改成 4；权限判断统一走 `ippgi_bonus_access_end > 当前时间`
+- 主题代码禁止手动升级会员等级到 Plus(4)；升级仅由 SWPM 支付流程自动处理，主题侧只允许降级到 Basic(2)
 - Plus 等级在 SWPM 后台设置为 "No Expiry"，所以 SWPM 不会自动降级用户，需要我们的代码在订阅到期时手动处理降级
 - 原 Trial (Level 3) 已废弃，统一使用 bonus 机制管理所有赠送天数
 

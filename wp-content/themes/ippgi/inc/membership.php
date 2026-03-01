@@ -963,23 +963,8 @@ function ippgi_activate_bonus_access($user_id, $days = null) {
         update_user_meta($user_id, 'ippgi_unused_bonus_days', 0);
     }
 
-    // Upgrade to Plus level in SWPM
-    if (ippgi_is_swpm_active() && class_exists('SwpmMemberUtils')) {
-        $wp_user = get_user_by('id', $user_id);
-        if ($wp_user) {
-            $swpm_member = SwpmMemberUtils::get_user_by_user_name($wp_user->user_login);
-            if ($swpm_member) {
-                global $wpdb;
-                $wpdb->update(
-                    $wpdb->prefix . 'swpm_members_tbl',
-                    ['membership_level' => 4], // Plus level
-                    ['member_id' => $swpm_member->member_id],
-                    ['%d'],
-                    ['%d']
-                );
-            }
-        }
-    }
+    // Do not change SWPM membership level when granting bonus access.
+    // Bonus permissions are controlled by ippgi_bonus_access_end only.
 
     // Schedule access expiration check
     wp_schedule_single_event(strtotime($end_date . ' ' . wp_timezone_string()), 'ippgi_check_bonus_access_expired', [$user_id]);
@@ -1140,10 +1125,10 @@ function ippgi_track_referral_bonus($user_id, $days, $type) {
 }
 
 /**
- * Handle referral bonus expiration - downgrade user to a specified level.
+ * Handle referral bonus expiration - downgrade user to Basic only.
  *
  * @param int $user_id User ID
- * @param int $original_level Target membership level ID
+ * @param int $original_level Legacy parameter kept for hook compatibility.
  */
 function ippgi_handle_referral_bonus_expired($user_id, $original_level) {
     if (!ippgi_is_swpm_active() || !class_exists('SwpmMemberUtils')) {
@@ -1168,16 +1153,20 @@ function ippgi_handle_referral_bonus_expired($user_id, $original_level) {
         return;
     }
 
-    global $wpdb;
-    $wpdb->update(
-        $wpdb->prefix . 'swpm_members_tbl',
-        ['membership_level' => $original_level],
-        ['member_id' => $swpm_member->member_id],
-        ['%d'],
-        ['%d']
-    );
+    $target_level = 2;
+    $current_level = (int) $swpm_member->membership_level;
+    if ($current_level !== $target_level) {
+        global $wpdb;
+        $wpdb->update(
+            $wpdb->prefix . 'swpm_members_tbl',
+            ['membership_level' => $target_level],
+            ['member_id' => $swpm_member->member_id],
+            ['%d'],
+            ['%d']
+        );
+    }
 
-    error_log(sprintf('IPPGI: Referral bonus expired for user %d, downgraded to level %d', $user_id, $original_level));
+    error_log(sprintf('IPPGI: Referral bonus expired for user %d, ensured membership level %d', $user_id, $target_level));
 }
 add_action('ippgi_referral_bonus_expired', 'ippgi_handle_referral_bonus_expired', 10, 2);
 
