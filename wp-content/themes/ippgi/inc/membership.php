@@ -206,7 +206,8 @@ function ippgi_register_swpm_hooks() {
     // SWPM/Social Login actual frontend registration hook (contains full member data)
     add_action('swpm_front_end_registration_complete_user_data', 'ippgi_on_swpm_registration', 10, 1);
 }
-add_action('init', 'ippgi_register_swpm_hooks');
+// Use early init priority so Social Login (also runs on init) cannot fire registration hooks before we attach.
+add_action('init', 'ippgi_register_swpm_hooks', 1);
 
 /**
  * Handle payment success (首次支付、续费成功)

@@ -821,6 +821,10 @@ class SwpmMiscUtils {
 	}
 
 	public static function get_countries_dropdown( $country = '' ) {
+		// PHP 8.1+: callers may pass null; normalize to string to avoid deprecation warnings.
+		$country = is_string( $country ) ? trim( $country ) : '';
+		$country_lc = strtolower( $country );
+
 		//Note: the country names are output using the __() function below so that they can be translated. The POT file just needs to have the country names in it.
 		$countries = array(
 			'Afghanistan',
@@ -1030,7 +1034,7 @@ class SwpmMiscUtils {
 		$curr_lev      = -1;
 		$guess_country = '';
 		foreach ( $countries as $country_name ) {
-			similar_text( strtolower( $country ), strtolower( $country_name ), $lev );
+			similar_text( $country_lc, strtolower( $country_name ), $lev );
 			if ( $lev >= $curr_lev ) {
 				//this is closest match so far
 				$curr_lev      = $lev;
@@ -1054,10 +1058,11 @@ class SwpmMiscUtils {
 		}
 		if ( $guess_country != '' ) {
 			$country = $guess_country;
+			$country_lc = strtolower( $country );
 		}
 		foreach ( $countries as $country_name ) {
 			//The country name strings are already in the POT file from the swpm_dummy_country_names_for_translation() function, so we can use __() function to output the country names.
-			$countries_dropdown .= "\r\n" . '<option value="' . $country_name . '"' . ( strtolower( $country_name ) == strtolower( $country ) ? ' selected' : '' ) . '>' . __($country_name, 'simple-membership') . '</option>';
+			$countries_dropdown .= "\r\n" . '<option value="' . $country_name . '"' . ( strtolower( $country_name ) == $country_lc ? ' selected' : '' ) . '>' . __($country_name, 'simple-membership') . '</option>';
 		}
 		return $countries_dropdown;
 	}

@@ -58,6 +58,8 @@
 | `swpm_registration_complete` | 新用户注册 | `ippgi_on_swpm_registration()` | 给予 7 天 bonus 访问、处理邀请码逻辑 |
 | `swpm_front_end_registration_complete_user_data` | 前台注册完成（含 Social Login 自动注册） | `ippgi_on_swpm_registration()` | 给予 7 天 bonus 访问、处理邀请码逻辑 |
 
+> 实现细节：`ippgi_register_swpm_hooks()` 在 `init` 优先级 `1` 注册，确保在 Social Login 插件（同样使用 `init`）触发注册动作前已挂载回调，避免漏发注册奖励/邀请奖励。
+
 **订阅到期处理流程**（`ippgi_on_subscription_expired`）：
 1. 验证用户当前是 Plus (4)
 2. 清除 SWPM 的 `subscr_id`（订阅已结束）
