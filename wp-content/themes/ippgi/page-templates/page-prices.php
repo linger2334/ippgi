@@ -102,8 +102,9 @@ if ($cached_data && isset($cached_data['categories'][$category_name]['result']))
                     'thickness'    => $item['thickness'] ?? '',
                     'width'        => $width,
                     'dimensions'   => ($item['thickness'] ?? '') . '*' . $width,
-                    'price'        => $item['price_usd'] ?? 0,
-                    'price_tax'    => $item['priceTax_usd'] ?? 0,
+                    // Keep /prices "Latest" aligned with homepage: use Rendui lastprice fields.
+                    'price'        => $item['lastprice_usd'] ?? ($item['price_usd'] ?? 0),
+                    'price_tax'    => $item['lastpriceTax_usd'] ?? ($item['priceTax_usd'] ?? 0),
                     'change'       => $item['riseAndFall_usd'] ?? 0,
                     'change_tax'   => $item['riseAndFallTax_usd'] ?? 0,
                     'product_spec' => $item['productSpec'] ?? '',

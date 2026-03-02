@@ -1152,8 +1152,8 @@
                 items.forEach(item => {
                     const thickness = item.thickness || '';
                     const dimensions = thickness + '*' + width;
-                    // Prefer current price fields; lastprice is historical reference.
-                    const priceUsd = item.price_usd || item.price || item.lastprice_usd || item.lastprice || 0;
+                    // Homepage Latest should follow Rendui "lastprice" as primary source.
+                    const priceUsd = item.lastprice_usd || item.lastprice || item.price_usd || item.price || 0;
                     const change = item.riseAndFall || item.riseAndFall_usd || item.change || 0;
                     const parsedPrice = parseFloat(priceUsd);
                     const parsedChange = parseFloat(change);
