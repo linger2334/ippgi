@@ -1223,8 +1223,10 @@ function ippgi_get_invitation_history($user_id = null) {
 
     $history = [];
     foreach ($referred_users as $user) {
+        $registered_utc_ts = strtotime($user->user_registered . ' UTC');
         $history[] = [
-            'timestamp' => date('M d, Y', strtotime($user->user_registered)),
+            // user_registered is stored in UTC; display in site timezone (UTC+8).
+            'timestamp' => $registered_utc_ts ? wp_date('M d, Y', $registered_utc_ts, wp_timezone()) : '',
             'email' => ippgi_mask_email($user->user_email),
         ];
     }
