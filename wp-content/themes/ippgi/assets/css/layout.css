@@ -535,6 +535,17 @@
     color: var(--color-text-white);
 }
 
+.social-icon__svg {
+    width: 24px;
+    height: 24px;
+}
+
+.social-icon__svg--instagram,
+.social-icon__svg--pinterest {
+    width: 26px;
+    height: 26px;
+}
+
 /* Footer Bottom */
 .site-footer__bottom {
     display: flex;
