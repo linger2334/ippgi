@@ -359,37 +359,41 @@ class IPPGI_Prices_API_Client {
 
     /**
      * Refresh price list incrementally (Category by Category)
-     * If a category fails to fetch, it keeps the previously cached data for that category.
+     * If a category fails to fetch, it keeps the previously cached data for that category
+     * BUT recalculates all prices with the latest exchange rate for consistency.
      *
      * @return array|WP_Error The updated price list or error
      */
     public function refresh_price_list_incrementally() {
-        // 1. Get current cached price list
+        // 1. Get current cached price list and latest exchange rate
         $current_cached = $this->cache_manager->get_price_list();
         $api_date = $this->get_api_date();
+        $latest_exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate();
 
-        // Initialize with cached data if available
         $all_data = array();
-        if ($current_cached && isset($current_cached['categories'])) {
-            $all_data = $current_cached['categories'];
-        }
-
         $errors = array();
         $updated_categories = array();
+        $recalculated_categories = array();
 
-        // 2. Fetch each category and update if successful
+        // 2. Process each category
         foreach (self::CATEGORY_IDS as $category_name => $category_id) {
             $category_data = $this->fetch_category_prices($category_id, $category_name, $api_date);
 
-            if (is_wp_error($category_data)) {
-                $errors[$category_name] = $category_data->get_error_message();
+            if (!is_wp_error($category_data) && isset($category_data['result']) && !empty($category_data['result'])) {
+                // Success: New data fetched and already converted with latest rate inside fetch_category_prices
+                $all_data[$category_name] = $category_data;
+                $updated_categories[] = $category_name;
             } else {
-                // Check if API actually returned result data
-                if (isset($category_data['result']) && !empty($category_data['result'])) {
-                    $all_data[$category_name] = $category_data;
-                    $updated_categories[] = $category_name;
+                // Failure: Try to use old cached data but RECALCULATE with latest exchange rate
+                if ($current_cached && isset($current_cached['categories'][$category_name])) {
+                    $old_category_data = $current_cached['categories'][$category_name];
+                    
+                    // Recalculate prices with latest rate to ensure consistency
+                    $all_data[$category_name] = $this->recalculate_category_prices($old_category_data, $latest_exchange_rate);
+                    $recalculated_categories[] = $category_name;
+                    $errors[$category_name] = is_wp_error($category_data) ? $category_data->get_error_message() : 'API returned empty';
                 } else {
-                    $errors[$category_name] = 'API returned empty result for ' . $category_name;
+                    $errors[$category_name] = 'No cached data available and API fetch failed';
                 }
             }
         }
@@ -401,6 +405,7 @@ class IPPGI_Prices_API_Client {
             'categories' => $all_data,
             'errors' => $errors,
             'updated_categories' => $updated_categories,
+            'recalculated_categories' => $recalculated_categories,
             'fetched_at' => current_time('Y-m-d H:i:s'),
         );
 
@@ -408,6 +413,32 @@ class IPPGI_Prices_API_Client {
         $this->cache_manager->set_price_list($result);
 
         return $result;
+    }
+
+    /**
+     * Recalculate category prices with a specific exchange rate
+     *
+     * @param array $category_data Category data
+     * @param float $exchange_rate New exchange rate
+     * @return array Updated category data
+     */
+    private function recalculate_category_prices($category_data, $exchange_rate) {
+        if (!isset($category_data['result']) || !is_array($category_data['result'])) {
+            return $category_data;
+        }
+
+        foreach ($category_data['result'] as $width => $items) {
+            if (!is_array($items)) {
+                continue;
+            }
+
+            foreach ($items as $index => $item) {
+                // Use the converter which handles using _cny fields if they exist
+                $category_data['result'][$width][$index] = IPPGI_Prices_Currency_Converter::convert_price_data($item, $exchange_rate);
+            }
+        }
+
+        return $category_data;
     }
 
     /**
