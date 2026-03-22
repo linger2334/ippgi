@@ -927,9 +927,17 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 也可在后台配置：`外观 > 自定义 > IPPGI Settings > API Credentials`（保存到 WordPress options）
   - 凭证读取优先级：常量（`wp-config.php`） > WordPress option > 系统环境变量
 
+### 邮件发送 API (Gmail API)
+- **服务商**：Google Cloud Platform (Gmail API)
+- **实现方式**：WP Mail SMTP 插件 + OAuth 2.0 (Client ID / Client Secret)
+- **发件账号**：wlg2008g@gmail.com
+- **作用域**：`https://www.googleapis.com/auth/gmail.send`
+- **重定向 URI**：`https://{domain}/wp-admin/options-general.php?page=wp-mail-smtp&action=setup`
+
 **部署注意**：
 - 代码同步（git pull）只会带上“后台设置页功能”，不会带上本地数据库中的凭证值
 - 线上测试服需要重新在后台填写一次凭证，或用 `wp option update` 写入
+- Gmail API 必须在 Google Cloud Console 中将 Publishing Status 设置为 "In Production" 以获得永久授权。
 
 ---
 
@@ -1416,6 +1424,13 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - `ippgi_social_instagram`
   - `ippgi_social_pinterest`
 - 未配置链接时保持 `href="#"`，配置后自动使用外链并以新标签页打开
+
+#### 53. Gmail SMTP 邮件系统配置 ✅
+- 安装并配置 WP Mail SMTP 插件。
+- 使用 Gmail API (OAuth 2.0) 替代传统的 SMTP 账号密码方式，提高安全性与稳定性。
+- 完成 wlg2008g@gmail.com 账号授权。
+- 同步 Simple Membership (SWPM) 邮件发件人设置，确保系统邮件通过 Gmail 成功投递。
+- 清理临时测试脚本及误安装的 WPForms Lite 插件。
 
 ---
 

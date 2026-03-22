@@ -1,3 +1,7 @@
 {
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "figma",
+    "html.to.design"
+  ]
 }

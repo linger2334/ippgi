@@ -694,6 +694,12 @@ class SimpleWpMembership {
                 echo '</div>';
             }
         }
+
+        if (SwpmMiscUtils::check_if_webhook_signing_key_config_required() == 'yes') {
+            echo '<div class="notice notice-error"><p>';
+            esc_html_e("Looks like you are using Stripe subscription payments, but the webhook signing secret is missing from the plugin settings. Please go to the Stripe Settings menu and configure the webhook signing secret.", "simple-membership"); 
+            echo '</p></div>';
+        }
     }
 
     public function meta_box() {
@@ -961,8 +967,10 @@ class SimpleWpMembership {
             'ajax_url' => $ajax_url,
             'query_args' => isset($params['query_args']) ? $params['query_args'] : array(),
         )), "before");
-       
-        wp_add_inline_script($handle, "var form_id = '".$params['form_id']."';", "before");
+
+		if (isset($params['form_id']) && !empty($params['form_id'])){
+            wp_add_inline_script($handle, "var form_id = '".$params['form_id']."';", "before");
+		}
 
         if (isset($params['custom_pass_pattern_validator']) && !empty($params['custom_pass_pattern_validator'])) {
             wp_add_inline_script($handle, "var custom_pass_pattern_validator = ".$params['custom_pass_pattern_validator'].";", "before");

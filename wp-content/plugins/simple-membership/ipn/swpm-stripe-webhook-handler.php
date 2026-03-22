@@ -35,16 +35,20 @@ class SwpmStripeWebhookHandler {
 			} else {
 				SwpmLog::log_simple_debug( 'Stripe webhook event data validated successfully!', true );
 			}
+		} else {
+			if ( empty( self::validate_webhook_data_no_signing_key($input) ) ) {
+				//Invalid webhook data received. Don't process this request.
+				http_response_code( 400 );
+				echo 'Error: Invalid webhook data received.';
+				exit();
+			} else {
+				SwpmLog::log_simple_debug( 'Stripe webhook event data validated successfully!', true );
+			}
 		}
 
 		$type = isset($event_json->type) ? $event_json->type : '';
 		$stripe_api_version = isset($event_json->api_version) ? $event_json->api_version : '';
 		SwpmLog::log_simple_debug( sprintf( 'Stripe subscription webhook received: %s and api version: %s. Checking if we need to handle this webhook.', $type, $stripe_api_version ), true );
-
-		if ( $type === 'customer.subscription.updated' ) {
-			// Broadcast subscription update events (for example: cancel_at_period_end toggled in Stripe dashboard).
-			do_action( 'swpm_stripe_subscription_updated', $event_json );
-		}
 
 		if ( 'customer.subscription.deleted' === $type || 'charge.refunded' === $type ) {
 			// Subscription expired or refunded event
@@ -227,36 +231,11 @@ class SwpmStripeWebhookHandler {
 	}
 
 	public static function validate_webhook_data( $event_data_raw ){
-		$event_json = json_decode( $event_data_raw );
-
-		$sub_id = '';
-		if ( isset($event_json->data->object->subscription) ){
-			$sub_id = $event_json->data->object->subscription;
-		} else if (isset( $event_json->data->object->id ) && $event_json->data->object->object == 'subscription' ){
-			$sub_id = $event_json->data->object->id;
-		}
-
-		$sub_agreement_cpt_id = SWPM_Utils_Subscriptions::get_subscription_agreement_cpt_id_by_subs_id($sub_id);;
-
-		// Check if the sandbox mode is enabled
-		$sandbox_enabled = SwpmSettings::get_instance()->get_value( 'enable-sandbox-testing' );
-		$webhook_signing_secret = SwpmSettings::get_instance()->get_value( 'stripe-webhook-signing-secret' );
-
-		$payment_button_id = get_post_meta($sub_agreement_cpt_id, 'payment_button_id', true);
-
-		$api_keys = SwpmMiscUtils::get_stripe_api_keys_from_payment_button( $payment_button_id, !$sandbox_enabled );
-
-		if (!isset($api_keys['secret'])){
-			SwpmLog::log_simple_debug('Stripe API secret key could not be retrieved. Could not validate this webhook.', false);
-			return false;
-		}
-
 		// Include the Stripe library.
 		SwpmMiscUtils::load_stripe_lib();
 
-		\Stripe\Stripe::setApiKey( $api_keys['secret'] );
-
 		$stripe_signature_header = $_SERVER['HTTP_STRIPE_SIGNATURE'];
+		$webhook_signing_secret = SwpmSettings::get_instance()->get_value( 'stripe-webhook-signing-secret' );
 
 		try {
 			$event_json = \Stripe\Webhook::constructEvent($event_data_raw, $stripe_signature_header, $webhook_signing_secret);
@@ -273,6 +252,129 @@ class SwpmStripeWebhookHandler {
 		return $event_json;
 	}
 
+	public static function validate_webhook_data_no_signing_key($event_data_raw){
+		$received_event = json_decode( $event_data_raw );
+
+		$events_to_validate = array(
+			'invoice.payment_succeeded', 
+			'customer.subscription.deleted',
+			'charge.refunded'
+		);
+
+		if (!in_array($received_event->type, $events_to_validate)) {
+			// No need to validate other unused events.
+			return true;
+		}
+
+		$max_allowed_event_creation_time_diff = 6 * 60 * 60; // 6 hours.
+
+		$received_sub_id = '';
+
+		$received_event_object = $received_event->data->object;
+		$received_object_name = $received_event_object->object;
+
+		switch(strtolower($received_object_name)){
+			case 'subscription':
+				$received_sub_id = isset($received_event_object->id) ? $received_event_object->id : '';
+				break;
+			case 'invoice':
+				$received_sub_id = isset($received_event_object->parent->subscription_details->subscription) ? $received_event_object->parent->subscription_details->subscription : '';
+				
+				$billing_reason = isset( $received_event_object->billing_reason ) ? $received_event_object->billing_reason : '';
+				if ( $billing_reason != 'subscription_cycle' ) {
+					// We don't need to validate invoice event with billing reason other than subscription_cycle.
+					return true;
+				}
+
+				break;
+			case 'charge':
+				// Change object does not directly contains any sub id, so its not possible to get the sub agreement cpt id hence not the payment button id.
+				// So its not possible to get the stripe api secret key. Thats why we are only checking the event creation time to validate this event. 
+				if ((time() - $received_event->created) > $max_allowed_event_creation_time_diff  ) {
+					SwpmLog::log_simple_debug('Error: Event creation time is too far in the past!', false);
+					return false;
+				} else {
+					return true;
+				}
+			default:
+				SwpmLog::log_simple_debug("Error: Invalid webhook event object '" . $received_object_name . "'", false);
+				return false;
+		}
+
+		$sub_agreement_cpt_id = SWPM_Utils_Subscriptions::get_subscription_agreement_cpt_id_by_subs_id($received_sub_id);
+
+		if (empty($sub_agreement_cpt_id)) {
+			SwpmLog::log_simple_debug("Error: can't retrieve subscription cpt record!", false);
+			return false;
+		}
+
+		// Check if the sandbox mode is enabled
+		$sandbox_enabled = SwpmSettings::get_instance()->get_value( 'enable-sandbox-testing' );
+
+		$payment_button_id = get_post_meta($sub_agreement_cpt_id, 'payment_button_id', true);
+
+		$api_keys = SwpmMiscUtils::get_stripe_api_keys_from_payment_button( $payment_button_id, !$sandbox_enabled );
+		
+		if (empty($api_keys['secret'])){
+			SwpmLog::log_simple_debug('Error: The Stripe API secret key could not be retrieved. Could not validate this webhook!', false);
+			return false;
+		}
+
+		// Include the Stripe library.
+		SwpmMiscUtils::load_stripe_lib();
+
+		\Stripe\Stripe::setApiKey( $api_keys['secret'] );
+
+		try {
+			// Re-fetch the event again by event id. Then check if the subscription id and creation time is valid or not.
+			$event = \Stripe\Event::retrieve($received_event->id);
+
+			// Check if invalid event creation time.
+			if ($event->created !== $received_event->created || (time() - $event->created) > $max_allowed_event_creation_time_diff  ) {
+				SwpmLog::log_simple_debug('Error: Event creation time is too far in the past!', false);
+				return false;
+			}
+
+			$sub_id = '';
+			$event_object = $event->data->object;
+			$event_object_name = $event_object->object;
+
+			if ($event_object_name != $received_object_name) {
+				SwpmLog::log_simple_debug("Error: Webhook event object mismatch!", false);
+				return false;
+			}
+
+			switch($event_object_name){
+				case 'subscription':
+					$sub_id = isset($event_object->id) ? $event_object->id : '';
+					break;
+				case 'invoice':
+					$sub_id = isset($event_object->parent->subscription_details->subscription) ? $event_object->parent->subscription_details->subscription : '';
+					break;
+				default:
+					SwpmLog::log_simple_debug("Error: Invalid webhook event object '" . $received_object_name . "'", false);
+					return false;
+			}
+
+			// Check if subscription id mismatch.
+			if ($sub_id != $received_sub_id) {
+				SwpmLog::log_simple_debug('Error: Subscription ID mismatch!', false);
+				return false;
+			}
+
+		} catch(\UnexpectedValueException $e) {
+			// Invalid payload. Don't Process this request.
+			SwpmLog::log_simple_debug('Error parsing payload: ' . $e->getMessage() , false);
+			return false;
+		} catch(\Exception $e) {
+			// Invalid signature. Don't Process this request.
+			SwpmLog::log_simple_debug('Error: ' . $e->getMessage() , false);
+			return false;
+		}
+
+		// Everything seems fine.
+		return true;
+	}
 }
 
 new SwpmStripeWebhookHandler();

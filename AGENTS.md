@@ -18,6 +18,7 @@
 
 ## 4) 关键业务约束
 - 会员体系（SWPM）：Basic=2，Plus=4；赠送天数走 bonus 机制（用户 meta）。
+- 邮件系统：使用 WP Mail SMTP 插件通过 Gmail API 发送邮件。发件人必须与 Gmail 认证账号一致。
 - 数据表前缀：`ippgi_`（非 `wp_`）。
 - REST 命名空间：`ippgi-prices/v1`。
 - 时区与调度：按 Asia/Shanghai（UTC+8）理解业务时间。

@@ -126,8 +126,19 @@ class SwpmAuth {
 			//If captcha is present and validation failed, it returns an error string. If validation succeeds, it returns an empty string.
 			$captcha_validation_output = apply_filters( 'swpm_validate_login_form_submission', '' );
 			if ( ! empty( $captcha_validation_output ) ) {
-				$this->lastStatusMsg = '<span class="swpm-login-error-msg swpm-red-error-text">' . SwpmUtils::_( 'Captcha validation failed on the login form.' ) . '</span>';
-				return;
+				$error_msg = SwpmUtils::_( 'Captcha validation failed on the login form.' );
+
+				if (is_array($captcha_validation_output)) {
+					if (!isset($captcha_validation_output['succeeded']) || empty($captcha_validation_output['succeeded'])) {
+						$error_msg = isset($captcha_validation_output['message']) ? sanitize_text_field($captcha_validation_output['message']) : $error_msg;
+						$this->lastStatusMsg = '<span class="swpm-login-error-msg swpm-red-error-text">' . esc_html($error_msg) . '</span>';
+						return;
+					}
+				
+				} else {
+					$this->lastStatusMsg = '<span class="swpm-login-error-msg swpm-red-error-text">' . $error_msg . '</span>';
+					return;
+				}
 			}
 
 			if ( is_email( $swpm_user_name ) ) {//User is trying to log-in using an email address
@@ -679,7 +690,7 @@ class SwpmAuth {
 
 	public function get_expire_date() {
 		if ( $this->isLoggedIn ) {
-			return SwpmUtils::get_formatted_expiry_date( $this->get( 'subscription_starts' ), $this->get( 'subscription_period' ), $this->get( 'subscription_duration_type' ) );
+			return SwpmMemberUtils::get_formatted_expiry_date_by_user_id( SwpmMemberUtils::get_logged_in_members_id() );
 		}
 		return '';
 	}

@@ -821,10 +821,6 @@ class SwpmMiscUtils {
 	}
 
 	public static function get_countries_dropdown( $country = '' ) {
-		// PHP 8.1+: callers may pass null; normalize to string to avoid deprecation warnings.
-		$country = is_string( $country ) ? trim( $country ) : '';
-		$country_lc = strtolower( $country );
-
 		//Note: the country names are output using the __() function below so that they can be translated. The POT file just needs to have the country names in it.
 		$countries = array(
 			'Afghanistan',
@@ -1034,7 +1030,7 @@ class SwpmMiscUtils {
 		$curr_lev      = -1;
 		$guess_country = '';
 		foreach ( $countries as $country_name ) {
-			similar_text( $country_lc, strtolower( $country_name ), $lev );
+			similar_text( strtolower( $country ), strtolower( $country_name ), $lev );
 			if ( $lev >= $curr_lev ) {
 				//this is closest match so far
 				$curr_lev      = $lev;
@@ -1058,11 +1054,10 @@ class SwpmMiscUtils {
 		}
 		if ( $guess_country != '' ) {
 			$country = $guess_country;
-			$country_lc = strtolower( $country );
 		}
 		foreach ( $countries as $country_name ) {
 			//The country name strings are already in the POT file from the swpm_dummy_country_names_for_translation() function, so we can use __() function to output the country names.
-			$countries_dropdown .= "\r\n" . '<option value="' . $country_name . '"' . ( strtolower( $country_name ) == $country_lc ? ' selected' : '' ) . '>' . __($country_name, 'simple-membership') . '</option>';
+			$countries_dropdown .= "\r\n" . '<option value="' . $country_name . '"' . ( strtolower( $country_name ) == strtolower( $country ) ? ' selected' : '' ) . '>' . __($country_name, 'simple-membership') . '</option>';
 		}
 		return $countries_dropdown;
 	}
@@ -1450,5 +1445,99 @@ class SwpmMiscUtils {
 
 		SwpmMiscUtils::mail( $to_email, $subject, $body, $headers );
 		SwpmLog::log_simple_debug( 'Account activation email for member ID: '.$member_id.' successfully sent to: ' . $to_email . '. From email address value used: ' . $from_address, true );
+	}
+
+
+	public static function get_months_data(int $year = null): array {
+		$year = $year ?? (int) date('Y');
+		$data = array();
+
+		for ($m = 1; $m <= 12; $m++) {
+			$date = DateTime::createFromFormat('Y-n-j', "$year-$m-1");
+
+			$data[] = [
+				'm' => $m,
+				'name' => $date->format('F'),
+				'days'  => $date->format('t'),
+			];
+		}
+
+		return $data;
+	}
+
+	public static function month_day_selector($selected_date = '') {
+		$currentYear = (int) date('Y');
+
+		if (!empty($selected_date)){
+			$selected_date = strtotime($selected_date);
+		} else {
+			$selected_date = strtotime(date('Y-01-01'));
+		}
+
+		$months = self::get_months_data($currentYear);
+
+		SimpleWpMembership::enqueue_validation_scripts_v2( 'swpm-month-day-selector' );
+
+		?>
+		<span class="swpm-month-day-selector" data-day-month-options="<?php echo esc_attr(json_encode($months)) ?>">
+            <select class="swpm-month-selector" name="subscription_period_<?php echo SwpmMembershipLevel::ANNUAL_FIXED_DATE?>[m]">
+                <?php foreach ($months as $month) { ?>
+                    <option value="<?php echo esc_attr($month['m']) ?>" <?php selected( intval(date('m', $selected_date)), $month['m'] ) ?>><?php echo esc_attr($month['name']) ?></option>
+                <?php } ?>
+            </select>
+            <select class="swpm-day-selector" name="subscription_period_<?php echo SwpmMembershipLevel::ANNUAL_FIXED_DATE?>[d]">
+                <?php
+                $selected_month_data = $months[intval(date('m', $selected_date)) - 1];
+                for ($i = 1; $i <= $selected_month_data['days']; $i++) { ?>
+                    <option value="<?php echo esc_attr($i) ?>" <?php selected( intval(date('d', $selected_date)), $i ) ?> ><?php echo esc_attr(SwpmUtils::pad_zero($i)) ?></option>
+                <?php } ?>
+            </select>
+        </span>
+		<?php
+	}
+
+	public static function check_if_webhook_signing_key_config_required(){
+		// Check if this is a stripe settings form submit and signing key field empty.
+		if (isset($_POST['stripe-webhook-signing-secret'])) {
+			if (empty($_POST['stripe-webhook-signing-secret'])) {
+				return 'yes';
+			} else {
+				return 'no';
+			}
+		}
+
+		$settings = SwpmSettings::get_instance();
+		$webhook_signing_secret = $settings->get_value( 'stripe-webhook-signing-secret' );
+
+		if (!empty(trim($webhook_signing_secret))) {
+			// Signing secret key is present.
+			return 'no';
+		}
+
+		$stripe_webhook_signing_key_config_required = $settings->get_value('stripe_webhook_signing_key_config_required', '');
+		if ( !empty($stripe_webhook_signing_key_config_required) ) {
+			return $stripe_webhook_signing_key_config_required;
+		}
+
+		$args = array(
+			'post_type' => 'swpm_payment_button',
+			'numberposts' => -1,
+			'fields' => 'ids',
+			'meta_query' => array(
+				array(
+					'key'   => 'button_type',
+					'value' => 'stripe_sca_subscription',
+				),				
+			),
+		);
+
+		$query = new WP_Query( $args );
+		$count = $query->found_posts;
+
+		$stripe_webhook_signing_key_config_required = empty($count) ? 'no' : 'yes';
+
+		$settings->set_value('stripe_webhook_signing_key_config_required', $stripe_webhook_signing_key_config_required)->save();
+
+		return $stripe_webhook_signing_key_config_required;
 	}
 }
