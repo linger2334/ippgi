@@ -591,6 +591,28 @@ class IPPGI_Prices_Currency_Converter {
     }
 
     /**
+     * Get the source CNY amount for a price field.
+     * Prefers existing *_cny values so cached USD payloads can be safely repriced.
+     *
+     * @param array  $price_data Price payload.
+     * @param string $field      Base field name.
+     * @return float|null Source amount in CNY or null if unavailable.
+     */
+    private static function get_cny_source_amount($price_data, $field) {
+        $cny_field = $field . '_cny';
+
+        if (isset($price_data[$cny_field]) && $price_data[$cny_field] !== null && is_numeric($price_data[$cny_field])) {
+            return (float) $price_data[$cny_field];
+        }
+
+        if (isset($price_data[$field]) && $price_data[$field] !== null && is_numeric($price_data[$field])) {
+            return (float) $price_data[$field];
+        }
+
+        return null;
+    }
+
+    /**
      * Convert price data from CNY to USD
      *
      * @param array $price_data Price data with CNY prices
@@ -603,23 +625,26 @@ class IPPGI_Prices_Currency_Converter {
         }
 
         // Convert price field
-        if (isset($price_data['price'])) {
-            $price_data['price_cny'] = $price_data['price'];
-            $price_data['price_usd'] = self::cny_to_usd($price_data['price'], $exchange_rate);
+        $price_source = self::get_cny_source_amount($price_data, 'price');
+        if (null !== $price_source) {
+            $price_data['price_cny'] = $price_source;
+            $price_data['price_usd'] = self::cny_to_usd($price_source, $exchange_rate);
             $price_data['price'] = $price_data['price_usd']; // Default to USD
         }
 
         // Convert taxPrice field
-        if (isset($price_data['taxPrice'])) {
-            $price_data['taxPrice_cny'] = $price_data['taxPrice'];
-            $price_data['taxPrice_usd'] = self::cny_to_usd($price_data['taxPrice'], $exchange_rate);
+        $tax_price_source = self::get_cny_source_amount($price_data, 'taxPrice');
+        if (null !== $tax_price_source) {
+            $price_data['taxPrice_cny'] = $tax_price_source;
+            $price_data['taxPrice_usd'] = self::cny_to_usd($tax_price_source, $exchange_rate);
             $price_data['taxPrice'] = $price_data['taxPrice_usd']; // Default to USD
         }
 
         // Convert priceTax field (alternative name)
-        if (isset($price_data['priceTax'])) {
-            $price_data['priceTax_cny'] = $price_data['priceTax'];
-            $price_data['priceTax_usd'] = self::cny_to_usd($price_data['priceTax'], $exchange_rate);
+        $price_tax_source = self::get_cny_source_amount($price_data, 'priceTax');
+        if (null !== $price_tax_source) {
+            $price_data['priceTax_cny'] = $price_tax_source;
+            $price_data['priceTax_usd'] = self::cny_to_usd($price_tax_source, $exchange_rate);
             $price_data['priceTax'] = $price_data['priceTax_usd']; // Default to USD
         }
 
@@ -633,9 +658,10 @@ class IPPGI_Prices_Currency_Converter {
         );
 
         foreach ($price_fields as $field) {
-            if (isset($price_data[$field]) && $price_data[$field] !== null && is_numeric($price_data[$field])) {
-                $price_data[$field . '_cny'] = $price_data[$field];
-                $price_data[$field . '_usd'] = self::cny_to_usd($price_data[$field], $exchange_rate);
+            $field_source = self::get_cny_source_amount($price_data, $field);
+            if (null !== $field_source) {
+                $price_data[$field . '_cny'] = $field_source;
+                $price_data[$field . '_usd'] = self::cny_to_usd($field_source, $exchange_rate);
                 $price_data[$field] = $price_data[$field . '_usd']; // Default to USD
             }
         }

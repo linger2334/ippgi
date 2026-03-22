@@ -241,9 +241,39 @@ class IPPGI_Prices_Scheduler {
             current_time('Y-m-d H:i:s')
         ));
 
-        // Collect and save current prices to database
-        // At midnight, this saves yesterday's data (cached from 17:00)
-        // The exchange rate is extracted from the cached price list data
+        // Step 1: Force refresh exchange rate at midnight.
+        $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate(null, true);
+        error_log(sprintf(
+            'IPPGI Prices: Refreshed exchange rate for midnight task: %.4f CNY per USD',
+            $exchange_rate
+        ));
+
+        // Step 2: Reprice cached price list with the latest exchange rate.
+        $price_list_reprice = $this->api_client->reprice_cached_price_list($exchange_rate);
+        if (is_wp_error($price_list_reprice)) {
+            error_log(sprintf(
+                'IPPGI Prices: Midnight price list reprice skipped - %s: %s',
+                $price_list_reprice->get_error_code(),
+                $price_list_reprice->get_error_message()
+            ));
+        } else {
+            error_log(sprintf(
+                'IPPGI Prices: Midnight repriced cached price list for %d categories',
+                count($price_list_reprice['repriced_categories'])
+            ));
+        }
+
+        // Step 3: Reprice cached real-time price payloads so detail pages show the same USD basis.
+        $realtime_reprice = $this->api_client->reprice_cached_realtime_prices($exchange_rate);
+        error_log(sprintf(
+            'IPPGI Prices: Midnight repriced %d cached realtime payloads (skipped: %d, errors: %d)',
+            $realtime_reprice['updated'],
+            $realtime_reprice['skipped'],
+            count($realtime_reprice['errors'])
+        ));
+
+        // Step 4: Collect and save current prices to database.
+        // At midnight, this saves the cached business-date prices after repricing them with the latest FX rate.
         $collection_results = $this->price_collector->collect_all_current_prices(false);
 
         if ($collection_results['success']) {
@@ -272,6 +302,9 @@ class IPPGI_Prices_Scheduler {
             'timestamp' => current_time('timestamp'),
             'datetime' => current_time('Y-m-d H:i:s'),
             'execution_time' => $execution_time,
+            'exchange_rate' => $exchange_rate,
+            'repriced_price_list' => !is_wp_error($price_list_reprice),
+            'repriced_realtime_prices' => $realtime_reprice['updated'],
             'prices_collected' => $collection_results['success'],
             'prices_saved' => $collection_results['total_saved'],
             'errors' => $collection_results['errors'],

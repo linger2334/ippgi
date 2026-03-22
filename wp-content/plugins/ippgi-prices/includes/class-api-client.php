@@ -358,6 +358,38 @@ class IPPGI_Prices_API_Client {
     }
 
     /**
+     * Reprice the cached price list with a fresh exchange rate while keeping CNY values unchanged.
+     *
+     * @param float|null $exchange_rate Exchange rate (CNY per USD).
+     * @return array|WP_Error Updated cached payload or error.
+     */
+    public function reprice_cached_price_list($exchange_rate = null) {
+        if (null === $exchange_rate) {
+            $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate();
+        }
+
+        $current_cached = $this->cache_manager->get_price_list();
+        if (false === $current_cached || empty($current_cached['categories']) || !is_array($current_cached['categories'])) {
+            return new WP_Error('cache_miss', 'No cached price list available to reprice');
+        }
+
+        $repriced_categories = array();
+
+        foreach ($current_cached['categories'] as $category_name => $category_data) {
+            $current_cached['categories'][$category_name] = $this->recalculate_category_prices($category_data, $exchange_rate);
+            $repriced_categories[] = $category_name;
+        }
+
+        $current_cached['repriced_categories'] = $repriced_categories;
+        $current_cached['repriced_at'] = current_time('Y-m-d H:i:s');
+        $current_cached['exchange_rate'] = $exchange_rate;
+
+        $this->cache_manager->set_price_list($current_cached);
+
+        return $current_cached;
+    }
+
+    /**
      * Refresh price list incrementally (Category by Category)
      * If a category fails to fetch, it keeps the previously cached data for that category
      * BUT recalculates all prices with the latest exchange rate for consistency.
@@ -413,6 +445,47 @@ class IPPGI_Prices_API_Client {
         $this->cache_manager->set_price_list($result);
 
         return $result;
+    }
+
+    /**
+     * Reprice all cached real-time price payloads with the latest exchange rate.
+     *
+     * @param float|null $exchange_rate Exchange rate (CNY per USD).
+     * @return array Summary of repriced entries.
+     */
+    public function reprice_cached_realtime_prices($exchange_rate = null) {
+        if (null === $exchange_rate) {
+            $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate();
+        }
+
+        $entries = $this->cache_manager->get_all_realtime_price_entries();
+        $results = array(
+            'updated' => 0,
+            'skipped' => 0,
+            'errors' => array(),
+            'exchange_rate' => $exchange_rate,
+        );
+
+        foreach ($entries as $entry) {
+            $payload = $entry['value'];
+
+            if (!is_array($payload) || !isset($payload['result']) || !is_array($payload['result'])) {
+                $results['skipped']++;
+                continue;
+            }
+
+            $payload['result'] = IPPGI_Prices_Currency_Converter::convert_price_data($payload['result'], $exchange_rate);
+            $payload['repriced_at'] = current_time('Y-m-d H:i:s');
+
+            if (!$this->cache_manager->update_realtime_price_entry($entry['option_name'], $payload)) {
+                $results['errors'][] = sprintf('Failed to update cached realtime payload: %s', $entry['option_name']);
+                continue;
+            }
+
+            $results['updated']++;
+        }
+
+        return $results;
     }
 
     /**

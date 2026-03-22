@@ -170,6 +170,55 @@ class IPPGI_Prices_Cache_Manager {
     }
 
     /**
+     * Get all cached real-time price entries from transients.
+     *
+     * @return array Cached entry list with option_name and value.
+     */
+    public function get_all_realtime_price_entries() {
+        global $wpdb;
+
+        $pattern = '_transient_' . self::CACHE_PREFIX . self::REALTIME_PRICE_PREFIX . '%';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $pattern
+            ),
+            ARRAY_A
+        );
+
+        if (empty($rows)) {
+            return array();
+        }
+
+        $entries = array();
+        foreach ($rows as $row) {
+            $entries[] = array(
+                'option_name' => $row['option_name'],
+                'value' => maybe_unserialize($row['option_value']),
+            );
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Update a cached real-time price entry by raw transient option name.
+     *
+     * @param string $option_name Raw transient option name.
+     * @param array  $data        Cached payload.
+     * @return bool True on success, false on failure.
+     */
+    public function update_realtime_price_entry($option_name, $data) {
+        $expected_prefix = '_transient_' . self::CACHE_PREFIX . self::REALTIME_PRICE_PREFIX;
+
+        if (strpos($option_name, $expected_prefix) !== 0) {
+            return false;
+        }
+
+        return update_option($option_name, $data, false);
+    }
+
+    /**
      * Get cache statistics
      *
      * @return array Cache statistics
