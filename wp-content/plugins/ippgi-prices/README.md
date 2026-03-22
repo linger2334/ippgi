@@ -4,7 +4,7 @@ WordPress plugin for fetching and caching material price data from external API 
 
 ## Features
 
-- **Scheduled Tasks**: Automatically fetches price data every hour from 9:00-17:00 daily
+- **Scheduled Tasks**: Runs hourly workflows at `:10` past each hour, with full price refresh from `09:10-17:10`
 - **Smart Caching**: Uses WordPress Transients API for efficient data caching
 - **REST API**: Exposes endpoints for frontend consumption
 - **Two Data Types**:
@@ -80,17 +80,25 @@ Manually triggers the scheduled task (clear cache + fetch price list).
 
 ### Scheduled Tasks
 
-The plugin schedules 9 daily tasks (one for each hour from 9:00-17:00). Each task:
+The plugin schedules:
 
-1. **Clears all caches** (price list + all real-time prices)
+- 1 daily snapshot task at `00:10`
+- 14 daily FX repricing tasks at `01:10-08:10` and `18:10-23:10`
+- 9 daily business-hour refresh tasks at `09:10-17:10`
+
+Business-hour refresh tasks:
+
+1. **Clears real-time price and exchange-rate caches** (keeps the price list cache)
 2. **Fetches price list** from API and caches it
 3. **Logs execution** details for debugging
 
+Off-hours FX repricing tasks refresh the exchange rate and reprice cached USD values for both price-list and real-time payloads without fetching new market data.
+
 ### Caching Strategy
 
-- **Price List**: Cached for 1 hour after fetching
-- **Real-time Prices**: Cached for 1 hour, fetched on-demand when frontend requests
-- Cache is automatically cleared every hour during business hours (9:00-17:00)
+- **Price List**: Stored in transients until the scheduled workflows replace it
+- **Real-time Prices**: Stored in transients and repriced hourly; refreshed on-demand when frontend requests miss cache
+- Business-hour refresh runs at `09:10-17:10`; FX-only repricing runs at the remaining hours' `:10`
 
 ### API Integration
 
@@ -161,7 +169,7 @@ define('WP_DEBUG_LOG', true);
 
 Then check `/wp-content/debug.log` for entries like:
 ```
-IPPGI Prices: Starting scheduled task at 2026-01-23 09:00:00 (hour: 9)
+IPPGI Prices: Starting scheduled task at 2026-01-23 09:10:00 (hour: 9)
 IPPGI Prices: Cleared caches - Price list: yes, Real-time prices: 15
 IPPGI Prices: Successfully fetched and cached price list
 IPPGI Prices: Completed scheduled task in 1.23 seconds
@@ -203,7 +211,7 @@ For issues or questions, contact the development team.
 
 ### 1.0.0
 - Initial release
-- Scheduled hourly tasks (9:00-17:00)
+- Scheduled hourly tasks at `:10` past each hour
 - Price list and real-time price caching
 - REST API endpoints
 - Admin tools for cache management
