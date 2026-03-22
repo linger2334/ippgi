@@ -128,18 +128,45 @@ class IPPGI_Prices_Currency_Converter {
             $rate = self::get_current_rate();
         }
 
-        // Store in database
-        $wpdb->replace(
-            $table_name,
-            array(
-                'rate_date' => $date,
-                'rate' => $rate,
-                'created_at' => current_time('mysql'),
-            ),
-            array('%s', '%f', '%s')
-        );
+        self::store_historical_rate($date, $rate);
 
         return $rate;
+    }
+
+    /**
+     * Force-refresh a historical rate from Aliyun and persist it to the database.
+     * Unlike get_exchange_rate($date, true), this method will NOT fall back to the current rate.
+     *
+     * @param string $date Date in YYYY-MM-DD format.
+     * @return float|false Exchange rate (CNY per USD) or false if Aliyun did not return a valid historical rate.
+     */
+    public static function refresh_historical_rate_from_aliyun($date) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $date)) {
+            return false;
+        }
+
+        $rate = self::get_historical_rate_from_aliyun($date);
+        if (false === $rate) {
+            return false;
+        }
+
+        self::store_historical_rate($date, $rate);
+
+        return $rate;
+    }
+
+    /**
+     * Get a historical rate directly from Aliyun without persisting it.
+     *
+     * @param string $date Date in YYYY-MM-DD format.
+     * @return float|false Exchange rate (CNY per USD) or false on failure.
+     */
+    public static function get_historical_rate_from_aliyun($date) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $date)) {
+            return false;
+        }
+
+        return self::fetch_aliyun_historical_rate($date);
     }
 
     /**
@@ -548,6 +575,29 @@ class IPPGI_Prices_Currency_Converter {
 
         error_log(sprintf('IPPGI Prices: Fetched Aliyun historical rate for %s: 1 USD = %.4f CNY', $date, $rate));
         return $rate;
+    }
+
+    /**
+     * Store a historical rate in the database.
+     *
+     * @param string $date Date in YYYY-MM-DD format.
+     * @param float  $rate Exchange rate (CNY per USD).
+     * @return void
+     */
+    private static function store_historical_rate($date, $rate) {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . self::HISTORICAL_RATES_TABLE;
+
+        $wpdb->replace(
+            $table_name,
+            array(
+                'rate_date' => $date,
+                'rate' => $rate,
+                'created_at' => current_time('mysql'),
+            ),
+            array('%s', '%f', '%s')
+        );
     }
 
     /**
