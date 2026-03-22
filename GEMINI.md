@@ -54,6 +54,7 @@ Toggle `IPPGI_DEV_MODE` in `wp-content/themes/ippgi/functions.php` to simulate p
 - **`wp-content/themes/ippgi/functions.php`**: Main theme initialization and membership logic.
 - **`wp-content/plugins/ippgi-prices/ippgi-prices.php`**: Main plugin entry point.
 - **`wp-content/plugins/ippgi-prices/includes/`**: Core logic classes (API client, database, scheduler, etc.).
+- **`wp-content/plugins/wp-mail-smtp/`**: Handles email delivery via Gmail API.
 - **`collect-current-prices.php`**: Root script for manual/scheduled price collection.
 - **`import-historical-data.php`**: Maintenance script for populating historical records.
 - **`resource/` & `screenshot/`**: Design assets, requirements, and UI references.

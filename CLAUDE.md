@@ -1432,6 +1432,20 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 同步 Simple Membership (SWPM) 邮件发件人设置，确保系统邮件通过 Gmail 成功投递。
 - 清理临时测试脚本及误安装的 WPForms Lite 插件。
 
+#### 54. 高级会员欢迎邮件实现 ✅
+- 补全 `ippgi_send_plus_welcome_email($member_id)` 函数。
+- **业务背景**：SWPM 插件在处理 IPN 支付（PayPal/Stripe）流程时不会自动发送升级通知。
+- **实现逻辑**：支付成功后手动触发，从 SWPM 读取 "Account Upgrade Notification" 模板并发送。
+- 支持动态标签替换（`{first_name}` 等）及 HTML 设置同步，确保付费用户收到欢迎信。
+
+#### 55. 订阅取消与到期邮件通知 ✅
+- 实现 `ippgi_send_subscription_cancelled_email()` 函数。
+- **分工策略**：
+  - **即时通知**：用户取消或 Webhook 到达时，由 SWPM 插件内置功能自动发信（依赖后台勾选状态）。
+  - **延迟通知**：针对自定义的每日定时任务（处理 PayPal 延迟降级），SWPM 无法感知，因此在 Cron 任务中手动触发发信。
+- 统一使用 SWPM "Subscription Payment Canceled or Expired" 模板，确保逻辑互补且不重复投递。
+
+
 ---
 
 ### Phase 2 - 待实现

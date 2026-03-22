@@ -19,6 +19,14 @@
 ## 4) 关键业务约束
 - 会员体系（SWPM）：Basic=2，Plus=4；赠送天数走 bonus 机制（用户 meta）。
 - 邮件系统：使用 WP Mail SMTP 插件通过 Gmail API 发送邮件。发件人必须与 Gmail 认证账号一致。
+- 邮件通知逻辑（职责分工）：
+  - **由 SWPM 插件自动发送**：
+    1. 首次 Google 注册成功 (Registration Complete)。
+    2. 即时触发的订阅取消/过期 (Subscription Payment Canceled or Expired)，如 Webhook 场景。
+  - **由自定义代码手动补全**：
+    1. 付费订阅成功后 (Account Upgrade Notification) —— 理由：SWPM 不会在 IPN 支付流程中自动触发。
+    2. 每日午夜定时降级逻辑中 (Subscription Payment Canceled or Expired) —— 理由：SWPM 无法感知延迟的 Cron 逻辑。
+  - **防冲突原则**：在上述“自动发送点”切勿增加手动 Hook，避免骚扰用户。
 - 数据表前缀：`ippgi_`（非 `wp_`）。
 - REST 命名空间：`ippgi-prices/v1`。
 - 时区与调度：按 Asia/Shanghai（UTC+8）理解业务时间。
