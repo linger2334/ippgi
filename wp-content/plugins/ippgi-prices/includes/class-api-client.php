@@ -358,6 +358,59 @@ class IPPGI_Prices_API_Client {
     }
 
     /**
+     * Refresh price list incrementally (Category by Category)
+     * If a category fails to fetch, it keeps the previously cached data for that category.
+     *
+     * @return array|WP_Error The updated price list or error
+     */
+    public function refresh_price_list_incrementally() {
+        // 1. Get current cached price list
+        $current_cached = $this->cache_manager->get_price_list();
+        $api_date = $this->get_api_date();
+
+        // Initialize with cached data if available
+        $all_data = array();
+        if ($current_cached && isset($current_cached['categories'])) {
+            $all_data = $current_cached['categories'];
+        }
+
+        $errors = array();
+        $updated_categories = array();
+
+        // 2. Fetch each category and update if successful
+        foreach (self::CATEGORY_IDS as $category_name => $category_id) {
+            $category_data = $this->fetch_category_prices($category_id, $category_name, $api_date);
+
+            if (is_wp_error($category_data)) {
+                $errors[$category_name] = $category_data->get_error_message();
+            } else {
+                // Check if API actually returned result data
+                if (isset($category_data['result']) && !empty($category_data['result'])) {
+                    $all_data[$category_name] = $category_data;
+                    $updated_categories[] = $category_name;
+                } else {
+                    $errors[$category_name] = 'API returned empty result for ' . $category_name;
+                }
+            }
+        }
+
+        // Prepare combined result
+        $result = array(
+            'success' => true,
+            'date' => $api_date,
+            'categories' => $all_data,
+            'errors' => $errors,
+            'updated_categories' => $updated_categories,
+            'fetched_at' => current_time('Y-m-d H:i:s'),
+        );
+
+        // 3. Cache the updated data
+        $this->cache_manager->set_price_list($result);
+
+        return $result;
+    }
+
+    /**
      * Get real-time price (from cache or API)
      *
      * @param string $product_spec Full productSpec

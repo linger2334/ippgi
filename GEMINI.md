@@ -62,4 +62,4 @@ Toggle `IPPGI_DEV_MODE` in `wp-content/themes/ippgi/functions.php` to simulate p
 ## Scheduled Tasks (WP-Cron)
 
 - **00:00 (UTC+8):** Snapshot yesterday's prices and exchange rates into historical tables.
-- **09:00 - 17:00 (UTC+8):** Hourly cache clearing and price refresh to ensure "real-time" accuracy during market hours.
+- **09:00 - 17:00 (UTC+8):** Hourly price refresh. Uses an incremental update strategy to preserve cached data if external APIs are unavailable.

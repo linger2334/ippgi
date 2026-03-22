@@ -172,12 +172,12 @@ class IPPGI_Prices_Scheduler {
             $hour
         ));
 
-        // Step 1: Clear all caches
-        $clear_results = $this->cache_manager->clear_all_caches();
+        // Step 1: Clear only real-time and exchange rate caches
+        $clear_results = $this->cache_manager->clear_realtime_and_exchange_rate_only();
 
         error_log(sprintf(
-            'IPPGI Prices: Cleared caches - Price list: %s, Real-time prices: %d, Exchange rate: %s',
-            $clear_results['price_list'] ? 'yes' : 'no',
+            'IPPGI Prices: Cleared real-time and exchange rate caches - Price list kept: %s, Real-time prices: %d, Exchange rate: %s',
+            $clear_results['price_list'] ? 'no' : 'yes',
             $clear_results['realtime_prices_count'],
             !empty($clear_results['exchange_rate']) ? 'yes' : 'no'
         ));
@@ -189,17 +189,24 @@ class IPPGI_Prices_Scheduler {
             $exchange_rate
         ));
 
-        // Step 3: Actively fetch new price list data
-        $price_list_result = $this->api_client->fetch_price_list(true);
+        // Step 3: Fetch new price list data incrementally
+        $price_list_result = $this->api_client->refresh_price_list_incrementally();
 
         if (is_wp_error($price_list_result)) {
             error_log(sprintf(
-                'IPPGI Prices: Failed to fetch price list - %s: %s',
+                'IPPGI Prices: Failed to refresh price list incrementally - %s: %s',
                 $price_list_result->get_error_code(),
                 $price_list_result->get_error_message()
             ));
         } else {
-            error_log('IPPGI Prices: Successfully fetched and cached new price list');
+            $updated_count = count($price_list_result['updated_categories']);
+            $error_count = count($price_list_result['errors']);
+            error_log(sprintf(
+                'IPPGI Prices: Incremental price list refresh complete. Updated: %d categories, Errors/Empty: %d categories. Categories updated: %s',
+                $updated_count,
+                $error_count,
+                implode(', ', $price_list_result['updated_categories'])
+            ));
         }
 
         // Calculate execution time

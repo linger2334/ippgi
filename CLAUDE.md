@@ -1445,6 +1445,12 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - **延迟通知**：针对自定义的每日定时任务（处理 PayPal 延迟降级），SWPM 无法感知，因此在 Cron 任务中手动触发发信。
 - 统一使用 SWPM "Subscription Payment Canceled or Expired" 模板，确保逻辑互补且不重复投递。
 
+#### 56. 定时任务鲁棒性优化（增量更新价格列表） ✅
+- 修改 09:00-17:00 整点定时任务逻辑：保留 `price_list` 缓存不预先清理。
+- 实现 `refresh_price_list_incrementally()` 方法，按产品分类逐个获取新价格。
+- 采用“差异覆盖”策略：新获取成功的分类覆盖旧数据，获取失败或为空的分类保留之前缓存的数据。
+- 确保在外部 API 不稳定时，前端仍能展示最后一版有效的价格列表。
+
 
 ---
 

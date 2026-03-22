@@ -142,6 +142,24 @@ class IPPGI_Prices_Cache_Manager {
     }
 
     /**
+     * Clear only real-time and exchange rate caches, preserving price list.
+     *
+     * @return array Results of clearing operations
+     */
+    public function clear_realtime_and_exchange_rate_only() {
+        $exchange_rate_cleared = false;
+        if (class_exists('IPPGI_Prices_Currency_Converter')) {
+            $exchange_rate_cleared = IPPGI_Prices_Currency_Converter::clear_cache();
+        }
+
+        return array(
+            'price_list' => false, // Not cleared
+            'realtime_prices_count' => $this->clear_all_realtime_prices(),
+            'exchange_rate' => $exchange_rate_cleared,
+        );
+    }
+
+    /**
      * Generate cache key for real-time price
      *
      * @param string $product_spec Full productSpec
