@@ -39,7 +39,7 @@
             </li>
             <li class="header-nav__item">
                 <a href="<?php echo esc_url(home_url('/invite')); ?>" class="header-nav__link js-require-login" data-href="<?php echo esc_url(home_url('/invite')); ?>">
-                    <?php esc_html_e('Share & Earn', 'ippgi'); ?>
+                    <?php esc_html_e('Invite & Earn', 'ippgi'); ?>
                 </a>
             </li>
             <li class="header-nav__item">

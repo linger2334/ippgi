@@ -99,15 +99,10 @@ if (is_user_logged_in()) {
         <!-- Page Header -->
         <header class="prices-page-header">
             <h1 class="prices-page-header__title">
-                <?php
-                printf(
-                    esc_html__('Price charts and tables of China %s and commodities', 'ippgi'),
-                    esc_html($current_material['code'])
-                );
-                ?>
+                <?php esc_html_e('Price charts and tables of China steel and commodities', 'ippgi'); ?>
             </h1>
             <p class="prices-page-header__disclaimer">
-                <?php esc_html_e('*These prices reflect the transaction prices within China and do not include shipping costs.', 'ippgi'); ?>
+                <?php esc_html_e('Prices are quoted on an ex works (EXW) basis in China and exclude freight costs.', 'ippgi'); ?>
             </p>
         </header>
 
@@ -283,13 +278,9 @@ if (is_user_logged_in()) {
         <div class="prices-disclaimer">
             <p class="prices-disclaimer__text">
                 <strong class="prices-disclaimer__label"><?php esc_html_e('Disclaimer:', 'ippgi'); ?></strong>
-                <?php
-                $product_name = esc_html($current_material['code']);
-                printf(
-                    esc_html__('%1$s Price strives to provide accurate and objective data, information, and opinions but does not guarantee its completeness or the need for updates. The information is intended to assist customers in decision-making, not as direct advice. Customers should rely on their own judgment, and %1$s Price is not liable for any consequences arising from the use of this data. This report is the copyrighted property of %1$s Price and is for the exclusive use of its customers. Sharing, publishing, or copying this report without %1$s Price\'s permission is strictly prohibited. %1$s Price reserves the right to pursue legal action for any copyright infringement or misuse of this report.', 'ippgi'),
-                    $product_name
-                );
-                ?>
+                <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
+                <strong class="prices-disclaimer__label"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></strong>
+                <?php esc_html_e('Users should exercise independent judgment and conduct their own due diligence; iPPGI shall not be held liable for any loss or damage arising from the use of this information. All content is the exclusive intellectual property of iPPGI. Any unauthorized reproduction, distribution, or copying without prior written consent is strictly prohibited. iPPGI reserves all rights to pursue legal action for any infringement.', 'ippgi'); ?>
             </p>
         </div>
     </div>

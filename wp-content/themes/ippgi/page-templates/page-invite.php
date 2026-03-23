@@ -23,13 +23,13 @@ get_header();
     <div class="container">
         <div class="invite-page">
             <!-- Main Title -->
-            <h1 class="invite-page__title"><?php esc_html_e('Earn rewards for each friend you invite.', 'ippgi'); ?></h1>
-            <p class="invite-page__subtitle"><?php esc_html_e('Share with your friends and get rewards.', 'ippgi'); ?></p>
+            <h1 class="invite-page__title"><?php esc_html_e('Invite Friends & Earn Bonus Days', 'ippgi'); ?></h1>
+            <p class="invite-page__subtitle"><?php esc_html_e('Share your exclusive referral link with friends.', 'ippgi'); ?></p>
 
             <!-- Referral Link Section -->
             <div class="invite-link-section">
                 <p class="invite-link-section__intro">
-                    <?php esc_html_e('Get Your Exclusive Referral Link! Share it with friends and earn rewards!', 'ippgi'); ?>
+                    <?php esc_html_e('When a friend registers through your exclusive referral link, you will receive 7 bonus days added to your subscription.', 'ippgi'); ?>
                 </p>
 
                 <div class="invite-link-box">
@@ -40,11 +40,11 @@ get_header();
                 </div>
 
                 <p class="invite-link-section__desc">
-                    <?php esc_html_e('Share your exclusive referral link with friends! When they register, you\'ll earn 7 days of free subscription time.', 'ippgi'); ?>
-                    <?php esc_html_e('Have questions?', 'ippgi'); ?>
+                    <?php esc_html_e('Have questions? Contact us through our', 'ippgi'); ?>
                     <a href="<?php echo esc_url(home_url('/about')); ?>" class="invite-link-section__contact">
-                        <?php esc_html_e('About us', 'ippgi'); ?>
-                    </a>.
+                        <?php esc_html_e('About Us', 'ippgi'); ?>
+                    </a>
+                    <?php esc_html_e('page.', 'ippgi'); ?>
                 </p>
             </div>
 

@@ -23,7 +23,7 @@ get_header();
                     </h2>
                 </div>
                 <p class="my-prices__disclaimer">
-                    <?php esc_html_e('*These prices reflect the transaction prices within China and do not include shipping costs.', 'ippgi'); ?>
+                    <?php esc_html_e('Prices are quoted on an ex works (EXW) basis in China and exclude freight costs.', 'ippgi'); ?>
                 </p>
                 <p class="my-prices__updated" id="prices-updated">
                     <?php

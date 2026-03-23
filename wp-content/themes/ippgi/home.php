@@ -15,10 +15,10 @@ get_header();
         <!-- Page Title Section -->
         <section class="blog-header">
             <h1 class="blog-header__title">
-                <?php esc_html_e('Top news on China steel and other commodity markets', 'ippgi'); ?>
+                <?php esc_html_e('Latest News on the China steel market', 'ippgi'); ?>
             </h1>
             <p class="blog-header__subtitle">
-                <?php esc_html_e('Latest Chinese commodities market news', 'ippgi'); ?>
+                <?php esc_html_e('Get the latest updates on News', 'ippgi'); ?>
             </p>
         </section>
 

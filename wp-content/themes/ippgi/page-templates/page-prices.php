@@ -40,37 +40,37 @@ $product_types = [
         'name' => ippgi_get_product_display_name('ppgi'),
         'full_name' => 'Pre-painted Galvanized Iron',
         'widths' => [1000, 1200],
-        'attributes_template' => 'Thickness: %s; Width: %s; Coating Weight: Z80-180g/m2 (for PPGI) or AZ50-150g/m2 (for PPGL); Coating Type: PE/PVDF, 10-25um topcoat + 5-10um primer; Grade: DX51D; Surface: Color coated (RAL colors), 2/1 coating structure; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Roofing, cladding.',
+        'attributes_template' => 'Thickness: 0.11–0.80 mm; Width: 1000–1200 mm; Color: Blue, Grey (RAL Color); Coating Type: Polyester (PE); Surface: Color Coated; Coil ID: 508 mm / 610 mm; Coil Weight: 3–8 MT per coil; Application: Construction, Home Appliances.',
     ],
     'gi' => [
         'name' => ippgi_get_product_display_name('gi'),
         'full_name' => 'Galvanized Steel',
         'widths' => [1000, 1200, 1219, 1250],
-        'attributes_template' => 'Thickness: %s; Width: %s; Coating Weight: Z40-275g/m2; Grade: DX51D+Z, SGCC; Surface: Regular spangle, minimum spangle, zero spangle; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Construction, appliances, automotive.',
+        'attributes_template' => 'Thickness: 0.40–2.00 mm; Width: 1000–1250 mm; Surface: Regular Spangle / Small Spangle; Coil ID: 508 mm / 610 mm; Coil Weight: 5–8 MT per coil; Applications: Construction, Home Appliances, Automotive.',
     ],
     'gl' => [
         'name' => ippgi_get_product_display_name('gl'),
         'full_name' => 'Galvalume Steel',
         'widths' => [1000, 1200],
-        'attributes_template' => 'Thickness: %s; Width: %s; Coating Weight: AZ50-150g/m2 (55%% Al, 43.4%% Zn, 1.6%% Si); Grade: DX51D+AZ; Surface: Anti-fingerprint available; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Roofing, cladding, HVAC.',
+        'attributes_template' => 'Thickness: 0.13–0.60 mm; Width: 1000–1200 mm; Coating Weight: AZ20–AZ170 g/m² (55% Al, 43.4% Zn, 1.6% Si); Surface Treatment: Anti-fingerprint / Passivation; Coil ID: 508 mm; Coil Weight: 3–5 MT per coil; Applications: Construction Materials, Home Appliances.',
     ],
     'hrc' => [
         'name' => ippgi_get_product_display_name('hrc'),
         'full_name' => 'Hot Rolled Coil',
         'widths' => [1010, 1500],
-        'attributes_template' => 'Thickness: %s; Width: %s; Grade: Q235B, SS400, SPHC; Surface: Pickled and oiled (P&O) available; Coil ID: 508/610mm; Weight: 5-25 tons/coil. Applications: Structural, machinery, tubes.',
+        'attributes_template' => 'Thickness: 3.00–4.75 mm; Width: 1010–1500 mm; Steel Grade: SPHC, Q195L, Q195, Q235B, Q355B; Surface: Bright; Coil ID: 508 mm / 610 mm; Coil Weight: 15–22 MT per coil; Applications: Machinery manufacturing, fabrication, and further processing.',
     ],
     'crc' => [
         'name' => ippgi_get_product_display_name('crc'),
         'full_name' => 'Cold Rolled Hard Coil',
         'widths' => [1000, 1200],
-        'attributes_template' => 'Thickness: %s; Width: %s; Grade: SPCC, DC01, ST12; Surface: Bright finish; Hardness: Full hard; Coil ID: 508mm; Weight: 3-8 tons/coil. Applications: Forming, stamping, appliances.',
+        'attributes_template' => 'Thickness: 0.13–0.60 mm; Width: 1000–1200 mm; Steel Grade: SPCC, DC01, ST12; Surface: Bright; Hardness: ≥100 HB (Brinell); Coil ID: 508 mm / 610 mm; Coil Weight: 15–22 MT per coil; Applications: Automotive parts, metal fabrication.',
     ],
     'aluminum' => [
         'name' => ippgi_get_product_display_name('aluminum'),
         'full_name' => 'Aluminum Sheet',
         'widths' => [1000],
-        'attributes_template' => 'Thickness: %s; Width: %s; Alloy: 1050, 1060, 1100, 3003, 5052; Temper: H14, H24, O; Surface: Mill finish, brushed; Coil ID: 508mm; Weight: 1-3 tons/coil. Applications: Decoration, insulation, packaging.',
+        'attributes_template' => 'Thickness: 0.25–0.41 mm; Width: 1000 mm; Alloy / Temper: 1060H18, 1060H24, 1100H24, 3003H24, 3004H24; Surface: Bright; Coil ID: 508 mm / 610 mm; Coil Weight: 1–3 MT per coil; Applications: Construction materials, roofing, cladding.',
     ],
 ];
 
@@ -130,15 +130,17 @@ if (empty($current_width) || !in_array((int)$current_width, $available_widths)) 
     $current_width = (string)$available_widths[0];
 }
 
-// Get dynamic dimensions range from cached price list
-$dimensions_range = ippgi_get_product_dimensions_range($current_type);
-$formatted_range = ippgi_format_dimensions_range($dimensions_range);
-
-// Generate attributes text with dynamic thickness and width
-$attributes_text = sprintf(
-    $current_product['attributes_template'],
-    $formatted_range['thickness'],
-    $formatted_range['width']
+// Generate attributes text for current product type.
+$attributes_text = $current_product['attributes_template'];
+$attributes_html = preg_replace(
+    '/(^|;\s)([^:;]+:)/u',
+    '$1<strong class="key-attributes__label">$2</strong>',
+    $attributes_text
+);
+$attributes_html = str_replace(
+    '55% Al, 43.4% Zn, 1.6% Si',
+    '<strong class="key-attributes__label">55% Al, 43.4% Zn, 1.6% Si</strong>',
+    $attributes_html
 );
 ?>
 
@@ -147,16 +149,10 @@ $attributes_text = sprintf(
         <!-- Page Header -->
         <header class="prices-page-header">
             <h1 class="prices-page-header__title">
-                <?php
-                printf(
-                    /* translators: %s: product type name (e.g., PPGI, GI, GL) */
-                    esc_html__('Price charts and tables of China %s and commodities', 'ippgi'),
-                    esc_html($current_product['name'])
-                );
-                ?>
+                <?php esc_html_e('Price charts and tables of China steel and commodities', 'ippgi'); ?>
             </h1>
             <p class="prices-page-header__disclaimer">
-                <?php esc_html_e('*These prices reflect the transaction prices within China and do not include shipping costs.', 'ippgi'); ?>
+                <?php esc_html_e('Prices are quoted on an ex works (EXW) basis in China and exclude freight costs.', 'ippgi'); ?>
             </p>
         </header>
 
@@ -194,7 +190,7 @@ $attributes_text = sprintf(
         <div class="key-attributes">
             <h3 class="key-attributes__title"><?php esc_html_e('Key attributes', 'ippgi'); ?></h3>
             <p class="key-attributes__text" id="key-attributes-text">
-                <?php echo esc_html($attributes_text); ?>
+                <?php echo wp_kses($attributes_html, ['strong' => ['class' => []]]); ?>
             </p>
         </div>
 
@@ -284,14 +280,9 @@ $attributes_text = sprintf(
         <div class="prices-disclaimer">
             <p class="prices-disclaimer__text">
                 <strong class="prices-disclaimer__label"><?php esc_html_e('Disclaimer:', 'ippgi'); ?></strong>
-                <?php
-                $product_name = esc_html($current_product['name']);
-                printf(
-                    /* translators: %s: product type name (e.g., PPGI, GI, GL) */
-                    esc_html__('%1$s Price strives to provide accurate and objective data, information, and opinions but does not guarantee its completeness or the need for updates. The information is intended to assist customers in decision-making, not as direct advice. Customers should rely on their own judgment, and %1$s Price is not liable for any consequences arising from the use of this data. This report is the copyrighted property of %1$s Price and is for the exclusive use of its customers. Sharing, publishing, or copying this report without %1$s Price\'s permission is strictly prohibited. %1$s Price reserves the right to pursue legal action for any copyright infringement or misuse of this report.', 'ippgi'),
-                    $product_name
-                );
-                ?>
+                <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
+                <strong class="prices-disclaimer__label"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></strong>
+                <?php esc_html_e('Users should exercise independent judgment and conduct their own due diligence; iPPGI shall not be held liable for any loss or damage arising from the use of this information. All content is the exclusive intellectual property of iPPGI. Any unauthorized reproduction, distribution, or copying without prior written consent is strictly prohibited. iPPGI reserves all rights to pursue legal action for any infringement.', 'ippgi'); ?>
             </p>
         </div>
     </div>
