@@ -561,9 +561,10 @@
 .billing-toggle {
     display: inline-flex;
     align-items: center;
-    background-color: var(--color-bg-gray);
+    background-color: transparent;
+    border: 1px solid #1a1a1a;
     border-radius: var(--radius-full);
-    padding: 4px;
+    padding: 2px;
 }
 
 .billing-toggle__option {
@@ -572,8 +573,8 @@
     gap: var(--spacing-xs);
     padding: var(--spacing-sm) var(--spacing-md);
     font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    color: var(--color-text-muted);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
     background: transparent;
     border: none;
     border-radius: var(--radius-full);
@@ -583,18 +584,19 @@
 }
 
 .billing-toggle__option.is-active {
-    background-color: var(--color-bg-light);
+    background-color: #e5e5e5;
     color: var(--color-text-primary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
 }
 
 .billing-toggle__option:not(.is-active):hover {
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
 }
 
 .billing-toggle__save {
     color: var(--color-success);
     font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
 }
 
 /* Subscribe Page Hero (Mobile) */
@@ -618,15 +620,15 @@
 }
 
 .subscribe-hero .billing-toggle {
-    background-color: var(--color-bg-gray);
+    background-color: transparent;
 }
 
 .subscribe-hero .billing-toggle__option {
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
 }
 
 .subscribe-hero .billing-toggle__option.is-active {
-    background-color: var(--color-bg-light);
+    background-color: #e5e5e5;
     color: var(--color-text-primary);
 }
 

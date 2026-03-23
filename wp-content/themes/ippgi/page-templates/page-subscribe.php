@@ -13,7 +13,7 @@ get_header();
     <!-- Mobile Header with gradient (visible on mobile only) -->
     <div class="subscribe-hero">
         <div class="container">
-            <div class="subscribe-hero__brand">PPGI.CN</div>
+            <div class="subscribe-hero__brand">iPPGI</div>
             <h1 class="subscribe-hero__title"><?php esc_html_e('Subscriptions & Services', 'ippgi'); ?></h1>
 
             <!-- Billing Toggle -->
