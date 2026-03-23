@@ -54,7 +54,7 @@
 
 | Hook | 触发时机 | 处理函数 | 做什么 |
 |------|---------|---------|--------|
-| `swpm_payment_ipn_processed` | 首次支付成功、续费成功 | `ippgi_on_payment_success()` | 显示成功模态框、清除取消状态、发送欢迎邮件 |
+| `swpm_payment_ipn_processed` | 首次支付成功、续费成功 | `ippgi_on_payment_success()` | 显示成功模态框、清除取消状态 |
 | `swpm_subscription_payment_cancelled` | 订阅到期（取消后到期、续费失败终止） | `ippgi_on_subscription_expired()` | 清除 subscr_id、激活奖励天数或降级为 Basic |
 | `swpm_stripe_subscription_updated` | Stripe 订阅更新（`customer.subscription.updated`） | `ippgi_on_stripe_subscription_updated()` | 同步 `cancel_at_period_end` 取消状态和到期时间 |
 | `swpm_registration_complete` | 新用户注册 | `ippgi_on_swpm_registration()` | 给予 7 天 bonus 访问、处理邀请码逻辑 |
@@ -1443,11 +1443,10 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 同步 Simple Membership (SWPM) 邮件发件人设置，确保系统邮件通过 Gmail 成功投递。
 - 清理临时测试脚本及误安装的 WPForms Lite 插件。
 
-#### 54. 高级会员欢迎邮件实现 ✅
-- 补全 `ippgi_send_plus_welcome_email($member_id)` 函数。
-- **业务背景**：SWPM 插件在处理 IPN 支付（PayPal/Stripe）流程时不会自动发送升级通知。
-- **实现逻辑**：支付成功后手动触发，从 SWPM 读取 "Account Upgrade Notification" 模板并发送。
-- 支持动态标签替换（`{first_name}` 等）及 HTML 设置同步，确保付费用户收到欢迎信。
+#### 54. 高级会员欢迎邮件去重 ✅
+- **现状结论**：当前 SWPM 插件在订阅 IPN 支付（PayPal/Stripe）流程中会自动发送 "Account Upgrade Notification"。
+- **修正动作**：移除主题侧基于 `swpm_payment_ipn_processed` 的重复手动发信逻辑，避免用户收到两封升级通知。
+- **保留逻辑**：支付成功后仍由 `ippgi_on_payment_success()` 负责显示成功模态框、清理取消状态；升级通知邮件统一交由 SWPM 插件发送。
 
 #### 55. 订阅取消与到期邮件通知 ✅
 - 实现 `ippgi_send_subscription_cancelled_email()` 函数。

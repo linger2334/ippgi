@@ -139,11 +139,11 @@ add_filter('wp_image_editors', function($editors) {
 });
 
 /**
- * Redirect logged-in users from membership-login page to home
+ * Redirect logged-in users from login pages to home
  * This handles the redirect after Google/social login
  */
 add_action('template_redirect', function() {
-    if (is_page('membership-login') && is_user_logged_in()) {
+    if ((is_page('membership-login') || is_page('login')) && is_user_logged_in()) {
         wp_redirect(home_url('/'));
         exit;
     }

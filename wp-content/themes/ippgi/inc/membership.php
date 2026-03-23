@@ -289,9 +289,6 @@ function ippgi_on_payment_success($ipn_data) {
     // Set flag for showing payment success modal on next page load
     update_user_meta($user_id, 'ippgi_payment_just_completed', true);
 
-    // Send welcome email (TODO: implement actual email)
-    ippgi_send_plus_welcome_email($member_id);
-
     error_log(sprintf('IPPGI: Payment success processed for user %d', $user_id));
 }
 
@@ -665,78 +662,6 @@ add_action('init', 'ippgi_schedule_subscription_check');
 
 // Hook the cron action
 add_action('ippgi_check_expired_subscriptions_hook', 'ippgi_check_expired_cancelled_subscriptions');
-
-/**
- * Send Plus welcome email
- * 
- * Triggered when a member successfully upgrades to Plus.
- * Uses the "Account Upgrade Notification" template from SWPM settings.
- *
- * @param int $member_id SWPM Member ID
- */
-function ippgi_send_plus_welcome_email($member_id) {
-    if (!ippgi_is_swpm_active() || !class_exists('SwpmSettings') || !class_exists('SwpmMemberUtils')) {
-        return;
-    }
-
-    // Get SWPM settings for the upgrade email
-    $settings = SwpmSettings::get_instance();
-    $subject = $settings->get_value('upgrade-complete-mail-subject');
-    $body = $settings->get_value('upgrade-complete-mail-body');
-
-    // If template is empty, use a fallback
-    if (empty($subject)) {
-        $subject = "Account Upgrade Confirmation Email";
-    }
-    if (empty($body)) {
-        $body = "Dear {first_name} {last_name},\n\nYour Account Has Been Upgraded to Plus.\n\nThank You";
-    }
-
-    // Get member data
-    $member = SwpmMemberUtils::get_user_by_id($member_id);
-    if (!$member) {
-        error_log(sprintf('IPPGI: Cannot send welcome email, member %d not found', $member_id));
-        return;
-    }
-
-    $to = $member->email;
-
-    // Replace dynamic tags using SWPM's internal utility if available
-    if (class_exists('SwpmMiscUtils') && method_exists('SwpmMiscUtils', 'replace_dynamic_tags')) {
-        $body = SwpmMiscUtils::replace_dynamic_tags($body, $member_id);
-    } else {
-        // Fallback manual replacement
-        $body = str_replace('{first_name}', $member->first_name, $body);
-        $body = str_replace('{last_name}', $member->last_name, $body);
-        $body = str_replace('{user_name}', $member->user_name, $body);
-    }
-
-    // Prepare headers
-    $from_address = $settings->get_value('email-from');
-    $headers = array();
-    
-    // Check if HTML emails are enabled in SWPM
-    $is_html = $settings->get_value('email-enable-html');
-    if (!empty($is_html)) {
-        $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $body = nl2br($body);
-    } else {
-        $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-    }
-
-    if (!empty($from_address)) {
-        $headers[] = 'From: ' . $from_address;
-    }
-
-    // Send the email
-    $success = wp_mail($to, $subject, $body, $headers);
-
-    if ($success) {
-        error_log(sprintf('IPPGI: Plus welcome email sent successfully to member %d (%s)', $member_id, $to));
-    } else {
-        error_log(sprintf('IPPGI: Failed to send Plus welcome email to member %d (%s)', $member_id, $to));
-    }
-}
 
 /**
  * Handle new SWPM registration
