@@ -67,6 +67,20 @@
     .section {
         padding: var(--spacing-2xl) 0;
     }
+
+    .section.section--banner {
+        padding: 0;
+    }
+
+    .section.section--prices {
+        padding-top: var(--spacing-sm);
+        padding-bottom: var(--spacing-md);
+    }
+
+    .section.section--insights {
+        padding-top: var(--spacing-md);
+    }
+
 }
 
 /* ==========================================================================
@@ -90,6 +104,23 @@
 
     .header-menu-btn {
         display: none;
+    }
+
+    .section.section--banner {
+        padding: 0;
+    }
+
+    .section.section--prices {
+        padding-top: var(--spacing-sm);
+        padding-bottom: var(--spacing-md);
+    }
+
+    .section.section--insights {
+        padding-top: var(--spacing-md);
+    }
+
+    .banner-carousel__slides {
+        height: 150px;
     }
 
     .header-login-btn {
@@ -221,6 +252,19 @@
     /* Spacing adjustments */
     .section {
         padding: var(--spacing-3xl) 0;
+    }
+
+    .section.section--banner {
+        padding: 0;
+    }
+
+    .section.section--prices {
+        padding-top: var(--spacing-sm);
+        padding-bottom: var(--spacing-md);
+    }
+
+    .section.section--insights {
+        padding-top: var(--spacing-md);
     }
 }
 
