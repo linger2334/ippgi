@@ -269,7 +269,7 @@
 
 /* Price Table */
 .price-table {
-    font-family: var(--font-family-mono);
+    font-family: var(--font-family-base);
 }
 
 .price-table__value {
@@ -2139,18 +2139,18 @@
 }
 
 .price-table__dimensions {
-    font-family: var(--font-family-mono);
+    font-family: var(--font-family-base);
     color: var(--color-text-secondary);
 }
 
 .price-table__price {
-    font-family: var(--font-family-mono);
+    font-family: var(--font-family-base);
     font-weight: var(--font-weight-medium);
     color: var(--color-text-primary);
 }
 
 .price-table__change {
-    font-family: var(--font-family-mono);
+    font-family: var(--font-family-base);
     font-size: var(--font-size-sm);
 }
 
@@ -2457,7 +2457,7 @@
     font-size: 48px;
     font-weight: var(--font-weight-bold);
     color: #d5e7ef;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-family-base);
 }
 
 .login-card {
@@ -2482,7 +2482,7 @@
     font-weight: var(--font-weight-bold);
     color: #6d6d6d;
     margin: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-family-base);
 }
 
 .login-card__body {
@@ -2513,7 +2513,7 @@
     font-weight: var(--font-weight-normal);
     cursor: pointer;
     transition: all var(--transition-fast);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-family-base);
 }
 
 .login-btn--google {
@@ -2540,7 +2540,7 @@
 /* Sign In Link */
 .login-card__signin {
     font-size: 16px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-family-base);
 }
 
 .login-card__signin-text {
@@ -2560,7 +2560,7 @@
 /* Terms */
 .login-card__terms {
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-family-base);
 }
 
 .login-card__terms p {
@@ -2597,7 +2597,7 @@
     font-weight: var(--font-weight-normal) !important;
     cursor: pointer;
     transition: all var(--transition-fast);
-    font-family: 'Inter', sans-serif !important;
+    font-family: var(--font-family-base) !important;
 }
 
 .login-card__body .swpm-login-form-google-checkout-button:hover,
@@ -4319,7 +4319,7 @@ html:has(.edit-profile-page-body) {
 }
 
 .prices-page-header__title {
-    font-family: 'Alumni Sans', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 28px;
     font-weight: var(--font-weight-normal);
     color: #868686;
@@ -4329,7 +4329,7 @@ html:has(.edit-profile-page-body) {
 }
 
 .prices-page-header__disclaimer {
-    font-family: 'Alumni Sans', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 18px;
     color: #c8c8c8;
     line-height: 1.4;
@@ -4352,7 +4352,7 @@ html:has(.edit-profile-page-body) {
     border: none;
     border-bottom: 1px solid #e0e0e0;
     cursor: pointer;
-    font-family: 'Alumni Sans', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 26px;
     color: #838383;
     text-align: left;
@@ -4444,7 +4444,7 @@ html:has(.edit-profile-page-body) {
 }
 
 .selected-product__name {
-    font-family: 'Inter', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 24px;
     font-weight: var(--font-weight-normal);
     color: #707070;
@@ -4456,7 +4456,7 @@ html:has(.edit-profile-page-body) {
 }
 
 .key-attributes__title {
-    font-family: 'Alumni Sans', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 20px;
     font-weight: var(--font-weight-bold);
     color: #757575;
@@ -4464,7 +4464,7 @@ html:has(.edit-profile-page-body) {
 }
 
 .key-attributes__text {
-    font-family: 'Inter', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 13px;
     color: #c7c7c7;
     line-height: 1.7;
@@ -4502,7 +4502,7 @@ html:has(.edit-profile-page-body) {
     background: transparent;
     border: none;
     border-radius: 18px;
-    font-family: 'Alumni Sans', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 20px;
     color: #757575;
     cursor: pointer;
@@ -4531,7 +4531,7 @@ html:has(.edit-profile-page-body) {
 }
 
 .price-controls__updated {
-    font-family: 'Inter', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 12px;
     font-weight: var(--font-weight-medium);
     color: #b3b3b3;
@@ -4582,7 +4582,7 @@ html:has(.edit-profile-page-body) {
 }
 
 .price-controls__toggle-text {
-    font-family: 'Alumni Sans', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 20px;
     color: #898989;
 }
@@ -4609,7 +4609,7 @@ html:has(.edit-profile-page-body) {
 
 .prices-table th {
     padding: var(--spacing-md);
-    font-family: 'Inter', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 14px;
     font-weight: var(--font-weight-normal);
     color: #788082;
@@ -4627,7 +4627,7 @@ html:has(.edit-profile-page-body) {
 
 .prices-table td {
     padding: var(--spacing-md);
-    font-family: 'Inter', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 14px;
     font-weight: var(--font-weight-medium);
     color: #888;
@@ -4681,7 +4681,7 @@ html:has(.edit-profile-page-body) {
     border: 1px solid #6a6968;
     border-radius: 20px;
     color: #44a9c6;
-    font-family: 'Inter', var(--font-family-base);
+    font-family: var(--font-family-base);
     font-size: 14px;
     font-weight: var(--font-weight-medium);
     text-decoration: none;
