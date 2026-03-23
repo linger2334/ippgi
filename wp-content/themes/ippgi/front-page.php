@@ -30,7 +30,7 @@ get_header();
                     printf(
                         /* translators: %s: date and time */
                         esc_html__('Updated: %s (UTC+8)', 'ippgi'),
-                        date_i18n('M d, Y, h:i A')
+                        ippgi_format_prices_fetched_at(ippgi_get_latest_prices_fetched_at(), 'Y-m-d H:i:s')
                     );
                     ?>
                 </p>

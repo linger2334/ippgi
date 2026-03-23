@@ -90,7 +90,7 @@ $category_name = $category_mapping[$current_type] ?? 'PPGI';
 $cache_manager = function_exists('ippgi_prices') ? ippgi_prices()->cache_manager : null;
 $cached_data = $cache_manager ? $cache_manager->get_category_price_list($category_name) : false;
 $category_prices = [];
-$fetched_at = '';
+$fetched_at = ippgi_get_latest_prices_fetched_at();
 
 if ($cached_data && isset($cached_data['result'])) {
     $result = $cached_data['result'];
@@ -113,11 +113,6 @@ if ($cached_data && isset($cached_data['result'])) {
             }
         }
         $category_prices[$width] = $width_items;
-    }
-
-    $full_price_list = $cache_manager ? $cache_manager->get_price_list() : false;
-    if ($full_price_list) {
-        $fetched_at = $full_price_list['fetched_at'] ?? '';
     }
 }
 
@@ -225,7 +220,7 @@ $attributes_text = sprintf(
                 printf(
                     /* translators: %s: date and time */
                     esc_html__('Updated: %s (UTC+8)', 'ippgi'),
-                    date_i18n('M d, Y, h:i A')
+                    ippgi_format_prices_fetched_at($fetched_at, 'M d, Y, h:i A')
                 );
                 ?>
             </div>

@@ -315,6 +315,41 @@ function ippgi_format_price($amount, $currency = 'CNY') {
 }
 
 /**
+ * Get the latest cached price-list fetched time.
+ *
+ * @return string
+ */
+function ippgi_get_latest_prices_fetched_at() {
+    if (!function_exists('ippgi_prices') || !isset(ippgi_prices()->cache_manager)) {
+        return '';
+    }
+
+    $price_list = ippgi_prices()->cache_manager->get_price_list();
+
+    return is_array($price_list) ? ($price_list['fetched_at'] ?? '') : '';
+}
+
+/**
+ * Format the cached price-list fetched time for UI display.
+ *
+ * @param string $fetched_at Cached fetched_at value in site timezone.
+ * @param string $format     Output format.
+ * @return string
+ */
+function ippgi_format_prices_fetched_at($fetched_at = '', $format = 'Y-m-d H:i:s') {
+    $timezone = wp_timezone();
+
+    if (!empty($fetched_at)) {
+        $datetime = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $fetched_at, $timezone);
+        if ($datetime instanceof DateTimeImmutable) {
+            return $datetime->format($format);
+        }
+    }
+
+    return wp_date($format, time(), $timezone);
+}
+
+/**
  * Get next billing date (placeholder)
  */
 function ippgi_get_next_billing_date() {
