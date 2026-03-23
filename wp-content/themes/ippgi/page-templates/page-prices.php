@@ -87,12 +87,13 @@ $category_mapping = [
     'aluminum' => 'AL',
 ];
 $category_name = $category_mapping[$current_type] ?? 'PPGI';
-$cached_data = get_transient('ippgi_prices_price_list');
+$cache_manager = function_exists('ippgi_prices') ? ippgi_prices()->cache_manager : null;
+$cached_data = $cache_manager ? $cache_manager->get_category_price_list($category_name) : false;
 $category_prices = [];
 $fetched_at = '';
 
-if ($cached_data && isset($cached_data['categories'][$category_name]['result'])) {
-    $result = $cached_data['categories'][$category_name]['result'];
+if ($cached_data && isset($cached_data['result'])) {
+    $result = $cached_data['result'];
     // result: { "1000": [ {thickness, price_usd, ...}, ... ], "1200": [...] }
     foreach ($result as $width => $items) {
         $width_items = [];
@@ -113,7 +114,11 @@ if ($cached_data && isset($cached_data['categories'][$category_name]['result']))
         }
         $category_prices[$width] = $width_items;
     }
-    $fetched_at = $cached_data['fetched_at'] ?? '';
+
+    $full_price_list = $cache_manager ? $cache_manager->get_price_list() : false;
+    if ($full_price_list) {
+        $fetched_at = $full_price_list['fetched_at'] ?? '';
+    }
 }
 
 // Derive available widths from actual cached data (keys of category_prices)

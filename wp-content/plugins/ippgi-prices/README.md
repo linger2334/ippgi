@@ -5,7 +5,7 @@ WordPress plugin for fetching and caching material price data from external API 
 ## Features
 
 - **Scheduled Tasks**: Runs hourly workflows at `:10` past each hour, with full price refresh from `09:10-17:10`
-- **Smart Caching**: Uses WordPress Transients API for efficient data caching
+- **Smart Caching**: Uses WordPress Transients API with per-category price-list caches to avoid oversized payloads
 - **REST API**: Exposes endpoints for frontend consumption
 - **Two Data Types**:
   - Price List: Overview of all material prices
@@ -96,7 +96,7 @@ Off-hours FX repricing tasks refresh the exchange rate and reprice cached USD va
 
 ### Caching Strategy
 
-- **Price List**: Stored in transients until the scheduled workflows replace it
+- **Price List**: Stored as per-category transients plus a tiny metadata transient until scheduled workflows replace them
 - **Real-time Prices**: Stored in transients and repriced hourly; refreshed on-demand when frontend requests miss cache
 - Business-hour refresh runs at `09:10-17:10`; FX-only repricing runs at the remaining hours' `:10`
 

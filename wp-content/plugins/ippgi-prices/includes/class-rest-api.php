@@ -220,7 +220,7 @@ class IPPGI_Prices_REST_API {
         return new WP_REST_Response(array(
             'success' => true,
             'data' => $data,
-            'cached' => (bool) $this->cache_manager->get_price_list(),
+            'cached' => $this->cache_manager->has_price_list_cache(),
         ), 200);
     }
 

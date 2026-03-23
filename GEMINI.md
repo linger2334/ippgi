@@ -57,9 +57,23 @@ Toggle `IPPGI_DEV_MODE` in `wp-content/themes/ippgi/functions.php` to simulate p
 - **`wp-content/plugins/wp-mail-smtp/`**: Handles email delivery via Gmail API.
 - **`collect-current-prices.php`**: Root script for manual/scheduled price collection.
 - **`import-historical-data.php`**: Maintenance script for populating historical records.
+- **`backfill-aliyun-rates-and-reprice.php`**: Maintenance script for backfilling Aliyun exchange rates and repricing historical database records.
 - **`resource/` & `screenshot/`**: Design assets, requirements, and UI references.
 
 ## Scheduled Tasks (WP-Cron)
 
-- **00:00 (UTC+8):** Snapshot yesterday's prices and exchange rates into historical tables.
-- **09:00 - 17:00 (UTC+8):** Hourly price refresh. Uses an incremental update strategy to preserve cached data if external APIs are unavailable.
+- **00:10 (UTC+8):** Refresh the latest Aliyun exchange rate, reprice all cached price-list data and cached single-spec detail data with the newest FX rate, then save the price snapshot and exchange-rate snapshot into the database. RMB values stay unchanged; only USD values are recalculated.
+- **01:10 - 08:10 and 18:10 - 23:10 (UTC+8):** Hourly FX-only repricing. These jobs refresh the latest Aliyun exchange rate and reprice both cache layers in memory/transients without collecting fresh market prices.
+- **09:10 - 17:10 (UTC+8):** Hourly price refresh. Uses an incremental strategy: keep existing category caches, fetch each category one by one, preserve old category data when the upstream price API fails, and still force USD repricing by the newest FX rate so the whole site stays on one exchange-rate basis.
+
+## Cache Strategy
+
+- **Price List Cache:** No longer stored as one large transient. It is split by category using keys like `ippgi_prices_price_list_category_ppgi`, plus a lightweight metadata transient `ippgi_prices_price_list_meta`.
+- **Single-spec Detail Cache:** Latest detail payloads are cached separately and are also repriced during the midnight and off-hours FX refresh jobs.
+- **REST Compatibility:** The `/prices` endpoint still returns the same overall structure; the server assembles the full response from per-category caches.
+- **Reason for Split Cache:** This avoids oversized transient payloads that can fail to persist when the serialized value approaches MySQL packet limits.
+
+## Exchange Rate Source
+
+- **Unified Source:** Current exchange-rate fetching is standardized on the Aliyun Market API.
+- **Historical Backfill:** When historical FX data must be repaired or unified, use `backfill-aliyun-rates-and-reprice.php` to fetch historical Aliyun rates, update the exchange-rate table, and recalculate stored historical USD price fields from preserved RMB values.

@@ -30,9 +30,31 @@ class IPPGI_Prices_Cache_Manager {
     const PRICE_LIST_KEY = 'price_list';
 
     /**
+     * Price list metadata cache key
+     */
+    const PRICE_LIST_META_KEY = 'price_list_meta';
+
+    /**
      * Real-time price cache key prefix
      */
     const REALTIME_PRICE_PREFIX = 'realtime_';
+
+    /**
+     * Price-list category cache key prefix
+     */
+    const PRICE_LIST_CATEGORY_PREFIX = 'price_list_category_';
+
+    /**
+     * Supported price-list categories
+     */
+    const PRICE_LIST_CATEGORIES = array(
+        'GI',
+        'GL',
+        'PPGI',
+        'HRC',
+        'CRC Hard',
+        'AL',
+    );
 
     /**
      * Get price list from cache
@@ -40,7 +62,26 @@ class IPPGI_Prices_Cache_Manager {
      * @return array|false Price list data or false if not cached
      */
     public function get_price_list() {
-        return get_transient(self::CACHE_PREFIX . self::PRICE_LIST_KEY);
+        $legacy = get_transient(self::CACHE_PREFIX . self::PRICE_LIST_KEY);
+        if (false !== $legacy) {
+            return $legacy;
+        }
+
+        $meta = get_transient(self::CACHE_PREFIX . self::PRICE_LIST_META_KEY);
+        $categories = $this->get_all_price_list_categories();
+
+        if (empty($categories)) {
+            return false;
+        }
+
+        if (!is_array($meta)) {
+            $meta = array();
+        }
+
+        $meta['success'] = isset($meta['success']) ? (bool) $meta['success'] : true;
+        $meta['categories'] = $categories;
+
+        return $meta;
     }
 
     /**
@@ -50,11 +91,31 @@ class IPPGI_Prices_Cache_Manager {
      * @return bool True on success, false on failure
      */
     public function set_price_list($data) {
-        return set_transient(
-            self::CACHE_PREFIX . self::PRICE_LIST_KEY,
-            $data,
+        if (!is_array($data) || empty($data['categories']) || !is_array($data['categories'])) {
+            return false;
+        }
+
+        $categories = $data['categories'];
+        $meta = $data;
+        unset($meta['categories']);
+
+        $all_saved = true;
+        foreach ($categories as $category_name => $category_data) {
+            if (!$this->set_category_price_list($category_name, $category_data)) {
+                $all_saved = false;
+            }
+        }
+
+        $meta_saved = set_transient(
+            self::CACHE_PREFIX . self::PRICE_LIST_META_KEY,
+            $meta,
             self::CACHE_EXPIRATION
         );
+
+        // Remove legacy single-transient payload if it exists.
+        delete_transient(self::CACHE_PREFIX . self::PRICE_LIST_KEY);
+
+        return $all_saved && $meta_saved;
     }
 
     /**
@@ -63,7 +124,69 @@ class IPPGI_Prices_Cache_Manager {
      * @return bool True on success, false on failure
      */
     public function clear_price_list() {
-        return delete_transient(self::CACHE_PREFIX . self::PRICE_LIST_KEY);
+        $cleared = delete_transient(self::CACHE_PREFIX . self::PRICE_LIST_KEY);
+        $meta_cleared = delete_transient(self::CACHE_PREFIX . self::PRICE_LIST_META_KEY);
+
+        foreach (self::PRICE_LIST_CATEGORIES as $category_name) {
+            $category_cleared = delete_transient($this->get_price_list_category_cache_key($category_name));
+            $cleared = $cleared || $category_cleared;
+        }
+
+        return $cleared || $meta_cleared;
+    }
+
+    /**
+     * Get a single category price list from cache.
+     *
+     * @param string $category_name Category name.
+     * @return array|false
+     */
+    public function get_category_price_list($category_name) {
+        return get_transient($this->get_price_list_category_cache_key($category_name));
+    }
+
+    /**
+     * Set a single category price list cache.
+     *
+     * @param string $category_name Category name.
+     * @param array  $data          Category payload.
+     * @return bool
+     */
+    public function set_category_price_list($category_name, $data) {
+        return set_transient(
+            $this->get_price_list_category_cache_key($category_name),
+            $data,
+            self::CACHE_EXPIRATION
+        );
+    }
+
+    /**
+     * Get all cached price-list categories.
+     *
+     * @return array
+     */
+    public function get_all_price_list_categories() {
+        $categories = array();
+
+        foreach (self::PRICE_LIST_CATEGORIES as $category_name) {
+            $category_data = $this->get_category_price_list($category_name);
+            if (false !== $category_data) {
+                $categories[$category_name] = $category_data;
+            }
+        }
+
+        return $categories;
+    }
+
+    /**
+     * Check whether any price-list cache exists.
+     *
+     * @return bool
+     */
+    public function has_price_list_cache() {
+        return false !== get_transient(self::CACHE_PREFIX . self::PRICE_LIST_META_KEY)
+            || false !== get_transient(self::CACHE_PREFIX . self::PRICE_LIST_KEY)
+            || !empty($this->get_all_price_list_categories());
     }
 
     /**
@@ -226,7 +349,7 @@ class IPPGI_Prices_Cache_Manager {
     public function get_cache_stats() {
         global $wpdb;
 
-        $price_list_cached = (bool) $this->get_price_list();
+        $price_list_cached = $this->has_price_list_cache();
 
         // Count real-time price caches
         $pattern = '_transient_' . self::CACHE_PREFIX . self::REALTIME_PRICE_PREFIX . '%';
@@ -241,5 +364,17 @@ class IPPGI_Prices_Cache_Manager {
             'price_list_cached' => $price_list_cached,
             'realtime_prices_count' => (int) $realtime_count,
         );
+    }
+
+    /**
+     * Generate cache key for a price-list category.
+     *
+     * @param string $category_name Category name.
+     * @return string
+     */
+    private function get_price_list_category_cache_key($category_name) {
+        $normalized = strtolower(str_replace(array(' ', '-'), '_', (string) $category_name));
+
+        return self::CACHE_PREFIX . self::PRICE_LIST_CATEGORY_PREFIX . $normalized;
     }
 }

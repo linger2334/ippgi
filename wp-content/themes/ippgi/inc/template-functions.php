@@ -511,14 +511,12 @@ function ippgi_get_product_dimensions_range($product_type) {
 
     $category_name = $category_mapping[$product_type];
 
-    // Get cached price list
-    $cached_data = get_transient('ippgi_prices_price_list');
+    $cache_manager = function_exists('ippgi_prices') ? ippgi_prices()->cache_manager : null;
+    $category_data = $cache_manager ? $cache_manager->get_category_price_list($category_name) : false;
 
-    if (!$cached_data || !isset($cached_data['categories'][$category_name])) {
+    if (!$category_data) {
         return false;
     }
-
-    $category_data = $cached_data['categories'][$category_name];
 
     // Check if data has result structure (直接在 category_data 下，不是 data.result)
     if (!isset($category_data['result']) || !is_array($category_data['result'])) {

@@ -687,7 +687,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - `?width=1000` - 指定默认宽度
 
 **数据来源**：
-- 所有价格数据从 `get_transient('ippgi_prices_price_list')` 缓存获取
+- 价格列表缓存已按分类拆分存储（如 `ippgi_prices_price_list_category_ppgi`），服务端按需拼装完整响应
 - 通过 `window.ippgiPricesPage` 传递给 JavaScript
 - 宽度切换和含税切换均在本地完成，无需 API 调用
 
@@ -910,7 +910,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 **服务端支持**：
 - 服务端业务日期函数：北京时间 9:00 前用昨天，9:00 及之后用今天
-- 价格列表缓存键不含日期（`ippgi_prices_price_list`）
+- 价格列表缓存键不含日期；按分类拆分为 `ippgi_prices_price_list_category_{category}`，元数据键为 `ippgi_prices_price_list_meta`
 - 价格详情“最新价”缓存键不含日期（`md5(productSpec)`）
 - `/prices/category` 与 `/price` 仍保留可选 `date` 参数，便于运维/调试时覆盖默认日期
 
@@ -1545,6 +1545,7 @@ crontab -u www-data -e
 - 价格数据展示是核心功能，需要考虑表格在移动端的展示方式
 - 内容权限控制需要精细到部分内容级别（同一页面部分可见）
 - **缓存策略**：缓存永不过期，由定时任务在 09:10-17:10 每小时清除并刷新
+- **价格列表缓存存储**：为避免单条 transient 过大，6 个分类分别缓存，REST `/prices` 响应在服务端拼装
 - 生产环境务必关闭 `IPPGI_DEV_MODE`
 - **资源版本号**：开发模式下自动使用 `assets/css` + `assets/js` 中最新修改时间作为版本号
 - **标题换行**：页面/区块标题统一使用 `text-wrap: wrap`，避免 Chrome `text-wrap: balance` 导致两行均分留白过大
