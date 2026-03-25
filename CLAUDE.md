@@ -920,8 +920,12 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 ### 价格数据 API
 - **价格列表**：`GET https://api.rendui.com/v1/jec/rendui/prices/daily`
+  - 请求头：`userid` + `referer`
+  - 注意：**不传 `phone`**
 - **实时价格**：`POST https://api.rendui.com/v1/jec/rendui/daily/getByProductSpecAndDate`
+  - 请求头：`Content-Type: application/json` + `phone: 13792171909`
 - **历史数据**：`GET https://api.rendui.com/v1/jec/rendui/prices/statistics`
+  - 请求头：`phone: 13792171909`
 
 ### 汇率数据 API
 - **服务商**：阿里云市场（数脉 API）
@@ -1460,6 +1464,23 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 实现 `refresh_price_list_incrementally()` 方法，按产品分类逐个获取新价格。
 - 采用“差异覆盖”策略：新获取成功的分类覆盖旧数据。
 - **汇率一致性保障**：获取失败或为空的分类保留旧数据，但会强制使用当前最新的汇率重新计算美元价格，确保全站 6 类产品的汇率字段和计算逻辑完全统一。
+
+#### 57. 登录入口统一与重复跳转逻辑收敛 ✅
+- **主入口调整**：`/login/` 作为主登录页；`/membership-login/` 仅保留兼容用途。
+- **行为统一**：已登录用户访问 `/login/` 或 `/membership-login/` 时，统一在主题 `template_redirect` 阶段立即跳转首页。
+- **维护优化**：移除登录页模板中的重复跳转判断，避免以后两处逻辑漏改。
+- **兼容说明**：
+  - SWPM `login-page-url` 应指向 `/login/`
+  - Google OAuth 回调需与 `/login/?swpm-google-login=1` 保持一致
+  - 首次注册成功后的 bonus、推荐关系处理、成功弹窗逻辑仍由既有 SWPM hook + user meta 驱动，不依赖旧的 `/membership-login/` slug
+
+#### 58. Rendui API `phone` 请求头统一调整 ✅
+- **背景**：人堆价格接口中，价格列表接口不需要 `phone`；实时价格和统计接口需要。
+- **当前规则**：
+  - `prices/daily`：不传 `phone`
+  - `daily/getByProductSpecAndDate`：传 `phone: 13792171909`
+  - `prices/statistics`：传 `phone: 13792171909`
+- **实现方式**：将需要的号码统一收敛到 `IPPGI_Prices_API_Client::API_PHONE`，并同步更新历史导入测试脚本与插件文档，避免下次改号时漏改。
 - 确保在外部 API 不稳定时，前端仍能展示最后一版有效的价格列表且汇率实时准确。
 - 底层货币转换逻辑优先使用已保留的 `*_cny` 原始人民币字段，避免缓存重算时对已转换的 USD 值重复换算。
 

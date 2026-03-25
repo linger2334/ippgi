@@ -110,7 +110,7 @@ Off-hours FX repricing tasks refresh the exchange rate and reprice cached USD va
 **Real-time Price API:**
 - URL: `https://api.rendui.com/v1/jec/rendui/daily/getByProductSpecAndDate`
 - Method: POST
-- Headers: `phone: 18210056805`
+- Headers: `phone: 13792171909`
 - Body: `{ productType, width, thickness, date }`
 
 ## Frontend Integration

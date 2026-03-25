@@ -16,6 +16,17 @@ This project is a custom WordPress-based platform for displaying and managing ra
   - Payments via PayPal and Stripe.
   - **Email Delivery:** WP Mail SMTP via Gmail API (OAuth 2.0).
 
+## Operational Facts
+
+- **Primary login route:** `/login/` is the canonical login page. `/membership-login/` remains for backward compatibility only.
+- **Logged-in redirect rule:** Logged-in users visiting `/login/` or `/membership-login/` should be redirected to the home page through centralized theme logic.
+- **Rendui header rules:**
+  - `prices/daily` uses `userid` and `referer` headers only. It should not send a `phone` header.
+  - `daily/getByProductSpecAndDate` and `prices/statistics` require `phone: 13792171909`.
+- **Membership mail responsibilities:**
+  - SWPM auto-sends `Registration Complete`, `Account Upgrade Notification`, and immediate `Subscription Payment Canceled or Expired` emails in webhook/IPN-driven flows.
+  - Custom theme code handles the payment-success modal, cancellation-state cleanup, and the delayed cancellation/expiration email sent from the nightly downgrade cron path only.
+
 ## Building and Running
 
 ### Requirements

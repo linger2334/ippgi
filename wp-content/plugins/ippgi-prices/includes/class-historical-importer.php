@@ -204,7 +204,7 @@ class IPPGI_Prices_Historical_Importer {
         // Make API request
         $response = wp_remote_get($url, array(
             'headers' => array(
-                'phone' => '18210056805',
+                'phone' => IPPGI_Prices_API_Client::API_PHONE,
             ),
             'timeout' => 60,
         ));

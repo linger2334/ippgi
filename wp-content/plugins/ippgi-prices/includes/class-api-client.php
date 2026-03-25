@@ -24,6 +24,11 @@ class IPPGI_Prices_API_Client {
     const REALTIME_PRICE_URL = 'https://api.rendui.com/v1/jec/rendui/daily/getByProductSpecAndDate';
 
     /**
+     * Phone header required by selected Rendui endpoints
+     */
+    const API_PHONE = '13792171909';
+
+    /**
      * Site ID (Location: 博兴 Boxing)
      */
     const SITE_ID = '1457210664971423746';
@@ -271,7 +276,7 @@ class IPPGI_Prices_API_Client {
         $response = wp_remote_post(self::REALTIME_PRICE_URL, array(
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'phone' => '18210056805',
+                'phone' => self::API_PHONE,
             ),
             'body' => wp_json_encode($body),
             'timeout' => 30,

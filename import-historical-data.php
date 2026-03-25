@@ -40,7 +40,7 @@ $test_url = add_query_arg(array(
 echo "Test URL: {$test_url}\n";
 
 $response = wp_remote_get($test_url, array(
-    'headers' => array('phone' => '18210056805'),
+    'headers' => array('phone' => IPPGI_Prices_API_Client::API_PHONE),
     'timeout' => 30,
 ));
 

@@ -350,7 +350,7 @@ class IPPGI_Prices_REST_API {
         // Make API request
         $response = wp_remote_get($api_url, array(
             'headers' => array(
-                'phone' => '18210056805',
+                'phone' => IPPGI_Prices_API_Client::API_PHONE,
             ),
             'timeout' => 30,
         ));
@@ -661,7 +661,7 @@ class IPPGI_Prices_REST_API {
         // Make API request
         $response = wp_remote_get($api_url, array(
             'headers' => array(
-                'phone' => '18210056805',
+                'phone' => IPPGI_Prices_API_Client::API_PHONE,
             ),
             'timeout' => 30,
         ));
