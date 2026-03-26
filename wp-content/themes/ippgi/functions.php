@@ -43,6 +43,8 @@ define('IPPGI_DEV_MEMBERSHIP_LEVEL', 'plus'); // Options: 'guest', 'basic', 'bon
  * Theme Setup
  */
 function ippgi_setup() {
+    load_theme_textdomain('ippgi', IPPGI_THEME_DIR . '/languages');
+
     // Add default posts and comments RSS feed links to head
     add_theme_support('automatic-feed-links');
 

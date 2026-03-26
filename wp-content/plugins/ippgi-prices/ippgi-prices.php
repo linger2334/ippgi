@@ -88,6 +88,8 @@ class IPPGI_Prices {
      * Initialize plugin
      */
     private function init() {
+        add_action('init', array($this, 'load_textdomain'));
+
         // Initialize components
         $this->cache_manager = new IPPGI_Prices_Cache_Manager();
         $this->api_client = new IPPGI_Prices_API_Client($this->cache_manager);
@@ -98,6 +100,17 @@ class IPPGI_Prices {
         // Register activation/deactivation hooks
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+    }
+
+    /**
+     * Load plugin translations.
+     */
+    public function load_textdomain() {
+        load_plugin_textdomain(
+            'ippgi-prices',
+            false,
+            dirname(plugin_basename(__FILE__)) . '/languages'
+        );
     }
 
     /**

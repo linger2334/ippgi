@@ -26,6 +26,7 @@ This project is a custom WordPress-based platform for displaying and managing ra
 - **Membership mail responsibilities:**
   - SWPM auto-sends `Registration Complete`, `Account Upgrade Notification`, and immediate `Subscription Payment Canceled or Expired` emails in webhook/IPN-driven flows.
   - Custom theme code handles the payment-success modal, cancellation-state cleanup, and the delayed cancellation/expiration email sent from the nightly downgrade cron path only.
+- **Translation loading timing:** On WordPress 6.7+, both the plugin and theme should load their textdomains explicitly at the proper hook timing (`init` for plugin, `after_setup_theme` for theme). The `ippgi-prices` scheduler also guards its `cron_schedules` label to avoid triggering translations before `init`.
 
 ## Building and Running
 

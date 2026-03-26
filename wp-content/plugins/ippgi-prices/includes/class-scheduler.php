@@ -94,7 +94,7 @@ class IPPGI_Prices_Scheduler {
         if (!isset($schedules['hourly'])) {
             $schedules['hourly'] = array(
                 'interval' => 3600,
-                'display' => __('Once Hourly', 'ippgi-prices'),
+                'display' => did_action('init') ? __('Once Hourly', 'ippgi-prices') : 'Once Hourly',
             );
         }
 

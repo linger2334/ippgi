@@ -1484,6 +1484,17 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 确保在外部 API 不稳定时，前端仍能展示最后一版有效的价格列表且汇率实时准确。
 - 底层货币转换逻辑优先使用已保留的 `*_cny` 原始人民币字段，避免缓存重算时对已转换的 USD 值重复换算。
 
+#### 59. WordPress 6.7+ 国际化加载时机 Notice 修复 ✅
+- **现象**：`debug.log` 出现 `_load_textdomain_just_in_time was called incorrectly`，提示 `ippgi-prices` 文本域加载过早。
+- **根因**：
+  - `ippgi-prices` 插件之前未显式在 `init` 阶段调用 `load_plugin_textdomain()`。
+  - 调度类 `cron_schedules` 过滤器中的 `__('Once Hourly', 'ippgi-prices')` 可能在 `init` 前执行，从而触发 WordPress 6.7+ 的“过早加载翻译” notice。
+- **修复动作**：
+  - 在插件主类中增加 `init -> load_plugin_textdomain('ippgi-prices', ...)`
+  - 为 `cron_schedules` 的显示文案增加保护：`init` 前先返回纯英文字符串，避免提前触发文本域加载
+  - 主题 `ippgi` 也补充了 `after_setup_theme` 阶段的 `load_theme_textdomain('ippgi', ...)`，减少后续同类风险
+- **排查结论**：主题内未发现新的“文件加载阶段直接调用翻译函数”的明显同类隐患；主要风险点已修复。
+
 
 ---
 
