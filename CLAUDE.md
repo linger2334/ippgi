@@ -1525,6 +1525,15 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 只有当用户当前仍是 Plus、并且本次将由 Cron 执行实际降级时，才发送取消/到期邮件。
 - **当前行为**：若账户已不再是 Plus，Cron 只清理残留的取消状态 meta，不再额外补发取消/到期邮件。
 
+#### 63. SWPM 国家下拉 PHP 8.1 Deprecated 兼容修复 ✅
+- **问题**：`simple-membership/classes/class.swpm-utils-misc.php` 的 `get_countries_dropdown()` 在 PHP 8.1+ 环境下可能收到 `null` 的国家值，并将其直接传给 `strtolower()`，导致 `Passing null to parameter #1 ($string) of type string is deprecated` 日志。
+- **修复动作**：
+  - 在 `SwpmMiscUtils::get_countries_dropdown()` 中将传入的 `$country` 统一兜底为字符串。
+  - 在国家列表遍历比较时，也将 `$country_name` 统一兜底为字符串。
+  - 同时覆盖该函数中 `similar_text(strtolower(...))` 的同类潜在 warning。
+- **影响范围**：仅为兼容性修复，不改变国家下拉的原有显示和匹配逻辑。
+- **注意事项**：此次修复位于第三方插件 `simple-membership` 源码中，后续升级插件时需要留意该补丁是否被覆盖。
+
 
 ---
 

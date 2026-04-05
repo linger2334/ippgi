@@ -29,6 +29,7 @@ This project is a custom WordPress-based platform for displaying and managing ra
   - For `Account Upgrade Notification`, the current theme customization rewrites the recipient to the email stored on the SWPM member profile before the mail is sent, instead of relying on the payment gateway callback email.
   - The nightly downgrade cron only sends `Subscription Payment Canceled or Expired` when the member is still on Plus and is actually being downgraded by that cron run; otherwise it only cleans stale cancellation meta.
 - **Translation loading timing:** On WordPress 6.7+, both the plugin and theme should load their textdomains explicitly at the proper hook timing (`init` for plugin, `after_setup_theme` for theme). The `ippgi-prices` scheduler also guards its `cron_schedules` label to avoid triggering translations before `init`.
+- **PHP 8.1 compatibility note for SWPM:** `simple-membership/classes/class.swpm-utils-misc.php::get_countries_dropdown()` has a local compatibility patch that normalizes `null` country values to empty strings before calling `strtolower()`, preventing deprecated notices when profile/admin country fields are empty.
 - **Homepage middle banner rendering:** The homepage carousel banner should fill the available container width and preserve the source image aspect ratio with `height: auto`; do not reintroduce fixed heights or `object-fit: cover` cropping. The currently uploaded banner images are roughly `485/486 x 120`, so larger desktop layouts may benefit from higher-resolution replacements later.
 
 ## Building and Running
