@@ -2402,7 +2402,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--spacing-xs);
-    color: #7ab4cd;
+    color: #3f7f9c;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-normal);
     text-decoration: none;
@@ -2414,7 +2414,7 @@
 }
 
 .section__more:hover {
-    color: #5a9ab5;
+    color: #2f6f8c;
     border-color: #999;
 }
 
