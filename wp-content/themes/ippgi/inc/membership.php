@@ -191,6 +191,10 @@ function ippgi_register_swpm_hooks() {
         return;
     }
 
+    // Route SWPM upgrade notification emails to the member profile email.
+    add_action('swpm_membership_level_changed', 'ippgi_prepare_swpm_upgrade_email_recipient', 10, 1);
+    add_filter('wp_mail', 'ippgi_override_swpm_upgrade_email_recipient', 10, 1);
+
     // Hook into payment processed (首次支付、续费成功)
     add_action('swpm_payment_ipn_processed', 'ippgi_on_payment_success', 10, 1);
 
@@ -208,6 +212,73 @@ function ippgi_register_swpm_hooks() {
 }
 // Use early init priority so Social Login (also runs on init) cannot fire registration hooks before we attach.
 add_action('init', 'ippgi_register_swpm_hooks', 1);
+
+/**
+ * Store the member ID for the next SWPM account upgrade notification email.
+ *
+ * SWPM triggers `swpm_membership_level_changed` immediately before it sends the
+ * built-in account upgrade email, so we keep a short-lived marker here and swap
+ * the recipient in the `wp_mail` filter below.
+ *
+ * @param array $change_data SWPM level change payload.
+ */
+function ippgi_prepare_swpm_upgrade_email_recipient($change_data) {
+    if (!is_array($change_data)) {
+        return;
+    }
+
+    $member_id = isset($change_data['member_id']) ? intval($change_data['member_id']) : 0;
+    $from_level = isset($change_data['from_level']) ? (string) $change_data['from_level'] : '';
+    $to_level = isset($change_data['to_level']) ? (string) $change_data['to_level'] : '';
+
+    if ($member_id <= 0 || $from_level === $to_level) {
+        return;
+    }
+
+    $GLOBALS['ippgi_pending_swpm_upgrade_email_member_id'] = $member_id;
+}
+
+/**
+ * Override SWPM account upgrade notification recipient with the profile email.
+ *
+ * @param array $mail_args WordPress wp_mail() args.
+ * @return array
+ */
+function ippgi_override_swpm_upgrade_email_recipient($mail_args) {
+    $pending_member_id = isset($GLOBALS['ippgi_pending_swpm_upgrade_email_member_id'])
+        ? intval($GLOBALS['ippgi_pending_swpm_upgrade_email_member_id'])
+        : 0;
+
+    if ($pending_member_id <= 0 || !class_exists('SwpmMemberUtils')) {
+        return $mail_args;
+    }
+
+    $backtrace_functions = wp_list_pluck(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 12), 'function');
+    if (!in_array('swpm_handle_subsc_signup_stand_alone', $backtrace_functions, true)) {
+        return $mail_args;
+    }
+
+    unset($GLOBALS['ippgi_pending_swpm_upgrade_email_member_id']);
+
+    $member = SwpmMemberUtils::get_user_by_id($pending_member_id);
+    $member_email = ($member && !empty($member->email)) ? sanitize_email($member->email) : '';
+    if (!is_email($member_email)) {
+        error_log(sprintf(
+            'IPPGI: SWPM upgrade email recipient fallback for member %d because profile email is empty or invalid.',
+            $pending_member_id
+        ));
+        return $mail_args;
+    }
+
+    $mail_args['to'] = $member_email;
+    error_log(sprintf(
+        'IPPGI: SWPM upgrade email recipient overridden to member profile email for member %d: %s',
+        $pending_member_id,
+        $member_email
+    ));
+
+    return $mail_args;
+}
 
 /**
  * Handle payment success (首次支付、续费成功)

@@ -29,6 +29,7 @@
 - 主题代码禁止手动升级会员等级到 Plus(4)；升级仅由 SWPM 支付流程自动处理，主题侧只允许降级到 Basic(2)
 - Plus 等级在 SWPM 后台设置为 "No Expiry"，所以 SWPM 不会自动降级用户，需要我们的代码在订阅到期时手动处理降级
 - 原 Trial (Level 3) 已废弃，统一使用 bonus 机制管理所有赠送天数
+- 付费升级成功后的 `Account Upgrade Notification` 仍由 SWPM 自动发送，但本站主题会在发送前把收件人改写为 SWPM 会员资料中的邮箱；若支付网关回调邮箱与站内资料邮箱不一致，以站内资料邮箱为准
 
 ### Bonus 访问机制
 
@@ -1507,6 +1508,14 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 轮播层改为 grid 叠放，保留现有淡入淡出切换逻辑，不再依赖绝对定位 + 固定高度裁剪
 - **当前行为**：banner 现为“宽度填满容器，高度按原图比例等比放大”，不会裁剪上下内容。
 - **注意事项**：由于现有 banner 原图分辨率偏小，大屏下虽然比例正确，但清晰度可能一般；后续若替换素材，建议保持相同比例并提供更高分辨率版本。
+
+#### 61. 升级通知邮件收件人改为站内会员资料邮箱 ✅
+- **背景**：SWPM 插件默认会把 `Account Upgrade Notification` 发送到支付网关回调中的 `payer_email`，当 PayPal/Stripe 付款邮箱与站内会员资料邮箱不一致时，用户可能收不到站内账号对应的升级通知。
+- **实现方式**：
+  - 保持 SWPM 插件自动发信职责不变，不改第三方插件源码。
+  - 在主题 `inc/membership.php` 中监听 `swpm_membership_level_changed`，仅对真正的升级事件记录待发送会员 ID。
+  - 通过 WordPress `wp_mail` 过滤器拦截 SWPM 紧随其后的升级通知，并将收件人改写为 `SwpmMemberUtils::get_user_by_id($member_id)->email`。
+- **回退策略**：若 SWPM 会员资料邮箱为空或非法，则保留原始收件人，不阻断邮件发送。
 
 
 ---
