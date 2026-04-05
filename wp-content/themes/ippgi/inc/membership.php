@@ -663,7 +663,6 @@ function ippgi_check_expired_cancelled_subscriptions() {
 
         $member_id = $member->member_id;
         $current_level = $member->membership_level;
-        $subscr_id = $member->subscr_id;
 
         // Only process if user is still Plus (4)
         if ($current_level != 4 && $current_level != '4') {
@@ -673,12 +672,6 @@ function ippgi_check_expired_cancelled_subscriptions() {
             delete_user_meta($user->ID, 'ippgi_subscription_end_date');
             continue;
         }
-
-        // Send cancellation email only for members who are actually being
-        // downgraded by this cron path. This avoids duplicate notices when a
-        // different flow has already downgraded the account but stale meta
-        // remains until cleanup.
-        ippgi_send_subscription_cancelled_email($member_id, $subscr_id);
 
         // Clear subscr_id
         $wpdb->update(
@@ -1821,60 +1814,6 @@ function ippgi_ajax_cancel_subscription() {
     ]);
 }
 add_action('wp_ajax_ippgi_cancel_subscription', 'ippgi_ajax_cancel_subscription');
-
-/**
- * Send subscription cancellation email
- * 
- * Uses the "Subscription Payment Canceled or Expired" template from SWPM settings.
- *
- * @param int $member_id SWPM Member ID
- * @param string $subscr_id Optional subscription ID for tag replacement
- */
-function ippgi_send_subscription_cancelled_email($member_id, $subscr_id = '') {
-    if (!ippgi_is_swpm_active() || !class_exists('SwpmSettings') || !class_exists('SwpmMemberUtils')) {
-        return;
-    }
-
-    $settings = SwpmSettings::get_instance();
-    $subject = $settings->get_value('subscription-cancel-member-mail-subject');
-    $body = $settings->get_value('subscription-cancel-member-mail-body');
-
-    // Fallbacks
-    if (empty($subject)) {
-        $subject = "Subscription payment agreement has been canceled or expired";
-    }
-    if (empty($body)) {
-        $body = "Dear {first_name},\n\nYour subscription payment agreement has been canceled or expired.\n\nThank You";
-    }
-
-    $member = SwpmMemberUtils::get_user_by_id($member_id);
-    if (!$member) {
-        return;
-    }
-
-    // Replace tags
-    $additional_args = array('subscription_id' => $subscr_id);
-    if (class_exists('SwpmMiscUtils') && method_exists('SwpmMiscUtils', 'replace_dynamic_tags')) {
-        $body = SwpmMiscUtils::replace_dynamic_tags($body, $member_id, $additional_args);
-    }
-
-    $headers = array();
-    $from_address = $settings->get_value('email-from');
-    if (!empty($from_address)) {
-        $headers[] = 'From: ' . $from_address;
-    }
-
-    $is_html = $settings->get_value('email-enable-html');
-    if (!empty($is_html)) {
-        $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $body = nl2br($body);
-    } else {
-        $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-    }
-
-    wp_mail($member->email, $subject, $body, $headers);
-    error_log(sprintf('IPPGI: Subscription cancellation email sent to member %d', $member_id));
-}
 
 /**
  * Cancel PayPal subscription via API

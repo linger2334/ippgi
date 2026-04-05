@@ -25,10 +25,10 @@ This project is a custom WordPress-based platform for displaying and managing ra
   - `prices/daily` uses `userid` and `referer` headers only. It should not send a `phone` header.
   - `daily/getByProductSpecAndDate` and `prices/statistics` require `phone: 13792171909`.
 - **Membership mail responsibilities:**
-  - SWPM auto-sends `Registration Complete`, `Account Upgrade Notification`, and immediate `Subscription Payment Canceled or Expired` emails in webhook/IPN-driven flows.
-  - Custom theme code handles the payment-success modal, cancellation-state cleanup, and the delayed cancellation/expiration email sent from the nightly downgrade cron path only.
+  - SWPM auto-sends `Registration Complete`, `Account Upgrade Notification`, and `Subscription Payment Canceled or Expired` emails.
+  - Custom theme code handles the payment-success modal and cancellation-state cleanup only; it no longer sends delayed cancellation/expiration emails from the nightly downgrade cron path.
   - For `Account Upgrade Notification`, the current theme customization rewrites the recipient to the email stored on the SWPM member profile before the mail is sent, instead of relying on the payment gateway callback email.
-  - The nightly downgrade cron only sends `Subscription Payment Canceled or Expired` when the member is still on Plus and is actually being downgraded by that cron run; otherwise it only cleans stale cancellation meta.
+  - The nightly downgrade cron only handles expiry checks, downgrade, bonus activation, and stale cancellation-meta cleanup; it does not send cancellation emails.
 - **Translation loading timing:** On WordPress 6.7+, both the plugin and theme should load their textdomains explicitly at the proper hook timing (`init` for plugin, `after_setup_theme` for theme). The `ippgi-prices` scheduler also guards its `cron_schedules` label to avoid triggering translations before `init`.
 - **PHP 8.1 compatibility note for SWPM:** `simple-membership/classes/class.swpm-utils-misc.php::get_countries_dropdown()` has a local compatibility patch that normalizes `null` country values to empty strings before calling `strtolower()`, preventing deprecated notices when profile/admin country fields are empty.
 - **Homepage middle banner rendering:** The homepage carousel banner should fill the available container width and preserve the source image aspect ratio with `height: auto`; do not reintroduce fixed heights or `object-fit: cover` cropping. The currently uploaded banner images are roughly `485/486 x 120`, so larger desktop layouts may benefit from higher-resolution replacements later.

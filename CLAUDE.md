@@ -1454,11 +1454,10 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **保留逻辑**：支付成功后仍由 `ippgi_on_payment_success()` 负责显示成功模态框、清理取消状态；升级通知邮件统一交由 SWPM 插件发送。
 
 #### 55. 订阅取消与到期邮件通知 ✅
-- 实现 `ippgi_send_subscription_cancelled_email()` 函数。
 - **分工策略**：
-  - **即时通知**：用户取消或 Webhook 到达时，由 SWPM 插件内置功能自动发信（依赖后台勾选状态）。
-  - **延迟通知**：针对自定义的每日定时任务（处理 PayPal 延迟降级），SWPM 无法感知，因此在 Cron 任务中手动触发发信。
-- 统一使用 SWPM "Subscription Payment Canceled or Expired" 模板，确保逻辑互补且不重复投递。
+  - 订阅取消或过期邮件统一由 SWPM 插件内置功能自动发信（依赖后台勾选状态）。
+  - 主题自定义代码不再手动补发 `Subscription Payment Canceled or Expired`，避免重复投递。
+- 取消/过期邮件模板继续使用 SWPM "Subscription Payment Canceled or Expired" 配置。
 
 #### 56. 定时任务鲁棒性优化（增量更新价格列表） ✅
 - 修改 09:10-17:10 定时任务逻辑：保留 `price_list` 缓存不预先清理。
@@ -1517,13 +1516,12 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 通过 WordPress `wp_mail` 过滤器拦截 SWPM 紧随其后的升级通知，并将收件人改写为 `SwpmMemberUtils::get_user_by_id($member_id)->email`。
 - **回退策略**：若 SWPM 会员资料邮箱为空或非法，则保留原始收件人，不阻断邮件发送。
 
-#### 62. 午夜 Cron 取消/到期邮件发送顺序修正 ✅
-- **问题**：自定义午夜降级任务此前会先发送 `Subscription Payment Canceled or Expired` 邮件，再检查当前 SWPM 会员等级是否仍为 Plus。若用户已被其他路径提前降级，但取消相关 meta 尚未清理，Cron 仍可能多发一封邮件。
+#### 62. 午夜 Cron 取消/到期邮件手动补发移除 ✅
+- **背景**：项目现已统一采用 SWPM 插件自动发送 `Subscription Payment Canceled or Expired` 邮件，不再需要主题在午夜 Cron 降级时手动补发。
 - **修复动作**：
-  - 调整 `ippgi_check_expired_cancelled_subscriptions()` 中的处理顺序。
-  - 先检查当前 SWPM 等级是否仍为 `Plus (4)`。
-  - 只有当用户当前仍是 Plus、并且本次将由 Cron 执行实际降级时，才发送取消/到期邮件。
-- **当前行为**：若账户已不再是 Plus，Cron 只清理残留的取消状态 meta，不再额外补发取消/到期邮件。
+  - 从 `ippgi_check_expired_cancelled_subscriptions()` 中移除手动发信调用。
+  - 删除主题中的 `ippgi_send_subscription_cancelled_email()` 辅助函数，避免后续误用。
+- **当前行为**：午夜 Cron 现在只负责检查到期、执行降级、激活 bonus（如有）并清理取消状态 meta；取消/过期邮件完全由 SWPM 内置逻辑负责。
 
 #### 63. SWPM 国家下拉 PHP 8.1 Deprecated 兼容修复 ✅
 - **问题**：`simple-membership/classes/class.swpm-utils-misc.php` 的 `get_countries_dropdown()` 在 PHP 8.1+ 环境下可能收到 `null` 的国家值，并将其直接传给 `strtolower()`，导致 `Passing null to parameter #1 ($string) of type string is deprecated` 日志。
