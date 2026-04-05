@@ -1495,6 +1495,19 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 主题 `ippgi` 也补充了 `after_setup_theme` 阶段的 `load_theme_textdomain('ippgi', ...)`，减少后续同类风险
 - **排查结论**：主题内未发现新的“文件加载阶段直接调用翻译函数”的明显同类隐患；主要风险点已修复。
 
+#### 60. 首页中部 Banner 等比显示修正 ✅
+- **问题**：首页中间 banner 之前使用固定高度（移动端 80px、平板 100px、桌面 150px）加 `object-fit: cover`，在手机、平板、PC 上都会裁剪图片内容。
+- **排查结果**：
+  - 模板位于 `wp-content/themes/ippgi/front-page.php`
+  - 样式位于 `wp-content/themes/ippgi/assets/css/components.css` 与 `wp-content/themes/ippgi/assets/css/responsive.css`
+  - 当前 Customizer 中 5 张 banner 原图尺寸约为 `485/486 x 120`，宽高比约 `4.05:1`
+- **修复动作**：
+  - 移除 banner 轮播容器在不同断点下的固定高度
+  - 将轮播图片改为 `width: 100%`、`height: auto`，由原图比例自动撑开容器高度
+  - 轮播层改为 grid 叠放，保留现有淡入淡出切换逻辑，不再依赖绝对定位 + 固定高度裁剪
+- **当前行为**：banner 现为“宽度填满容器，高度按原图比例等比放大”，不会裁剪上下内容。
+- **注意事项**：由于现有 banner 原图分辨率偏小，大屏下虽然比例正确，但清晰度可能一般；后续若替换素材，建议保持相同比例并提供更高分辨率版本。
+
 
 ---
 

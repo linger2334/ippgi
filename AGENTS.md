@@ -48,6 +48,7 @@
 - 前端（主题 JS + 模板）：
   - 若改 REST 返回结构，必须同步改调用处（首页、价格页、详情页）。
   - 涉及会员可见性的 UI 变更，需覆盖 guest/basic/bonus/plus 状态。
+  - 首页中间 banner（`front-page.php` + `assets/css/components.css`）当前要求为“宽度填满容器，按原图比例自动撑高，不裁剪”；避免重新引入固定高度 + `object-fit: cover` 的裁剪方案。
 
 ## 6) 变更前后检查清单
 - 语法与基础检查：
