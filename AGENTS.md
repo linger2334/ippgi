@@ -28,7 +28,7 @@
     3. 即时触发的订阅取消/过期 (Subscription Payment Canceled or Expired)，如 Webhook 场景。
   - **由自定义代码手动补全**：
     1. 支付成功后的成功模态框、取消状态清理等站内 UI/状态处理，不再重复发送升级邮件。
-    2. 每日午夜定时降级逻辑中 (Subscription Payment Canceled or Expired) —— 理由：SWPM 无法感知延迟的 Cron 逻辑。
+    2. 每日午夜定时降级逻辑中 (Subscription Payment Canceled or Expired) —— 理由：SWPM 无法感知延迟的 Cron 逻辑；且仅在用户当前仍是 Plus、确实要由 Cron 执行降级时才发送，避免对已提前降级的账户重复发信。
   - **防冲突原则**：在上述“自动发送点”切勿增加手动 Hook，避免骚扰用户。
 - Rendui 价格 API 头约束：
   - `prices/daily`（价格列表）请求头只保留 `userid` + `referer`，不传 `phone`。

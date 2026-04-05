@@ -665,9 +665,6 @@ function ippgi_check_expired_cancelled_subscriptions() {
         $current_level = $member->membership_level;
         $subscr_id = $member->subscr_id;
 
-        // Send cancellation email
-        ippgi_send_subscription_cancelled_email($member_id, $subscr_id);
-
         // Only process if user is still Plus (4)
         if ($current_level != 4 && $current_level != '4') {
             // Already downgraded, just clean up meta
@@ -676,6 +673,12 @@ function ippgi_check_expired_cancelled_subscriptions() {
             delete_user_meta($user->ID, 'ippgi_subscription_end_date');
             continue;
         }
+
+        // Send cancellation email only for members who are actually being
+        // downgraded by this cron path. This avoids duplicate notices when a
+        // different flow has already downgraded the account but stale meta
+        // remains until cleanup.
+        ippgi_send_subscription_cancelled_email($member_id, $subscr_id);
 
         // Clear subscr_id
         $wpdb->update(

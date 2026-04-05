@@ -1517,6 +1517,14 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 通过 WordPress `wp_mail` 过滤器拦截 SWPM 紧随其后的升级通知，并将收件人改写为 `SwpmMemberUtils::get_user_by_id($member_id)->email`。
 - **回退策略**：若 SWPM 会员资料邮箱为空或非法，则保留原始收件人，不阻断邮件发送。
 
+#### 62. 午夜 Cron 取消/到期邮件发送顺序修正 ✅
+- **问题**：自定义午夜降级任务此前会先发送 `Subscription Payment Canceled or Expired` 邮件，再检查当前 SWPM 会员等级是否仍为 Plus。若用户已被其他路径提前降级，但取消相关 meta 尚未清理，Cron 仍可能多发一封邮件。
+- **修复动作**：
+  - 调整 `ippgi_check_expired_cancelled_subscriptions()` 中的处理顺序。
+  - 先检查当前 SWPM 等级是否仍为 `Plus (4)`。
+  - 只有当用户当前仍是 Plus、并且本次将由 Cron 执行实际降级时，才发送取消/到期邮件。
+- **当前行为**：若账户已不再是 Plus，Cron 只清理残留的取消状态 meta，不再额外补发取消/到期邮件。
+
 
 ---
 
