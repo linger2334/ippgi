@@ -119,10 +119,6 @@
         padding-top: var(--spacing-md);
     }
 
-    .banner-carousel__slides {
-        height: 150px;
-    }
-
     .header-login-btn {
         display: none;
     }
