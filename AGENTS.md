@@ -18,6 +18,7 @@
 
 ## 4) 关键业务约束
 - 会员体系（SWPM）：Basic=2，Plus=4；赠送天数走 bonus 机制（用户 meta）。
+- Trial（Level 3）已停用且不再参与任何业务流程；当前项目仅保留 Basic=2、Plus=4 两个实际使用的 SWPM 等级。
 - 登录入口：`/login/` 是主登录页；`/membership-login/` 保留兼容。已登录用户访问这两个页面时应立即跳回首页，避免重复维护两套跳转逻辑。
 - 邮件系统：使用 WP Mail SMTP 插件通过 Gmail API 发送邮件。发件人必须与 Gmail 认证账号一致。
 - 升级通知邮件收件人：SWPM 自动发出的 `Account Upgrade Notification` 在本站当前实现中应优先发送到 SWPM 会员资料里的邮箱；若支付网关返回邮箱与站内资料邮箱不一致，也以站内资料邮箱为准。

@@ -20,6 +20,7 @@ This project is a custom WordPress-based platform for displaying and managing ra
 
 - **Primary login route:** `/login/` is the canonical login page. `/membership-login/` remains for backward compatibility only.
 - **Logged-in redirect rule:** Logged-in users visiting `/login/` or `/membership-login/` should be redirected to the home page through centralized theme logic.
+- **Membership levels in active use:** The project only uses SWPM `Basic (2)` and `Plus (4)` for live membership state. Trial `Level 3` has been retired from business logic, and all temporary gifted access is handled through the bonus meta mechanism.
 - **Rendui header rules:**
   - `prices/daily` uses `userid` and `referer` headers only. It should not send a `phone` header.
   - `daily/getByProductSpecAndDate` and `prices/statistics` require `phone: 13792171909`.

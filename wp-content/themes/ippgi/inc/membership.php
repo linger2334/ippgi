@@ -761,7 +761,7 @@ function ippgi_on_swpm_registration($member_data) {
     // Idempotency guard: avoid duplicate grant if multiple registration hooks fire.
     $bonus_granted = get_user_meta($wp_user->ID, 'ippgi_registration_bonus_granted', true);
     if (!$bonus_granted) {
-        // Give new user 7 days bonus access (replaces Trial mechanism)
+        // Give new user 7 days bonus access via the bonus mechanism.
         ippgi_activate_bonus_access($wp_user->ID, 7);
         update_user_meta($wp_user->ID, 'ippgi_registration_bonus_granted', current_time('mysql'));
         error_log(sprintf('IPPGI: Granted 7 days bonus access to new user %d', $wp_user->ID));

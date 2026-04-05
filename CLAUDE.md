@@ -28,7 +28,7 @@
 - bonus 激活/续期只写入 bonus 相关 meta，不会把 SWPM membership_level 改成 4；权限判断统一走 `ippgi_bonus_access_end > 当前时间`
 - 主题代码禁止手动升级会员等级到 Plus(4)；升级仅由 SWPM 支付流程自动处理，主题侧只允许降级到 Basic(2)
 - Plus 等级在 SWPM 后台设置为 "No Expiry"，所以 SWPM 不会自动降级用户，需要我们的代码在订阅到期时手动处理降级
-- 原 Trial (Level 3) 已废弃，统一使用 bonus 机制管理所有赠送天数
+- Trial (Level 3) 已从业务流程中移除；当前仅使用 Basic (2) 与 Plus (4)，所有赠送天数统一通过 bonus 机制管理
 - 付费升级成功后的 `Account Upgrade Notification` 仍由 SWPM 自动发送，但本站主题会在发送前把收件人改写为 SWPM 会员资料中的邮箱；若支付网关回调邮箱与站内资料邮箱不一致，以站内资料邮箱为准
 
 ### Bonus 访问机制
@@ -1533,6 +1533,17 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 同时覆盖该函数中 `similar_text(strtolower(...))` 的同类潜在 warning。
 - **影响范围**：仅为兼容性修复，不改变国家下拉的原有显示和匹配逻辑。
 - **注意事项**：此次修复位于第三方插件 `simple-membership` 源码中，后续升级插件时需要留意该补丁是否被覆盖。
+
+#### 64. Trial(Level 3) 残留清理与删除确认 ✅
+- **结论**：当前项目代码已经不再使用 Trial (Level 3)；赠送访问统一走 bonus 机制，实际使用的 SWPM 等级仅为 Basic (2) 与 Plus (4)。
+- **数据库核查结果**：
+  - `swpm_membership_tbl` 中仍存在 `Trial` 等级记录。
+  - `swpm_members_tbl` 中 `membership_level = 3` 的会员数为 `0`。
+  - `swpm_transactions` 与 SWPM 按钮相关 meta 中未发现引用等级 `3` 的记录。
+- **处理动作**：
+  - 清理主题代码中最后一处 `Trial mechanism` 注释残留。
+  - 文档统一更新为 bonus 机制口径，不再保留“旧 Trial 流程仍存在”的歧义。
+- **后台操作建议**：基于当前数据库状态，可以直接在 WordPress 后台删除 SWPM 的 Trial(Level 3) 等级；删除前后无需额外迁移现有会员数据。
 
 
 ---
