@@ -479,7 +479,15 @@
         font-size: var(--font-size-base);
     }
 
+    .blog-card__title {
+        font-size: var(--font-size-base);
+    }
+
     .article-card__excerpt {
+        font-size: var(--font-size-sm);
+    }
+
+    .blog-card__excerpt {
         font-size: var(--font-size-sm);
     }
 }

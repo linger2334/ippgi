@@ -160,8 +160,8 @@ $attributes_html = str_replace(
         <div class="product-selector">
             <button type="button" class="product-selector__trigger" id="product-selector-trigger" aria-haspopup="listbox" aria-expanded="false">
                 <span class="product-selector__label"><?php esc_html_e('Product', 'ippgi'); ?></span>
-                <svg class="product-selector__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
+                <svg class="product-selector__arrow" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="3">
+                    <polyline points="6 4 12 16 18 4"></polyline>
                 </svg>
             </button>
 
@@ -281,7 +281,7 @@ $attributes_html = str_replace(
             <p class="prices-disclaimer__text">
                 <strong class="prices-disclaimer__label"><?php esc_html_e('Disclaimer:', 'ippgi'); ?></strong>
                 <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
-                <strong class="prices-disclaimer__label"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></strong>
+                <span class="prices-disclaimer__notice"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></span>
                 <?php esc_html_e('Users should exercise independent judgment and conduct their own due diligence; iPPGI shall not be held liable for any loss or damage arising from the use of this information. All content is the exclusive intellectual property of iPPGI. Any unauthorized reproduction, distribution, or copying without prior written consent is strictly prohibited. iPPGI reserves all rights to pursue legal action for any infringement.', 'ippgi'); ?>
             </p>
         </div>

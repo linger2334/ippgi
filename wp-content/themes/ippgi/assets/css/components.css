@@ -212,7 +212,7 @@
     align-items: center;
     gap: var(--spacing-xs);
     font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
 }
 
 .article-card__meta svg {
@@ -1350,7 +1350,7 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     cursor: pointer;
     padding: var(--spacing-sm) 0;
     border-bottom: 1px solid var(--color-border);
@@ -1940,7 +1940,7 @@
 
 .my-prices__disclaimer {
     font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     margin: 0 0 var(--spacing-xs);
 }
 
@@ -2142,7 +2142,8 @@
 
 .price-table__dimensions {
     font-family: var(--font-family-base);
-    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
 }
 
 .price-table__price {
@@ -2165,7 +2166,7 @@
 }
 
 .price-table__change--neutral {
-    color: var(--color-text-muted);
+    color: var(--color-text-primary);
 }
 
 .price-table__price--up {
@@ -2648,9 +2649,9 @@
 }
 
 .single-post__title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #333333;
+    font-size: 18px;
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
     line-height: 1.3;
     margin: 0 0 var(--spacing-sm) 0;
     text-wrap: wrap; /* Override h1's default text-wrap: balance in Chrome */
@@ -2686,8 +2687,8 @@
 }
 
 .single-post__date {
-    font-size: 16px;
-    color: #d6d6d6;
+    font-size: 14px;
+    color: var(--color-text-muted);
 }
 
 .single-post__content {
@@ -2720,17 +2721,17 @@
 }
 
 .blog-header__title {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: #929292;
+    font-size: 28px;
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-primary);
     margin: 0 0 var(--spacing-xs);
     line-height: 1.3;
     text-wrap: wrap; /* Override h1's default text-wrap: balance in Chrome */
 }
 
 .blog-header__subtitle {
-    font-size: var(--font-size-sm);
-    color: #d5d5d5;
+    font-size: 18px;
+    color: var(--color-text-secondary);
     margin: 0;
 }
 
@@ -2791,11 +2792,11 @@
 }
 
 .blog-card__title {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-bold);
-    color: #909090;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
     margin: 0;
-    line-height: 1.3;
+    line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -2807,8 +2808,8 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
-    font-size: var(--font-size-sm);
-    color: #c0c0c0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
 }
 
 .blog-card__date svg {
@@ -2816,9 +2817,9 @@
 }
 
 .blog-card__excerpt {
-    font-size: var(--font-size-sm);
-    color: #c0c0c0;
-    line-height: 1.4;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -2840,9 +2841,9 @@
 }
 
 .legal-header__title {
-    font-size: 26px;
-    font-weight: var(--font-weight-normal);
-    color: #949494;
+    font-size: 18px;
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
     margin: 0;
     line-height: 1.2;
 }
@@ -3761,7 +3762,7 @@ html:has(.edit-profile-page-body) {
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (max-width: 767px) {
     .profile-page {
         padding: var(--spacing-sm);
     }
@@ -3870,7 +3871,7 @@ html:has(.edit-profile-page-body) {
     display: block;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
     .profile-footer__links {
         flex-direction: column;
         align-items: center;
@@ -3893,17 +3894,17 @@ html:has(.edit-profile-page-body) {
 }
 
 .invite-page__title {
-    font-size: 24px;
-    font-weight: var(--font-weight-bold);
-    color: #333;
+    font-size: 28px;
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-primary);
     text-align: left;
     margin: 0 0 4px;
     line-height: 1.3;
 }
 
 .invite-page__subtitle {
-    font-size: 14px;
-    color: #666;
+    font-size: 18px;
+    color: var(--color-text-secondary);
     text-align: left;
     margin: 0;
     padding-bottom: 12px;
@@ -4043,12 +4044,7 @@ html:has(.edit-profile-page-body) {
     padding: 24px 16px !important;
 }
 
-/* Responsive */
-@media (max-width: 640px) {
-    .invite-page__title {
-        font-size: 20px;
-    }
-
+@media (max-width: 767px) {
     .invite-link-box {
         flex-direction: column;
         align-items: center;
@@ -4083,7 +4079,7 @@ html:has(.edit-profile-page-body) {
 .favorites-header__title {
     font-size: 28px;
     font-weight: var(--font-weight-normal);
-    color: #4f4f4f;
+    color: var(--color-text-primary);
     line-height: 1.4;
     margin: 0 0 var(--spacing-sm);
 }
@@ -4091,7 +4087,7 @@ html:has(.edit-profile-page-body) {
 .favorites-header__subtitle {
     font-size: 18px;
     font-weight: var(--font-weight-normal);
-    color: #585858;
+    color: var(--color-text-secondary);
     margin: 0;
 }
 
@@ -4278,11 +4274,7 @@ html:has(.edit-profile-page-body) {
 }
 
 /* Responsive */
-@media (max-width: 640px) {
-    .favorites-header__title {
-        font-size: 22px;
-    }
-
+@media (max-width: 767px) {
     .favorites-header__subtitle {
         font-size: 15px;
     }
@@ -4318,7 +4310,7 @@ html:has(.edit-profile-page-body) {
     font-family: var(--font-family-base);
     font-size: 28px;
     font-weight: var(--font-weight-normal);
-    color: #868686;
+    color: var(--color-text-primary);
     line-height: 1.3;
     margin-bottom: var(--spacing-sm);
     text-wrap: wrap; /* Override h1's default text-wrap: balance in Chrome */
@@ -4327,7 +4319,7 @@ html:has(.edit-profile-page-body) {
 .prices-page-header__disclaimer {
     font-family: var(--font-family-base);
     font-size: 18px;
-    color: #c8c8c8;
+    color: var(--color-text-secondary);
     line-height: 1.4;
     margin: 0;
 }
@@ -4350,7 +4342,7 @@ html:has(.edit-profile-page-body) {
     cursor: pointer;
     font-family: var(--font-family-base);
     font-size: 26px;
-    color: #838383;
+    color: var(--color-text-primary);
     text-align: left;
 }
 
@@ -4397,7 +4389,7 @@ html:has(.edit-profile-page-body) {
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     font-size: var(--font-size-base);
-    color: #666;
+    color: var(--color-text-primary);
     text-align: left;
     transition: background var(--transition-fast);
 }
@@ -4443,7 +4435,7 @@ html:has(.edit-profile-page-body) {
     font-family: var(--font-family-base);
     font-size: 24px;
     font-weight: var(--font-weight-normal);
-    color: #707070;
+    color: var(--color-text-primary);
 }
 
 /* Key Attributes */
@@ -4462,14 +4454,14 @@ html:has(.edit-profile-page-body) {
 .key-attributes__text {
     font-family: var(--font-family-base);
     font-size: 13px;
-    color: #c7c7c7;
+    color: var(--color-text-secondary);
     line-height: 1.7;
     margin: 0;
 }
 
 .key-attributes__label {
-    color: #000;
-    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-normal);
 }
 
 /* Width Filter Tabs */
@@ -4505,7 +4497,7 @@ html:has(.edit-profile-page-body) {
     border-radius: 18px;
     font-family: var(--font-family-base);
     font-size: 20px;
-    color: #757575;
+    color: var(--color-text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
     white-space: nowrap;
@@ -4518,7 +4510,7 @@ html:has(.edit-profile-page-body) {
 .width-filter__tab.is-active {
     background: #fefefe;
     border: 1px solid #ededed;
-    color: #8b8b8b;
+    color: var(--color-text-secondary);
 }
 
 /* Price Controls (Update Info & Tax Toggle) */
@@ -4534,8 +4526,8 @@ html:has(.edit-profile-page-body) {
 .price-controls__updated {
     font-family: var(--font-family-base);
     font-size: 12px;
-    font-weight: var(--font-weight-medium);
-    color: #b3b3b3;
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-secondary);
 }
 
 .price-controls__toggle {
@@ -4585,7 +4577,7 @@ html:has(.edit-profile-page-body) {
 .price-controls__toggle-text {
     font-family: var(--font-family-base);
     font-size: 20px;
-    color: #898989;
+    color: var(--color-text-secondary);
 }
 
 /* Prices Table Section */
@@ -4613,7 +4605,7 @@ html:has(.edit-profile-page-body) {
     font-family: var(--font-family-base);
     font-size: 14px;
     font-weight: var(--font-weight-normal);
-    color: #788082;
+    color: var(--color-text-secondary);
     text-align: center;
     border: 1px solid #9ca0a1;
 }
@@ -4631,14 +4623,14 @@ html:has(.edit-profile-page-body) {
     font-family: var(--font-family-base);
     font-size: 14px;
     font-weight: var(--font-weight-medium);
-    color: #888;
+    color: var(--color-text-primary);
     text-align: center;
     vertical-align: middle;
 }
 
 .prices-table td:first-child {
     text-align: left;
-    color: #8c8c8c;
+    color: var(--color-text-primary);
 }
 
 .prices-table__loading {
@@ -4783,13 +4775,18 @@ html:has(.edit-profile-page-body) {
 .prices-disclaimer__text {
     font-size: 13px;
     line-height: 1.7;
-    color: #c7c7c7;
+    color: var(--color-text-secondary);
     margin: 0;
 }
 
 .prices-disclaimer__label {
     color: #000;
     font-weight: var(--font-weight-semibold);
+}
+
+.prices-disclaimer__notice {
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-normal);
 }
 
 /* ==========================================================================
@@ -4971,7 +4968,7 @@ html:has(.edit-profile-page-body) {
     align-items: center;
     gap: 10px;
     font-size: 18px;
-    color: #717171;
+    color: var(--color-text-secondary);
     margin-bottom: var(--spacing-md);
     cursor: pointer;
 }
@@ -5326,12 +5323,18 @@ html:has(.edit-profile-page-body) {
 
 /* Responsive - Prices Page */
 @media (max-width: 767px) {
+    .blog-header__title,
+    .invite-page__title,
+    .favorites-header__title,
     .prices-page-header__title {
-        font-size: 22px;
+        font-size: var(--font-size-lg);
     }
 
+    .blog-header__subtitle,
+    .invite-page__subtitle,
+    .favorites-header__subtitle,
     .prices-page-header__disclaimer {
-        font-size: 15px;
+        font-size: var(--font-size-sm);
     }
 
     .product-selector__trigger {
