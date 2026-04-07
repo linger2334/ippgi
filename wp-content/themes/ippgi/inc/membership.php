@@ -1215,14 +1215,6 @@ function ippgi_handle_referral_bonus_expired($user_id, $original_level) {
         return;
     }
 
-    // Only downgrade if they haven't purchased Plus in the meantime
-    // Check if they still have the bonus level and haven't made a payment
-    $has_paid = get_user_meta($user_id, 'ippgi_has_paid_subscription', true);
-    if ($has_paid) {
-        error_log(sprintf('IPPGI: User %d has paid subscription, not downgrading', $user_id));
-        return;
-    }
-
     $target_level = 2;
     $current_level = (int) $swpm_member->membership_level;
     if ($current_level !== $target_level) {
