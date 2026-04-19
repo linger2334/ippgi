@@ -27,8 +27,8 @@ $current_user = wp_get_current_user();
 $user_email = $current_user->user_email;
 
 // Price configuration
-$monthly_price = 9.9;
-$yearly_price = 99;
+$monthly_price = 29;
+$yearly_price = 290;
 $price = $is_yearly ? $yearly_price : $monthly_price;
 $period = $is_yearly ? 'year' : 'month';
 

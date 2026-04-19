@@ -34,7 +34,7 @@
                 <a href="<?php echo esc_url(home_url('/about')); ?>" class="site-footer__legal-link"><?php esc_html_e('About Us', 'ippgi'); ?></a>
             </div>
             <p class="site-footer__copyright">
-                &copy; <?php echo esc_html(date('Y')); ?> <?php esc_html_e('AFO Group Pty Ltd, all rights reserved.', 'ippgi'); ?>
+                &copy; <?php esc_html_e('2026 ANT LIMITED, all rights reserved.', 'ippgi'); ?>
             </p>
         </div>
 

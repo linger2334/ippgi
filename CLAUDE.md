@@ -81,9 +81,15 @@
 | Stripe Monthly | 126 | Stripe 月度订阅 |
 | Stripe Yearly | 127 | Stripe 年度订阅 |
 
+> 注意：当前支付页模板 `page-payment.php` 中写死引用的按钮 ID 仍是 `168/169/173/174`，与本地数据库现存的 `123/124/126/127` 不一致。后续如继续调整真实扣款逻辑或排查支付异常，应先核对运行环境实际启用的 SWPM Payment Button ID。
+
 ### 订阅价格
-- 月度：US$10.00/month
-- 年度：US$100.00/year
+- 前台展示价格当前已改为：月度 `US$29.00/month`、年度 `US$290.00/year`
+- 真实扣款价格仍取决于 SWPM Payment Button 配置与 Stripe 侧 Price ID，修改订阅价格时必须同步更新：
+  - 主题模板：`page-subscribe.php`、`page-payment.php`
+  - SWPM PayPal 按钮金额
+  - SWPM Stripe 按钮绑定的 `stripe_plan_id`
+  - Stripe 后台对应的 Price
 
 ### 订阅状态获取
 - 使用 PayPal/Stripe API 获取真实的下次扣款日期（`next_billing_time` / `current_period_end`）
@@ -642,10 +648,16 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 ### 价格列表页面 (Prices Page)
 **模板文件**：`/page-templates/page-prices.php`
 
+**当前访问规则**：
+- 未登录用户访问 `/prices`：跳转登录页，并携带 `redirect_to`
+- 已登录用户访问 `/prices`：允许直接进入，不再要求 Plus 或 bonus
+- 首页价格表、Read More、Footer 产品价格链接、导航 `Prices & Trends` 跳转逻辑已统一为与直链访问 `/prices` 一致
+- 价格详情页 `/price-detail` 仍单独要求 Plus 或活跃 bonus 权限
+
 **页面结构**：
 1. **页面标题**
-   - 动态标题：`Price charts and tables of China {产品名称} and commodities`
-   - 副标题/免责声明：`*These prices reflect the transaction prices within China...`
+   - 固定标题：`Price charts and tables of China steel and commodities`
+   - 副标题：`Prices are quoted on an ex works (EXW) basis in China and exclude freight costs.`
 
 2. **产品选择器**
    - 下拉按钮显示 "Product" + 向下箭头
@@ -666,9 +678,10 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
    - 宽度选项从缓存数据动态获取，不再硬编码
    - 点击标签本地切换数据（无需网络请求）
 
-6. **更新时间和含税切换**
-   - 左侧：更新时间（如 `Updated: Jan 30, 2026, 10:00 AM (UTC+8)`）
-   - 右侧：圆形单选按钮 + "Tax-inclusive price" 标签
+6. **更新时间**
+   - 显示更新时间（如 `Updated: Jan 30, 2026, 10:00 AM (UTC+8)`）
+   - 价格列表页顶部含税切换按钮已移除
+   - 表格默认显示含税价格（`showTaxInclusive = true`）
 
 7. **价格表格**
    - 表头：Dimensions(mm) | Latest($) | Change($) | Historical
@@ -677,10 +690,11 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
      - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`（如 `0.4*1200`）
      - **HRC, AL**：显示 `厚度*宽度 产品名称`（如 `2.0*1010 热卷`）
    - Change 列根据涨跌显示不同颜色
-   - Historical 列显示 "View >" 按钮，跳转到价格详情页
+   - Historical 列显示 "Trend >" 按钮，跳转到价格详情页
 
 8. **Disclaimer**
-   - 动态文本，产品名称根据当前选中类型变化
+   - 固定免责声明文本
+   - 原表格下方带锁升级提示（`premium-gate`）已删除
 
 **URL 参数支持**：
 - `?type=ppgi` - 直接指定产品类型（小写）
@@ -690,7 +704,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 **数据来源**：
 - 价格列表缓存已按分类拆分存储（如 `ippgi_prices_price_list_category_ppgi`），服务端按需拼装完整响应
 - 通过 `window.ippgiPricesPage` 传递给 JavaScript
-- 宽度切换和含税切换均在本地完成，无需 API 调用
+- 宽度切换在本地完成，无需 API 调用
 
 **CSS 样式**：位于 `/assets/css/components.css`
 - `.prices-page-header` - 页面标题区域
@@ -727,9 +741,10 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 4. **实时数据区域**
    - 标题：`Real-Time Data`
-   - 圆形含税切换按钮
-   - 大号当前价格（使用 `lastprice_usd` / `lastpriceTax_usd`）
-   - 涨跌值和百分比（涨绿跌红，使用 `riseAndFall_usd` 和 `riseRange`）
+   - 圆形含税切换按钮，默认勾选
+   - 按钮文案：`Incl. China VAT`
+   - 默认展示含税价格（使用 `lastpriceTax_usd`、`priceTax_usd`、`riseAndFallTax_usd` 等税价字段）
+   - 涨跌值和百分比（涨绿跌红）
    - 统计数据网格：
      - Avg：使用 `price_usd` / `priceTax_usd`
      - WoW：使用 `lastWeekDiff_usd` / `lastWeekDiffTax_usd`
@@ -1277,8 +1292,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **需求**：PC 端和移动端导航菜单的 "Prices & Trends" 链接添加权限检查逻辑
 - **跳转规则**：
   - 未登录 → 登录页面 `/login/`
-  - 已登录但无高级权限 → 订阅页面 `/subscribe/`
-  - 有高级会员权限 → 价格列表页 `/prices/`
+  - 已登录 → 价格列表页 `/prices/`
 - **实现方式**：
   1. 给链接添加 `js-prices-link` 类，`href` 设为 `#`
   2. JavaScript 中复用 `navigateToPrices()` 函数处理点击事件
@@ -1376,8 +1390,8 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - Footer 底部 6 个产品价格链接（`data-category`）
 - **行为确认**：
   - 未登录 → 弹出登录模态框（PC）或跳转登录页（移动）
-  - 已登录但无 Premium → 跳转到订阅页面 `/subscribe`
-  - 有 Premium（Plus 或 Bonus）→ 正常跳转到价格页面
+  - 已登录 → 正常跳转到价格页面
+  - `/price-detail` 详情页仍由服务端单独校验 Plus 或 Bonus 权限
 - **代码逻辑**（`navigateToPrices()` 函数）：
   ```javascript
   if (!ippgiData.hasPremium) {

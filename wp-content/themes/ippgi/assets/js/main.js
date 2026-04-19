@@ -1397,7 +1397,7 @@
 
     /**
      * Initialize price table and Read More click handlers
-     * Handles navigation based on login and membership status
+     * Handles navigation based on login status
      */
     function initPriceTableClick() {
         const priceTableContainer = document.getElementById('price-table-container');
@@ -1423,14 +1423,7 @@
                 return;
             }
 
-            // Check if user has premium membership (Bonus or Plus)
-            if (!ippgiData.hasPremium) {
-                // Logged in but no premium - redirect to subscribe page
-                window.location.href = ippgiData.subscribeUrl;
-                return;
-            }
-
-            // Has premium - redirect to prices page with category
+            // Logged-in users can access the prices page.
             window.location.href = ippgiData.pricesUrl + '?category=' + encodeURIComponent(category);
         }
 
@@ -1581,7 +1574,6 @@
         const productDropdown = document.getElementById('product-selector-dropdown');
         const widthFilter = document.getElementById('width-filter');
         const pricesTableBody = document.getElementById('prices-table-body');
-        const taxToggle = document.getElementById('tax-inclusive-toggle');
 
         if (!productTrigger || !pricesTableBody) return;
 
@@ -1589,7 +1581,7 @@
         var categoryPrices = pageData.categoryPrices || {};
         var currentType = pageData.currentType || 'ppgi';
         var currentWidth = pageData.currentWidth || '';
-        var showTaxInclusive = false;
+        var showTaxInclusive = true;
 
         // Product selector dropdown
         productTrigger.addEventListener('click', function() {
@@ -1642,14 +1634,6 @@
                     url.searchParams.set('width', newWidth);
                     window.history.pushState({}, '', url.toString());
                 });
-            });
-        }
-
-        // Tax inclusive toggle
-        if (taxToggle) {
-            taxToggle.addEventListener('change', function() {
-                showTaxInclusive = this.checked;
-                renderCurrentWidth();
             });
         }
 
@@ -1709,7 +1693,7 @@
                     '<td class="prices-table__change--' + changeClass + '">' + changeText + '</td>' +
                     '<td>' +
                     '<a href="' + escapeHtml(detailUrl) + '" class="prices-table__view-btn">' +
-                    'View <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+                    'Trend <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
                     '</a>' +
                     '</td>' +
                     '</tr>';

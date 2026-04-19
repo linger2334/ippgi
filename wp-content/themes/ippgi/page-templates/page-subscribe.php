@@ -55,8 +55,8 @@ get_header();
                     <h2 class="pricing-card__title"><?php esc_html_e('Plus', 'ippgi'); ?></h2>
                     <div class="pricing-card__price">
                         <span class="pricing-card__currency">$</span>
-                        <span class="pricing-card__amount pricing-card__amount--monthly">9.90</span>
-                        <span class="pricing-card__amount pricing-card__amount--yearly" style="display: none;">99.00</span>
+                        <span class="pricing-card__amount pricing-card__amount--monthly">29.00</span>
+                        <span class="pricing-card__amount pricing-card__amount--yearly" style="display: none;">290.00</span>
                         <span class="pricing-card__period pricing-card__period--monthly">/<?php esc_html_e('month', 'ippgi'); ?></span>
                         <span class="pricing-card__period pricing-card__period--yearly" style="display: none;">/<?php esc_html_e('year', 'ippgi'); ?></span>
                     </div>

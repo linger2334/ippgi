@@ -139,9 +139,9 @@ if (is_user_logged_in()) {
             <div class="detail-realtime__header">
                 <span class="detail-realtime__label"><?php esc_html_e('Real-Time Data', 'ippgi'); ?></span>
                 <label class="price-controls__toggle">
-                    <input type="checkbox" id="detail-tax-toggle" class="price-controls__checkbox">
+                    <input type="checkbox" id="detail-tax-toggle" class="price-controls__checkbox" checked>
                     <span class="price-controls__toggle-indicator"></span>
-                    <span class="price-controls__toggle-text"><?php esc_html_e('Tax-inclusive price', 'ippgi'); ?></span>
+                    <span class="price-controls__toggle-text"><?php esc_html_e('Incl. China VAT', 'ippgi'); ?></span>
                 </label>
             </div>
 
@@ -279,7 +279,7 @@ if (is_user_logged_in()) {
             <p class="prices-disclaimer__text">
                 <strong class="prices-disclaimer__label"><?php esc_html_e('Disclaimer:', 'ippgi'); ?></strong>
                 <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
-                <strong class="prices-disclaimer__label"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></strong>
+                <span class="prices-disclaimer__notice"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></span>
                 <?php esc_html_e('Users should exercise independent judgment and conduct their own due diligence; iPPGI shall not be held liable for any loss or damage arising from the use of this information. All content is the exclusive intellectual property of iPPGI. Any unauthorized reproduction, distribution, or copying without prior written consent is strictly prohibited. iPPGI reserves all rights to pursue legal action for any infringement.', 'ippgi'); ?>
             </p>
         </div>
@@ -386,7 +386,7 @@ window.ippgiPriceDetail = {
             detail.priceData = r;
 
             // Update Real-Time Data section
-            updateRealtimeDisplay(r, false);
+            updateRealtimeDisplay(r, true);
         })
         .catch(function(err) {
             console.error('Failed to fetch realtime price:', err);
@@ -518,7 +518,7 @@ window.ippgiPriceDetail = {
     // Fetch TD (today) chart data - uses unified /historical endpoint
     function fetchTodayData() {
         if (!isAfter9AM()) {
-            showChartMessage('No data available before 9:00 AM');
+            showChartMessage('No data available before 9:00 AM (UTC+8)');
             return;
         }
 

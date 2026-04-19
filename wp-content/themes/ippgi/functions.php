@@ -153,8 +153,8 @@ add_action('template_redirect', function() {
 
 /**
  * Protect prices pages:
- * - Guest users -> login page
- * - Logged-in users without Plus/bonus -> subscribe page
+ * - /prices requires login only
+ * - /price-detail requires Plus/bonus
  */
 add_action('template_redirect', function() {
     $is_prices_page = is_page_template('page-templates/page-prices.php') || is_page('prices');
@@ -176,7 +176,7 @@ add_action('template_redirect', function() {
         exit;
     }
 
-    if (!ippgi_user_has_plus()) {
+    if ($is_price_detail_page && !ippgi_user_has_plus()) {
         wp_redirect(ippgi_get_subscribe_url());
         exit;
     }

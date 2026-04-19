@@ -220,11 +220,6 @@ $attributes_html = str_replace(
                 );
                 ?>
             </div>
-            <label class="price-controls__toggle">
-                <input type="checkbox" id="tax-inclusive-toggle" class="price-controls__checkbox">
-                <span class="price-controls__toggle-indicator"></span>
-                <span class="price-controls__toggle-text"><?php esc_html_e('Tax-inclusive price', 'ippgi'); ?></span>
-            </label>
         </div>
 
         <!-- Price Table -->
@@ -250,31 +245,6 @@ $attributes_html = str_replace(
                 </table>
             </div>
         </div>
-
-        <?php if (!ippgi_user_can_view_history()) : ?>
-        <!-- Upgrade Prompt for Non-Premium Users -->
-        <div class="premium-gate">
-            <div class="premium-gate__content">
-                <svg class="premium-gate__icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-                <h3 class="premium-gate__title"><?php esc_html_e('Unlock Price History', 'ippgi'); ?></h3>
-                <p class="premium-gate__text">
-                    <?php esc_html_e('Subscribe to IPPGI Plus to access complete historical price data, interactive charts, and trend analysis.', 'ippgi'); ?>
-                </p>
-                <a href="<?php echo esc_url(home_url('/subscribe')); ?>" class="btn btn--primary">
-                    <?php esc_html_e('Upgrade to Plus', 'ippgi'); ?>
-                </a>
-                <?php if (!is_user_logged_in()) : ?>
-                    <p class="premium-gate__login">
-                        <?php esc_html_e('Already have an account?', 'ippgi'); ?>
-                        <a href="<?php echo esc_url(ippgi_get_login_url()); ?>"><?php esc_html_e('Log in', 'ippgi'); ?></a>
-                    </p>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endif; ?>
 
         <!-- Disclaimer -->
         <div class="prices-disclaimer">
