@@ -6,8 +6,6 @@
  * @since 1.0.0
  */
 
-get_header();
-
 // Get parameters from URL
 // Support both ?type=ppgi&spec=0.11*1000 (from prices page) and ?material=gi (legacy)
 $material_code = '';
@@ -20,6 +18,8 @@ if (empty($material_code)) {
     $material_code = 'ppgi';
 }
 
+$material_code = ippgi_normalize_product_type($material_code);
+
 $product_spec = isset($_GET['spec']) ? sanitize_text_field($_GET['spec']) : '';
 
 // Material data mapping
@@ -28,19 +28,28 @@ $materials = [
     'gi'       => ['name' => __('Galvanized Steel', 'ippgi'), 'code' => ippgi_get_product_display_name('gi'), 'api_category' => 'GI'],
     'gl'       => ['name' => __('Galvalume Steel', 'ippgi'), 'code' => ippgi_get_product_display_name('gl'), 'api_category' => 'GL'],
     'ppgi'     => ['name' => __('Pre-painted Galvanized Iron', 'ippgi'), 'code' => ippgi_get_product_display_name('ppgi'), 'api_category' => 'PPGI'],
-    'hrc'      => ['name' => __('Hot Rolled Coil', 'ippgi'), 'code' => ippgi_get_product_display_name('hrc'), 'api_category' => 'HRC'],
     'crc'      => ['name' => __('Cold Rolled Hard Coil', 'ippgi'), 'code' => ippgi_get_product_display_name('crc'), 'api_category' => 'CRC Hard'],
     'aluminum' => ['name' => __('Aluminum Sheet', 'ippgi'), 'code' => ippgi_get_product_display_name('aluminum'), 'api_category' => 'AL'],
 ];
 
-$current_material = isset($materials[$material_code]) ? $materials[$material_code] : $materials['ppgi'];
+if (!isset($materials[$material_code]) || !ippgi_is_visible_product_type($material_code)) {
+    global $wp_query;
+    $wp_query->set_404();
+    status_header(404);
+    nocache_headers();
+    require get_query_template('404');
+    exit;
+}
+
+get_header();
+
+$current_material = $materials[$material_code];
 
 // Category ID mapping
 $category_id_mapping = [
     'ppgi'     => '1482328115005964290',
     'gi'       => '1457211766760558593',
     'gl'       => '1683315093109178369',
-    'hrc'      => '1457211813719986177',
     'crc'      => '1457211766760558594',
     'aluminum' => '1457211893311098881',
 ];
@@ -61,11 +70,11 @@ if ($product_spec) {
 }
 
 // Build display dimensions
-// Only show product name for HRC and AL (they have consistent naming)
+// Only show product name for AL (it has consistent naming)
 // For PPGI, GI, GL, CRC - only show dimensions (they have mixed Chinese/English names)
 $short_spec = $matched_thickness && $matched_width ? ($matched_thickness . '*' . $matched_width) : $product_spec;
 $display_dimensions = $short_spec;
-if ($product_name_from_spec && in_array($material_code, ['hrc', 'aluminum'], true)) {
+if ($product_name_from_spec && in_array($material_code, ['aluminum'], true)) {
     $display_dimensions = $short_spec . ' ' . $product_name_from_spec;
 }
 
@@ -74,7 +83,6 @@ $favorite_type_mapping = [
     'ppgi'     => 'ppgi',
     'gi'       => 'gi',
     'gl'       => 'gl',
-    'hrc'      => 'hrc',
     'crc'      => 'crc_hard',
     'aluminum' => 'al',
 ];
@@ -83,6 +91,57 @@ $favorite_type = $favorite_type_mapping[$material_code] ?? $material_code;
 // Favorite ID format: type-productSpec (e.g., "ppgi-1482328115005964290_1000_0.11_彩涂")
 // Use full $product_spec as unique identifier
 $favorite_id = $product_spec ? ($favorite_type . '-' . $product_spec) : $favorite_type;
+
+$format_detail_price_range = static function($min, $max, $fallback = null) {
+    $min_num = is_numeric($min) ? (float) $min : 0;
+    $max_num = is_numeric($max) ? (float) $max : 0;
+    $fallback_num = is_numeric($fallback) ? (float) $fallback : 0;
+
+    $format_number = static function($value) {
+        return number_format((float) $value, 2, '.', ',');
+    };
+
+    if ($min_num > 0 && $max_num > 0) {
+        return '$' . $format_number($min_num) . '~$' . $format_number($max_num);
+    }
+
+    if ($fallback_num > 0) {
+        return '$' . $format_number($fallback_num);
+    }
+
+    return '--';
+};
+
+$detail_price_display = '--';
+$cache_manager = function_exists('ippgi_prices') ? ippgi_prices()->cache_manager : null;
+$cached_category_data = $cache_manager ? $cache_manager->get_category_price_list($current_material['api_category']) : false;
+
+if ($cached_category_data && isset($cached_category_data['result']) && is_array($cached_category_data['result'])) {
+    foreach ($cached_category_data['result'] as $width => $items) {
+        if (!is_array($items)) {
+            continue;
+        }
+
+        foreach ($items as $item) {
+            $candidate_spec = isset($item['productSpec']) ? sanitize_text_field($item['productSpec']) : '';
+            $candidate_dimensions = trim((string) ($item['thickness'] ?? '')) . '*' . trim((string) $width);
+            $is_matching_spec = $product_spec !== '' && $candidate_spec === $product_spec;
+            $is_matching_dimensions = $product_spec === '' && $short_spec !== '' && $candidate_dimensions === $short_spec;
+
+            if (!$is_matching_spec && !$is_matching_dimensions) {
+                continue;
+            }
+
+            $detail_price_display = $format_detail_price_range(
+                $item['lastpriceTax_range_min_usd'] ?? ($item['priceTax_range_min_usd'] ?? 0),
+                $item['lastpriceTax_range_max_usd'] ?? ($item['priceTax_range_max_usd'] ?? 0),
+                $item['lastpriceTax_usd'] ?? ($item['priceTax_usd'] ?? 0)
+            );
+
+            break 2;
+        }
+    }
+}
 
 // Check if this product is already in user's favorites
 $is_favorited = false;
@@ -137,35 +196,12 @@ if (is_user_logged_in()) {
         <!-- Real-Time Data Section -->
         <div class="detail-realtime">
             <div class="detail-realtime__header">
-                <span class="detail-realtime__label"><?php esc_html_e('Real-Time Data', 'ippgi'); ?></span>
-                <label class="price-controls__toggle">
-                    <input type="checkbox" id="detail-tax-toggle" class="price-controls__checkbox" checked>
-                    <span class="price-controls__toggle-indicator"></span>
-                    <span class="price-controls__toggle-text"><?php esc_html_e('Incl. China VAT', 'ippgi'); ?></span>
-                </label>
+                <span class="detail-realtime__label"><?php esc_html_e('Real-Time Price', 'ippgi'); ?></span>
             </div>
 
             <div class="detail-realtime__price-row">
                 <div class="detail-realtime__main-price">
-                    <span class="detail-realtime__value" id="detail-price">--</span>
-                    <div class="detail-realtime__change" id="detail-change-wrap">
-                        <span class="detail-realtime__change-value" id="detail-change">--</span>
-                        <span class="detail-realtime__change-pct" id="detail-change-pct">--</span>
-                    </div>
-                </div>
-                <div class="detail-realtime__stats">
-                    <div class="detail-realtime__stat">
-                        <span class="detail-realtime__stat-label">Avg:</span><span class="detail-realtime__stat-value" id="detail-avg">--</span>
-                    </div>
-                    <div class="detail-realtime__stat">
-                        <span class="detail-realtime__stat-label">WoW:</span><span class="detail-realtime__stat-value" id="detail-wow">--</span>
-                    </div>
-                    <div class="detail-realtime__stat">
-                        <span class="detail-realtime__stat-label">MoM:</span><span class="detail-realtime__stat-value" id="detail-mom">--</span>
-                    </div>
-                    <div class="detail-realtime__stat">
-                        <span class="detail-realtime__stat-label">YoY:</span><span class="detail-realtime__stat-value" id="detail-yoy">--</span>
-                    </div>
+                    <span class="detail-realtime__value" id="detail-price"><?php echo esc_html($detail_price_display); ?></span>
                 </div>
             </div>
         </div>
@@ -197,13 +233,9 @@ if (is_user_logged_in()) {
             <div class="detail-chart__range-tabs">
                 <div class="detail-chart__range-track" id="detail-range-track">
                     <div class="detail-chart__range-slider" id="detail-range-slider"></div>
-                    <button type="button" class="detail-chart__range-btn is-active" data-range="td">TD</button>
-                    <button type="button" class="detail-chart__range-btn" data-range="1m">1M</button>
-                    <button type="button" class="detail-chart__range-btn" data-range="6m">6M</button>
-                    <button type="button" class="detail-chart__range-btn" data-range="1y">1Y</button>
-                    <button type="button" class="detail-chart__range-btn" data-range="2y">2Y</button>
-                    <button type="button" class="detail-chart__range-btn" data-range="3y">3Y</button>
-                    <button type="button" class="detail-chart__range-btn" data-range="4y">4Y</button>
+                    <button type="button" class="detail-chart__range-btn is-active" data-range="7d">7D</button>
+                    <button type="button" class="detail-chart__range-btn" data-range="15d">15D</button>
+                    <button type="button" class="detail-chart__range-btn" data-range="30d">1M</button>
                 </div>
             </div>
 
@@ -241,7 +273,8 @@ if (is_user_logged_in()) {
                         <div class="detail-chart__balloons" id="detail-chart-balloons"></div>
                         <!-- Touch Crosshair -->
                         <div class="chart-crosshair" id="chart-crosshair">
-                            <div class="chart-crosshair__dot"></div>
+                            <div class="chart-crosshair__dot chart-crosshair__dot--lower" id="chart-crosshair-dot-lower"></div>
+                            <div class="chart-crosshair__dot chart-crosshair__dot--upper" id="chart-crosshair-dot-upper"></div>
                         </div>
                         <!-- Crosshair Info Box -->
                         <div class="chart-infobox" id="chart-infobox">
@@ -274,12 +307,31 @@ if (is_user_logged_in()) {
             </div>
         </div>
 
+        <?php
+        $quote_product_interest = trim($current_material['code'] . ' ' . $display_dimensions);
+        ?>
+        <section class="quote-card quote-card--price-detail" aria-labelledby="quote-card-title">
+            <h2 id="quote-card-title" class="quote-card__title"><?php esc_html_e('Request a Quote', 'ippgi'); ?></h2>
+            <p class="quote-card__description">
+                <?php esc_html_e('Submit your sourcing request and get free access to the latest market pricing for steel coils, aluminum coils, roofing sheets, plate sheets, and wall panels.', 'ippgi'); ?><br>
+                <?php esc_html_e('We provide timely pricing insights to support your procurement decisions.', 'ippgi'); ?>
+            </p>
+
+            <?php
+            get_template_part('template-parts/quote-request-form', null, array(
+                'form_id' => 'quote-request-form-detail',
+                'source' => 'price_detail',
+                'product_interest' => $quote_product_interest,
+            ));
+            ?>
+        </section>
+
         <!-- Disclaimer -->
         <div class="prices-disclaimer">
             <p class="prices-disclaimer__text">
                 <strong class="prices-disclaimer__label"><?php esc_html_e('Disclaimer:', 'ippgi'); ?></strong>
-                <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
-                <span class="prices-disclaimer__notice"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></span>
+                <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. Prices are derived from multiple market sources, including public market data, supplier quotations, and internal estimation models. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
+                <?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?>
                 <?php esc_html_e('Users should exercise independent judgment and conduct their own due diligence; iPPGI shall not be held liable for any loss or damage arising from the use of this information. All content is the exclusive intellectual property of iPPGI. Any unauthorized reproduction, distribution, or copying without prior written consent is strictly prohibited. iPPGI reserves all rights to pursue legal action for any infringement.', 'ippgi'); ?>
             </p>
         </div>
@@ -363,115 +415,10 @@ window.ippgiPriceDetail = {
 
     var restUrl = <?php echo json_encode(rest_url('ippgi-prices/v1/')); ?>;
 
-    var url = restUrl + 'price?' +
-        'productSpec=' + encodeURIComponent(detail.productSpec) +
-        '&categoryId=' + encodeURIComponent(detail.categoryId);
-
-    fetch(url)
-        .then(function(res) {
-            if (!res.ok) {
-                throw new Error('HTTP ' + res.status);
-            }
-            return res.text();
-        })
-        .then(function(text) {
-            if (!text) {
-                throw new Error('Empty response');
-            }
-            var resp = JSON.parse(text);
-            if (!resp.success || !resp.data || !resp.data.result) return;
-            var r = resp.data.result;
-
-            // Store data for tax toggle
-            detail.priceData = r;
-
-            // Update Real-Time Data section
-            updateRealtimeDisplay(r, true);
-        })
-        .catch(function(err) {
-            console.error('Failed to fetch realtime price:', err);
-        });
-
-    // Tax toggle
-    var taxToggle = document.getElementById('detail-tax-toggle');
-    if (taxToggle) {
-        taxToggle.addEventListener('change', function() {
-            if (detail.priceData) {
-                updateRealtimeDisplay(detail.priceData, this.checked);
-            }
-        });
-    }
-
     // Format price with 2 decimal places
     function formatPrice(num) {
         if (typeof num !== 'number' || isNaN(num)) return '0.00';
         return num.toFixed(2);
-    }
-
-    function formatUsd(num) {
-        return '$' + formatPrice(num);
-    }
-
-    function formatSignedUsd(num) {
-        if (typeof num !== 'number' || isNaN(num)) return '$0.00';
-        var sign = num > 0 ? '+' : (num < 0 ? '-' : '');
-        return sign + '$' + formatPrice(Math.abs(num));
-    }
-
-    function updateRealtimeDisplay(r, isTax) {
-        var price = isTax ? (r.lastpriceTax_usd || 0) : (r.lastprice_usd || 0);
-        var avgPrice = isTax ? (r.priceTax_usd || 0) : (r.price_usd || 0);
-        var change = isTax ? (r.riseAndFallTax_usd || 0) : (r.riseAndFall_usd || 0);
-        // Use riseRange/riseRangeTax directly from API (already a percentage)
-        var changePct = isTax ? r.riseRangeTax : r.riseRange;
-        changePct = (typeof changePct === 'number') ? changePct : 0;
-
-        var wow = numOrNull(isTax ? r.lastWeekDiffTax_usd : r.lastWeekDiff_usd);
-        var mom = numOrNull(isTax ? r.lastMonthDiffTax_usd : r.lastMonthDiff_usd);
-        var yoy = numOrNull(isTax ? r.lastYearsDiffTax_usd : r.lastYearsDiff_usd);
-
-        // Main price
-        var priceEl = document.getElementById('detail-price');
-        if (priceEl) priceEl.textContent = formatUsd(price);
-
-        // Change
-        var changeWrap = document.getElementById('detail-change-wrap');
-        var changeEl = document.getElementById('detail-change');
-        var changePctEl = document.getElementById('detail-change-pct');
-        if (changeWrap) {
-            changeWrap.className = 'detail-realtime__change' +
-                (change < 0 ? ' is-down' : (change > 0 ? ' is-up' : ''));
-        }
-        if (changeEl) changeEl.textContent = formatSignedUsd(change);
-        if (changePctEl) changePctEl.textContent = changePct + '%';
-
-        // Avg
-        var avgEl = document.getElementById('detail-avg');
-        if (avgEl) avgEl.textContent = formatUsd(avgPrice);
-
-        // WoW / MoM / YoY
-        updateStatValue('detail-wow', wow);
-        updateStatValue('detail-mom', mom);
-        updateStatValue('detail-yoy', yoy);
-    }
-
-    // Return number or null (handles "-" string and undefined)
-    function numOrNull(val) {
-        if (typeof val === 'number' && !isNaN(val)) return val;
-        return null;
-    }
-
-    function updateStatValue(id, val) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        if (val !== null && val !== 0) {
-            el.textContent = formatSignedUsd(val);
-            el.className = 'detail-realtime__stat-value' +
-                (val < 0 ? ' is-down' : (val > 0 ? ' is-up' : ''));
-        } else {
-            el.textContent = '--';
-            el.className = 'detail-realtime__stat-value';
-        }
     }
 
     // ========== Chart Functions ==========
@@ -511,7 +458,7 @@ window.ippgiPriceDetail = {
 
     // Store chart data
     var chartData = null;
-    var currentRange = 'td';
+    var currentRange = '7d';
     // Store rendered chart state for touch crosshair
     var chartRenderState = null;
 
@@ -610,17 +557,32 @@ window.ippgiPriceDetail = {
             }
         }
 
-        // Extract prices (use price_usd)
-        var prices = sampledList.map(function(item) {
-            return item.price_usd || item.price || 0;
+        function getNumericValue(item, keys) {
+            for (var keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+                var value = item[keys[keyIndex]];
+                var numericValue = Number(value);
+                if (!isNaN(numericValue) && numericValue > 0) {
+                    return numericValue;
+                }
+            }
+
+            return 0;
+        }
+
+        var lowerPrices = sampledList.map(function(item) {
+            return getNumericValue(item, ['price_tax_usd_min', 'priceTax_usd_min', 'priceTax_usd', 'price_tax_usd', 'price_usd', 'price']);
         });
-        var timestamps = sampledList.map(function(item) {
-            return item.timestamp;
+        var upperPrices = sampledList.map(function(item) {
+            return getNumericValue(item, ['price_tax_usd_max', 'priceTax_usd_max', 'priceTax_usd', 'price_tax_usd', 'price_usd', 'price']);
+        });
+        var midPrices = lowerPrices.map(function(lowerPrice, index) {
+            return (lowerPrice + upperPrices[index]) / 2;
         });
 
         // Calculate min/max for Y axis
-        var minPrice = Math.min.apply(null, prices);
-        var maxPrice = Math.max.apply(null, prices);
+        var allPrices = lowerPrices.concat(upperPrices);
+        var minPrice = Math.min.apply(null, allPrices);
+        var maxPrice = Math.max.apply(null, allPrices);
         var priceRange = maxPrice - minPrice;
 
         // Add padding to price range
@@ -653,63 +615,83 @@ window.ippgiPriceDetail = {
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw line chart
         var w = canvas.width;
         var h = canvas.height;
 
-        ctx.beginPath();
-        ctx.strokeStyle = '#2196F3';
-        ctx.lineWidth = 2;
-
-        for (var i = 0; i < prices.length; i++) {
-            var x = (i / (prices.length - 1)) * w;
-            var y = h - ((prices[i] - minPrice) / priceRange) * h;
-
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
+        function getPointX(index, totalPoints) {
+            if (totalPoints <= 1) {
+                return w / 2;
             }
-        }
-        ctx.stroke();
 
-        // Find max and min point positions
-        var maxIdx = 0, minIdx = 0;
-        for (var i = 1; i < prices.length; i++) {
-            if (prices[i] > prices[maxIdx]) maxIdx = i;
-            if (prices[i] < prices[minIdx]) minIdx = i;
+            return (index / (totalPoints - 1)) * w;
         }
 
-        // Create HTML balloon element
-        var balloonsContainer = document.getElementById('detail-chart-balloons');
-        balloonsContainer.innerHTML = ''; // Clear existing balloons
-
-        function createBalloon(idx) {
-            var px = (idx / (prices.length - 1)) * w;
-            var py = h - ((prices[idx] - minPrice) / priceRange) * h;
-            var label = formatPrice(prices[idx]);
-
-            // Create balloon element
-            var balloon = document.createElement('div');
-            balloon.className = 'chart-balloon';
-            balloon.innerHTML = '<span class="chart-balloon__text">' + label + '</span><span class="chart-balloon__arrow"></span>';
-
-            // Position balloon (arrow tip at data point)
-            balloon.style.left = px + 'px';
-            balloon.style.top = py + 'px';
-
-            balloonsContainer.appendChild(balloon);
+        function getPointY(price) {
+            return h - ((price - minPrice) / priceRange) * h;
         }
 
-        if (prices.length > 1) {
-            createBalloon(maxIdx);
-            createBalloon(minIdx);
+        function drawSeries(prices, color, lineWidth) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+
+            for (var i = 0; i < prices.length; i++) {
+                var x = getPointX(i, prices.length);
+                var y = getPointY(prices[i]);
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+
+            ctx.stroke();
         }
+
+        var lowerLineColor = '#8FB8E0';
+        var upperLineColor = '#6E9FD0';
+        var rangeFillColor = 'rgba(143, 184, 224, 0.36)';
+
+        function fillRangeArea(lowerSeries, upperSeries, fillColor) {
+            if (!lowerSeries.length || !upperSeries.length || lowerSeries.length !== upperSeries.length) {
+                return;
+            }
+
+            ctx.beginPath();
+
+            for (var i = 0; i < upperSeries.length; i++) {
+                var upperX = getPointX(i, upperSeries.length);
+                var upperY = getPointY(upperSeries[i]);
+
+                if (i === 0) {
+                    ctx.moveTo(upperX, upperY);
+                } else {
+                    ctx.lineTo(upperX, upperY);
+                }
+            }
+
+            for (var j = lowerSeries.length - 1; j >= 0; j--) {
+                var lowerX = getPointX(j, lowerSeries.length);
+                var lowerY = getPointY(lowerSeries[j]);
+                ctx.lineTo(lowerX, lowerY);
+            }
+
+            ctx.closePath();
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+        }
+
+        fillRangeArea(lowerPrices, upperPrices, rangeFillColor);
+        drawSeries(lowerPrices, lowerLineColor, 2);
+        drawSeries(upperPrices, upperLineColor, 2);
 
         // Store render state for touch crosshair
         chartRenderState = {
             list: sampledList,
-            prices: prices,
+            lowerPrices: lowerPrices,
+            upperPrices: upperPrices,
+            midPrices: midPrices,
             minPrice: minPrice,
             maxPrice: maxPrice,
             priceRange: priceRange,
@@ -721,14 +703,20 @@ window.ippgiPriceDetail = {
 
     // Update X-axis labels based on data type
     function updateXAxisLabels(xAxisEl, list, isHistorical) {
-        var labelCount = 9; // Number of labels to show
         var labels = [];
 
         if (isHistorical && list.length > 0) {
             // For historical data, show dates
-            var step = Math.max(1, Math.floor(list.length / (labelCount - 1)));
+            var labelCount = Math.min(9, list.length);
+            var maxIndex = list.length - 1;
+
             for (var i = 0; i < labelCount; i++) {
-                var idx = Math.min(i * step, list.length - 1);
+                var idx;
+                if (labelCount === 1) {
+                    idx = 0;
+                } else {
+                    idx = Math.round((i * maxIndex) / (labelCount - 1));
+                }
                 var item = list[idx];
                 // Note: external API uses 'satisticsTime' (typo), DB uses 'statisticsTime'
                 var dateStr = item.statisticsTime || item.satisticsTime || '';
@@ -790,13 +778,7 @@ window.ippgiPriceDetail = {
     // Load data based on selected range
     function loadChartData(range) {
         currentRange = range;
-
-        if (range === 'td') {
-            fetchTodayData();
-        } else {
-            // Fetch historical data for 1m, 6m, 1y, 2y, 3y, 4y
-            fetchHistoricalData(range);
-        }
+        fetchHistoricalData(range);
     }
 
     // ========== Time Range Tabs ==========
@@ -807,10 +789,8 @@ window.ippgiPriceDetail = {
 
     function moveSlider(btn) {
         if (!rangeSlider || !rangeTrack) return;
-        var trackRect = rangeTrack.getBoundingClientRect();
-        var btnRect = btn.getBoundingClientRect();
-        rangeSlider.style.left = (btnRect.left - trackRect.left) + 'px';
-        rangeSlider.style.width = btnRect.width + 'px';
+        rangeSlider.style.left = btn.offsetLeft + 'px';
+        rangeSlider.style.width = btn.offsetWidth + 'px';
     }
 
     // Set initial slider position
@@ -842,8 +822,15 @@ window.ippgiPriceDetail = {
         });
     });
 
-    // Load initial chart data (TD)
-    loadChartData('td');
+    window.addEventListener('resize', function() {
+        var activeRangeBtn = document.querySelector('.detail-chart__range-btn.is-active');
+        if (activeRangeBtn) {
+            moveSlider(activeRangeBtn);
+        }
+    });
+
+    // Load initial chart data (7D)
+    loadChartData('7d');
 
     // ========== Date Picker ==========
 
@@ -1003,6 +990,13 @@ window.ippgiPriceDetail = {
                     // If clicked date is before start, swap them
                     dpEndDate = dpStartDate;
                     dpStartDate = date;
+                } else if (isSameDateDP(date, dpStartDate)) {
+                    // Disallow single-day custom range selection so we always use historical DB queries.
+                    dpEndDate = null;
+                    dpSelectingStart = false;
+                    updateRangeDisplayDP();
+                    renderCalendarDP();
+                    return;
                 } else {
                     dpEndDate = date;
                 }
@@ -1022,9 +1016,11 @@ window.ippgiPriceDetail = {
         }
 
         function confirmSelectionDP() {
+            var hasValidRange = dpStartDate && dpEndDate && !isSameDateDP(dpStartDate, dpEndDate);
+
             // Update the trigger text
             if (triggerText) {
-                if (dpStartDate && dpEndDate) {
+                if (hasValidRange) {
                     triggerText.textContent = formatDateShortDP(dpStartDate) + ' ~ ' + formatDateShortDP(dpEndDate);
                 } else if (dpStartDate) {
                     triggerText.textContent = formatDateShortDP(dpStartDate) + ' ~';
@@ -1036,7 +1032,7 @@ window.ippgiPriceDetail = {
             closeDatePicker();
 
             // If we have a valid date range, fetch custom historical data
-            if (dpStartDate && dpEndDate) {
+            if (hasValidRange) {
                 // Deselect all range buttons
                 rangeBtns.forEach(function(b) {
                     b.classList.remove('is-active');
@@ -1051,7 +1047,6 @@ window.ippgiPriceDetail = {
         function fetchCustomRangeData(startDate, endDate) {
             var fromStr = formatDateDP(startDate);
             var toStr = formatDateDP(endDate);
-            var isSameDay = (fromStr === toStr);
 
             var url = restUrl + 'historical?' +
                 'productSpec=' + encodeURIComponent(detail.productSpec) +
@@ -1071,19 +1066,14 @@ window.ippgiPriceDetail = {
                         showChartMessage('No data available');
                         return;
                     }
-                    // Same-day returns statistics API format: data.result.list
-                    // Multi-day returns historical format: data.list
-                    var list = isSameDay
-                        ? (resp.data.result && resp.data.result.list)
-                        : resp.data.list;
+                    var list = resp.data.list;
 
                     if (!list || list.length === 0) {
                         showChartMessage('No data available');
                         return;
                     }
                     chartData = resp.data;
-                    // Same-day shows times (like TD), multi-day shows dates
-                    drawChart(list, !isSameDay);
+                    drawChart(list, true);
                 })
                 .catch(function(err) {
                     console.error('Failed to fetch custom range data:', err);
@@ -1126,7 +1116,8 @@ window.ippgiPriceDetail = {
     var infobox = document.getElementById('chart-infobox');
 
     if (chartArea && crosshair && infobox) {
-        var crosshairDot = crosshair.querySelector('.chart-crosshair__dot');
+        var crosshairDotLower = document.getElementById('chart-crosshair-dot-lower');
+        var crosshairDotUpper = document.getElementById('chart-crosshair-dot-upper');
         var infoboxTime = document.getElementById('chart-infobox-time');
         var infoboxName = document.getElementById('chart-infobox-name');
         var infoboxSpec = document.getElementById('chart-infobox-spec');
@@ -1136,10 +1127,10 @@ window.ippgiPriceDetail = {
         var productSpec = detail.productSpec || '';
         var materialCode = detail.materialCode || '';
         var specParts = productSpec.split('_');
-        // Only show product name for HRC and AL (they have consistent naming)
+        // Only show product name for AL (it has consistent naming)
         // For PPGI, GI, GL, CRC - hide product name (they have mixed Chinese/English names)
         var productName = '';
-        if ((materialCode === 'hrc' || materialCode === 'aluminum') && specParts.length >= 4) {
+        if (materialCode === 'aluminum' && specParts.length >= 4) {
             productName = specParts[specParts.length - 1];
         }
         var thickness = specParts.length >= 3 ? specParts[2] : '';
@@ -1162,25 +1153,33 @@ window.ippgiPriceDetail = {
 
             // Calculate index based on touch position
             var ratio = x / w;
-            var idx = Math.round(ratio * (chartRenderState.prices.length - 1));
-            idx = Math.max(0, Math.min(idx, chartRenderState.prices.length - 1));
+            var idx = Math.round(ratio * (chartRenderState.midPrices.length - 1));
+            idx = Math.max(0, Math.min(idx, chartRenderState.midPrices.length - 1));
 
             var item = chartRenderState.list[idx];
-            var price = chartRenderState.prices[idx];
+            var lowerPrice = chartRenderState.lowerPrices[idx];
+            var upperPrice = chartRenderState.upperPrices[idx];
+            var midPrice = chartRenderState.midPrices[idx];
 
             // Snap to the actual data point X position
-            var snapX = (idx / (chartRenderState.prices.length - 1)) * w;
+            var snapX = chartRenderState.midPrices.length <= 1
+                ? (w / 2)
+                : ((idx / (chartRenderState.midPrices.length - 1)) * w);
 
-            // Calculate Y position for the dot
-            var y = h - ((price - chartRenderState.minPrice) / chartRenderState.priceRange) * h;
+            var lowerY = h - ((lowerPrice - chartRenderState.minPrice) / chartRenderState.priceRange) * h;
+            var upperY = h - ((upperPrice - chartRenderState.minPrice) / chartRenderState.priceRange) * h;
+            var midY = h - ((midPrice - chartRenderState.minPrice) / chartRenderState.priceRange) * h;
 
             // Position crosshair at snapped data point X
             crosshair.style.left = snapX + 'px';
             crosshair.classList.add('is-active');
 
-            // Position dot at data point
-            if (crosshairDot) {
-                crosshairDot.style.top = y + 'px';
+            // Position dots at lower / upper bounds
+            if (crosshairDotLower) {
+                crosshairDotLower.style.top = lowerY + 'px';
+            }
+            if (crosshairDotUpper) {
+                crosshairDotUpper.style.top = upperY + 'px';
             }
 
             // Format time/date string
@@ -1198,7 +1197,7 @@ window.ippgiPriceDetail = {
                 }
             } else {
                 // Today: calculate time based on index position (09:00 - 17:00 range)
-                var totalPoints = chartRenderState.prices.length;
+                var totalPoints = chartRenderState.midPrices.length;
                 var timeRangeMinutes = 8 * 60; // 8 hours = 480 minutes
                 var startMinutes = 9 * 60; // 09:00 = 540 minutes from midnight
                 var pointMinutes = startMinutes + (idx / Math.max(1, totalPoints - 1)) * timeRangeMinutes;
@@ -1212,13 +1211,13 @@ window.ippgiPriceDetail = {
             if (infoboxTime) infoboxTime.textContent = timeStr;
             if (infoboxName) infoboxName.textContent = productName;
             if (infoboxSpec) infoboxSpec.textContent = dimensionStr;
-            if (infoboxPrice) infoboxPrice.textContent = '$' + formatPrice(price);
+            if (infoboxPrice) infoboxPrice.textContent = '$' + formatPrice(lowerPrice) + '~$' + formatPrice(upperPrice);
 
             // Position infobox - keep within chart bounds
             var infoboxWidth = infobox.offsetWidth || 200;
             var infoboxHeight = infobox.offsetHeight || 50;
             var infoboxX = snapX + 10; // 10px to the right of crosshair
-            var infoboxY = y - infoboxHeight / 2; // Center vertically at data point
+            var infoboxY = midY - infoboxHeight / 2; // Center vertically between two lines
 
             // Keep within horizontal bounds
             if (infoboxX + infoboxWidth > w) {

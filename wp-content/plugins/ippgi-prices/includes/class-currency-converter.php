@@ -642,7 +642,6 @@ class IPPGI_Prices_Currency_Converter {
 
     /**
      * Get the source CNY amount for a price field.
-     * Prefers existing *_cny values so cached USD payloads can be safely repriced.
      *
      * @param array  $price_data Price payload.
      * @param string $field      Base field name.
@@ -663,39 +662,70 @@ class IPPGI_Prices_Currency_Converter {
     }
 
     /**
-     * Convert price data from CNY to USD
+     * Convert price data from CNY to USD.
+     * Converted payloads keep only USD-facing fields plus the applied exchange rate.
      *
      * @param array $price_data Price data with CNY prices
      * @param float|null $exchange_rate Exchange rate (if null, will fetch current rate)
-     * @return array Price data with both CNY and USD prices
+     * @return array Price data with USD price fields
      */
     public static function convert_price_data($price_data, $exchange_rate = null) {
         if (null === $exchange_rate) {
             $exchange_rate = self::get_exchange_rate();
         }
 
+        $already_usd = isset($price_data['currency']) && 'USD' === strtoupper((string) $price_data['currency']);
+        $converted_from_cny = false;
+
         // Convert price field
-        $price_source = self::get_cny_source_amount($price_data, 'price');
+        $price_source = $already_usd ? null : self::get_cny_source_amount($price_data, 'price');
         if (null !== $price_source) {
-            $price_data['price_cny'] = $price_source;
             $price_data['price_usd'] = self::cny_to_usd($price_source, $exchange_rate);
-            $price_data['price'] = $price_data['price_usd']; // Default to USD
+            $price_data['price'] = $price_data['price_usd'];
+            $converted_from_cny = true;
+        } elseif ($already_usd) {
+            $price_usd = isset($price_data['price_usd']) && is_numeric($price_data['price_usd'])
+                ? (float) $price_data['price_usd']
+                : (isset($price_data['price']) && is_numeric($price_data['price']) ? (float) $price_data['price'] : null);
+
+            if (null !== $price_usd) {
+                $price_data['price_usd'] = $price_usd;
+                $price_data['price'] = $price_usd;
+            }
         }
 
         // Convert taxPrice field
-        $tax_price_source = self::get_cny_source_amount($price_data, 'taxPrice');
+        $tax_price_source = $already_usd ? null : self::get_cny_source_amount($price_data, 'taxPrice');
         if (null !== $tax_price_source) {
-            $price_data['taxPrice_cny'] = $tax_price_source;
             $price_data['taxPrice_usd'] = self::cny_to_usd($tax_price_source, $exchange_rate);
-            $price_data['taxPrice'] = $price_data['taxPrice_usd']; // Default to USD
+            $price_data['taxPrice'] = $price_data['taxPrice_usd'];
+            $converted_from_cny = true;
+        } elseif ($already_usd) {
+            $tax_price_usd = isset($price_data['taxPrice_usd']) && is_numeric($price_data['taxPrice_usd'])
+                ? (float) $price_data['taxPrice_usd']
+                : (isset($price_data['taxPrice']) && is_numeric($price_data['taxPrice']) ? (float) $price_data['taxPrice'] : null);
+
+            if (null !== $tax_price_usd) {
+                $price_data['taxPrice_usd'] = $tax_price_usd;
+                $price_data['taxPrice'] = $tax_price_usd;
+            }
         }
 
         // Convert priceTax field (alternative name)
-        $price_tax_source = self::get_cny_source_amount($price_data, 'priceTax');
+        $price_tax_source = $already_usd ? null : self::get_cny_source_amount($price_data, 'priceTax');
         if (null !== $price_tax_source) {
-            $price_data['priceTax_cny'] = $price_tax_source;
             $price_data['priceTax_usd'] = self::cny_to_usd($price_tax_source, $exchange_rate);
-            $price_data['priceTax'] = $price_data['priceTax_usd']; // Default to USD
+            $price_data['priceTax'] = $price_data['priceTax_usd'];
+            $converted_from_cny = true;
+        } elseif ($already_usd) {
+            $price_tax_usd = isset($price_data['priceTax_usd']) && is_numeric($price_data['priceTax_usd'])
+                ? (float) $price_data['priceTax_usd']
+                : (isset($price_data['priceTax']) && is_numeric($price_data['priceTax']) ? (float) $price_data['priceTax'] : null);
+
+            if (null !== $price_tax_usd) {
+                $price_data['priceTax_usd'] = $price_tax_usd;
+                $price_data['priceTax'] = $price_tax_usd;
+            }
         }
 
         // Convert other price fields
@@ -708,17 +738,34 @@ class IPPGI_Prices_Currency_Converter {
         );
 
         foreach ($price_fields as $field) {
-            $field_source = self::get_cny_source_amount($price_data, $field);
+            $field_source = $already_usd ? null : self::get_cny_source_amount($price_data, $field);
             if (null !== $field_source) {
-                $price_data[$field . '_cny'] = $field_source;
                 $price_data[$field . '_usd'] = self::cny_to_usd($field_source, $exchange_rate);
-                $price_data[$field] = $price_data[$field . '_usd']; // Default to USD
+                $price_data[$field] = $price_data[$field . '_usd'];
+                $converted_from_cny = true;
+            } elseif ($already_usd) {
+                $field_usd = isset($price_data[$field . '_usd']) && is_numeric($price_data[$field . '_usd'])
+                    ? (float) $price_data[$field . '_usd']
+                    : (isset($price_data[$field]) && is_numeric($price_data[$field]) ? (float) $price_data[$field] : null);
+
+                if (null !== $field_usd) {
+                    $price_data[$field . '_usd'] = $field_usd;
+                    $price_data[$field] = $field_usd;
+                }
             }
         }
 
-        // Add exchange rate info
-        $price_data['exchange_rate'] = $exchange_rate;
+        // Keep the rate that was actually used to derive USD values.
+        if ($converted_from_cny || !isset($price_data['exchange_rate'])) {
+            $price_data['exchange_rate'] = $exchange_rate;
+        }
         $price_data['currency'] = 'USD';
+
+        foreach (array_keys($price_data) as $key) {
+            if (substr($key, -4) === '_cny') {
+                unset($price_data[$key]);
+            }
+        }
 
         return $price_data;
     }

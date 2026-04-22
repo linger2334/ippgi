@@ -1,7 +1,7 @@
 <?php
 /**
- * Collect and save current prices to database
- * Run this script before the 9:00 AM cache clear
+ * Collect and save current prices to database.
+ * This is a manual utility script for ad-hoc collection or troubleshooting.
  */
 
 // Load WordPress
@@ -10,7 +10,7 @@ require('/Users/linger3048/Sites/php81.test/ippgi/wp-load.php');
 
 echo "=== Collect Current Prices ===\n\n";
 echo "This script will fetch current prices from API and save them to database.\n";
-echo "Run this before the 9:00 AM cache clear to preserve current prices.\n\n";
+echo "Use this for ad-hoc collection or troubleshooting when needed.\n\n";
 
 // Load required classes
 require_once(WP_PLUGIN_DIR . '/ippgi-prices/includes/class-cache-manager.php');
@@ -90,5 +90,5 @@ foreach ($stats as $material_type => $material_stats) {
 echo str_repeat("=", 80) . "\n";
 echo "Done!\n\n";
 
-echo "💡 Tip: Schedule this script to run daily before 9:00 AM:\n";
-echo "   0 8 * * * cd /path/to/wordpress && php collect-current-prices.php\n\n";
+echo "💡 Tip: If you want to automate this utility separately, schedule it explicitly in crontab.\n";
+echo "   Example: 0 8 * * * cd /path/to/wordpress && php collect-current-prices.php\n\n";

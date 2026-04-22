@@ -176,6 +176,32 @@ function ippgi_customize_register($wp_customize) {
     ]);
 
     // ========================================
+    // Quote Requests Section
+    // ========================================
+    $wp_customize->add_section('ippgi_quote_requests_section', [
+        'title'       => __('Quote Requests', 'ippgi'),
+        'description' => __('Configure where homepage quote request notifications are sent.', 'ippgi'),
+        'panel'       => 'ippgi_settings',
+        'priority'    => 45,
+    ]);
+
+    $wp_customize->add_setting('ippgi_quote_request_recipient_email', [
+        'default'           => '',
+        'sanitize_callback' => 'ippgi_sanitize_optional_email',
+        'validate_callback' => 'ippgi_validate_quote_request_recipient_emails',
+    ]);
+
+    $wp_customize->add_control('ippgi_quote_request_recipient_email', [
+        'label'       => __('Quote Notification Emails', 'ippgi'),
+        'description' => __('Enter one or more email addresses, separated by commas. Example: sales@example.com, quote@example.com. Leave empty to use the site admin email.', 'ippgi'),
+        'section'     => 'ippgi_quote_requests_section',
+        'type'        => 'text',
+        'input_attrs' => [
+            'placeholder' => 'sales@example.com, quote@example.com',
+        ],
+    ]);
+
+    // ========================================
     // Homepage Banner Section
     // ========================================
     $wp_customize->add_section('ippgi_banner_section', [
@@ -283,6 +309,84 @@ add_action('customize_register', 'ippgi_customize_register');
  */
 function ippgi_sanitize_checkbox($checked) {
     return (isset($checked) && true === $checked) ? true : false;
+}
+
+/**
+ * Sanitize optional email recipients.
+ *
+ * @param string $value Raw email string.
+ * @return string Comma-separated sanitized emails or empty string.
+ */
+function ippgi_sanitize_optional_email($value) {
+    $value = trim((string) $value);
+
+    if ($value === '') {
+        return '';
+    }
+
+    $parts = preg_split('/[\s,;]+/', $value);
+    $emails = [];
+
+    foreach ($parts as $part) {
+        $email = sanitize_email($part);
+        if ($email !== '' && is_email($email)) {
+            $emails[] = $email;
+        }
+    }
+
+    $emails = array_values(array_unique($emails));
+
+    return implode(', ', $emails);
+}
+
+/**
+ * Validate optional quote request recipient emails.
+ *
+ * @param WP_Error $validity Validation state.
+ * @param string   $value    Raw email string.
+ * @return WP_Error
+ */
+function ippgi_validate_quote_request_recipient_emails($validity, $value) {
+    $value = trim((string) $value);
+
+    if ($value === '') {
+        return $validity;
+    }
+
+    if (strpos($value, '，') !== false) {
+        $validity->add(
+            'ippgi_quote_request_recipient_email_invalid_separator',
+            __('Please use English commas to separate multiple email addresses.', 'ippgi')
+        );
+        return $validity;
+    }
+
+    $parts = preg_split('/[\s,;]+/', $value);
+    $invalid_emails = [];
+
+    foreach ($parts as $part) {
+        if ($part === '') {
+            continue;
+        }
+
+        $email = sanitize_email($part);
+        if ($email === '' || !is_email($email)) {
+            $invalid_emails[] = $part;
+        }
+    }
+
+    if (!empty($invalid_emails)) {
+        $validity->add(
+            'ippgi_quote_request_recipient_email_invalid',
+            sprintf(
+                /* translators: %s: invalid email list */
+                __('These email addresses are invalid: %s', 'ippgi'),
+                implode(', ', $invalid_emails)
+            )
+        );
+    }
+
+    return $validity;
 }
 
 /**

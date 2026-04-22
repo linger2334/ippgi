@@ -21,6 +21,8 @@
         initSmoothScroll();
         initFavoriteButtons();
         initLoginModal();
+        initQuoteRequestForms();
+        initQuoteRequestModal();
         initRequireLoginLinks();
         initAnnouncementBanner();
         initSearchOverlay();
@@ -302,6 +304,151 @@
                 }
             }
         };
+    }
+
+    /**
+     * Initialize reusable quote request form submissions.
+     */
+    function initQuoteRequestForms() {
+        const forms = document.querySelectorAll('.js-quote-request-form');
+
+        forms.forEach(function(form) {
+            if (form.dataset.quoteFormBound === 'true') {
+                return;
+            }
+
+            const submitButton = form.querySelector('.quote-form__submit');
+            if (!submitButton) {
+                return;
+            }
+
+            const defaultSubmitText = submitButton.textContent;
+            form.dataset.quoteFormBound = 'true';
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                if (!form.checkValidity()) {
+                    form.reportValidity();
+                    return;
+                }
+
+                submitButton.disabled = true;
+                submitButton.textContent = form.dataset.submittingText || 'Submitting...';
+
+                const formData = new FormData(form);
+
+                fetch(ippgiData.ajaxUrl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return {
+                            ok: response.ok,
+                            body: data
+                        };
+                    });
+                })
+                .then(function(result) {
+                    if (!result.ok || !result.body.success) {
+                        throw new Error(result.body && result.body.data && result.body.data.message
+                            ? result.body.data.message
+                            : form.dataset.errorMessage);
+                    }
+
+                    if (typeof form.reset === 'function') {
+                        form.reset();
+                    }
+
+                    form.dispatchEvent(new CustomEvent('quote:success', {
+                        bubbles: true
+                    }));
+
+                    if (typeof ippgiToast !== 'undefined') {
+                        ippgiToast.success(result.body.data && result.body.data.message
+                            ? result.body.data.message
+                            : form.dataset.successMessage, 3000);
+                    }
+                })
+                .catch(function(error) {
+                    if (typeof ippgiToast !== 'undefined') {
+                        ippgiToast.error(error.message || form.dataset.errorMessage, 3000);
+                    }
+                })
+                .finally(function() {
+                    submitButton.disabled = false;
+                    submitButton.textContent = defaultSubmitText;
+                });
+            });
+        });
+    }
+
+    /**
+     * Initialize homepage quote request modal.
+     */
+    function initQuoteRequestModal() {
+        const modal = document.getElementById('quote-request-modal');
+        const trigger = document.getElementById('quote-request-trigger');
+        const form = document.getElementById('quote-request-form');
+        const closeButtons = modal ? modal.querySelectorAll('[data-quote-modal-close]') : [];
+        const productInput = form ? form.querySelector('[name="product_interest"]') : null;
+
+        if (!modal || !trigger || !form) {
+            return;
+        }
+
+        form.dataset.quoteModalForm = 'true';
+        let lastFocusedElement = null;
+
+        function prefillProductInterest() {
+            if (!productInput || productInput.value.trim() !== '') {
+                return;
+            }
+
+            productInput.value = currentPriceCategory || 'PPGI';
+        }
+
+        function openModal() {
+            lastFocusedElement = document.activeElement;
+            prefillProductInterest();
+            modal.hidden = false;
+            document.body.style.overflow = 'hidden';
+
+            const firstInput = form.querySelector('input:not([type="hidden"]):not([tabindex="-1"]), textarea');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }
+
+        function closeModal() {
+            modal.hidden = true;
+            document.body.style.overflow = '';
+
+            if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                lastFocusedElement.focus();
+            }
+        }
+
+        trigger.addEventListener('click', function() {
+            openModal();
+        });
+
+        closeButtons.forEach(function(button) {
+            button.addEventListener('click', function() {
+                closeModal();
+            });
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.hidden) {
+                closeModal();
+            }
+        });
+
+        form.addEventListener('quote:success', function() {
+            closeModal();
+        });
     }
 
     /**
@@ -1127,6 +1274,35 @@
         }
 
         /**
+         * Format a USD number with exactly 2 decimals and thousands separators.
+         */
+        function formatPriceNumber(num) {
+            var n = parseFloat(num);
+            if (isNaN(n)) return '0';
+            var str = n.toFixed(2);
+            return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        /**
+         * Format a USD range string like $465~$486.
+         */
+        function formatPriceRange(min, max, fallback) {
+            var minNum = parseFloat(min);
+            var maxNum = parseFloat(max);
+            var fallbackNum = parseFloat(fallback);
+
+            if (!isNaN(minNum) && !isNaN(maxNum) && minNum > 0 && maxNum > 0) {
+                return '$' + formatPriceNumber(minNum) + '~$' + formatPriceNumber(maxNum);
+            }
+
+            if (!isNaN(fallbackNum) && fallbackNum > 0) {
+                return '$' + formatPriceNumber(fallbackNum);
+            }
+
+            return '$0';
+        }
+
+        /**
          * Build price table HTML for a category
          */
         function buildPriceTableHTML(category) {
@@ -1154,15 +1330,23 @@
                     const dimensions = thickness + '*' + width;
                     // Homepage Latest should follow Rendui "lastprice" as primary source.
                     const priceUsd = item.lastprice_usd || item.lastprice || item.price_usd || item.price || 0;
-                    const change = item.riseAndFall || item.riseAndFall_usd || item.change || 0;
+                    const priceMinUsd = item.lastprice_range_min_usd || item.price_range_min_usd || priceUsd || 0;
+                    const priceMaxUsd = item.lastprice_range_max_usd || item.price_range_max_usd || priceUsd || 0;
+                    const direction = normalizePriceDirection(
+                        item.lastprice_range_direction_usd || '',
+                        item.riseAndFall || item.riseAndFall_usd || item.change || 0
+                    );
                     const parsedPrice = parseFloat(priceUsd);
-                    const parsedChange = parseFloat(change);
+                    const parsedPriceMin = parseFloat(priceMinUsd);
+                    const parsedPriceMax = parseFloat(priceMaxUsd);
 
                     rows.push({
                         product: productName,
                         dimensions: dimensions,
                         price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
-                        change: Number.isFinite(parsedChange) ? parsedChange : 0
+                        priceMin: Number.isFinite(parsedPriceMin) ? parsedPriceMin : 0,
+                        priceMax: Number.isFinite(parsedPriceMax) ? parsedPriceMax : 0,
+                        direction: direction
                     });
                 });
             });
@@ -1175,23 +1359,17 @@
             html += '<th>Products</th>';
             html += '<th>Dimensions(mm)</th>';
             html += '<th>Latest($)</th>';
-            html += '<th>Change($)</th>';
             html += '</tr></thead><tbody>';
 
             rows.forEach(row => {
-                const changeClass = row.change > 0 ? 'up' : (row.change < 0 ? 'down' : 'neutral');
-                let changeDisplay = '$0.00';
-                if (row.change > 0) {
-                    changeDisplay = '+$' + row.change.toFixed(2);
-                } else if (row.change < 0) {
-                    changeDisplay = '-$' + Math.abs(row.change).toFixed(2);
-                }
+                const changeClass = row.direction || 'neutral';
+                const latestDisplay = formatPriceRange(row.priceMin, row.priceMax, row.price);
+                const latestArrow = buildPriceDirectionArrow(changeClass, 'price-table__arrow');
 
                 html += '<tr>';
                 html += '<td><span class="price-table__product">' + row.product + '</span></td>';
                 html += '<td><span class="price-table__dimensions">' + row.dimensions + '</span></td>';
-                html += '<td><span class="price-table__price price-table__price--' + changeClass + '">$' + row.price.toFixed(2) + '</span></td>';
-                html += '<td><span class="price-table__change price-table__change--' + changeClass + '">' + changeDisplay + '</span></td>';
+                html += '<td><span class="price-table__price price-table__price--' + changeClass + '">' + latestDisplay + latestArrow + '</span></td>';
                 html += '</tr>';
             });
 
@@ -1566,6 +1744,72 @@
         startAutoplay();
     }
 
+    /**
+     * Format a USD number with exactly 2 decimals and thousands separators.
+     */
+    function formatDisplayPriceNumber(num) {
+        var n = parseFloat(num);
+        if (isNaN(n)) return '0';
+        var str = n.toFixed(2);
+        return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    /**
+     * Format a USD range string like $465~$486.
+     */
+    function formatDisplayPriceRange(min, max, fallback) {
+        var minNum = parseFloat(min);
+        var maxNum = parseFloat(max);
+        var fallbackNum = parseFloat(fallback);
+
+        if (!isNaN(minNum) && !isNaN(maxNum) && minNum > 0 && maxNum > 0) {
+            return '$' + formatDisplayPriceNumber(minNum) + '~$' + formatDisplayPriceNumber(maxNum);
+        }
+
+        if (!isNaN(fallbackNum) && fallbackNum > 0) {
+            return '$' + formatDisplayPriceNumber(fallbackNum);
+        }
+
+        return '$0';
+    }
+
+    /**
+     * Normalize a direction string to up/down/neutral with legacy change fallback.
+     */
+    function normalizePriceDirection(directionValue, legacyChangeValue) {
+        if (directionValue === 'up' || directionValue === 'down' || directionValue === 'neutral') {
+            return directionValue;
+        }
+
+        var parsedLegacyChange = parseFloat(legacyChangeValue);
+        if (Number.isFinite(parsedLegacyChange)) {
+            if (parsedLegacyChange > 0) {
+                return 'up';
+            }
+
+            if (parsedLegacyChange < 0) {
+                return 'down';
+            }
+        }
+
+        return 'neutral';
+    }
+
+    /**
+     * Build a small visual arrow for up/down price direction.
+     */
+    function buildPriceDirectionArrow(direction, arrowClassName) {
+        if (direction === 'up') {
+            return '<span class="' + arrowClassName + '" aria-hidden="true">↑</span>';
+        }
+
+        if (direction === 'down') {
+            return '<span class="' + arrowClassName + '" aria-hidden="true">↓</span>';
+        }
+
+        return '';
+    }
+
     // =========================================================================
     // Prices Page Functionality
     // =========================================================================
@@ -1643,7 +1887,7 @@
 
             if (items.length === 0) {
                 pricesTableBody.innerHTML =
-                    '<tr><td colspan="4" class="prices-table__loading">' +
+                    '<tr><td colspan="3" class="prices-table__loading">' +
                     '<span>No price data available for this width.</span>' +
                     '</td></tr>';
                 return;
@@ -1652,26 +1896,16 @@
             var html = '';
             items.forEach(function(item) {
                 var price = showTaxInclusive ? (item.price_tax || item.price) : item.price;
-                var change = showTaxInclusive ? (item.change_tax || 0) : (item.change || 0);
-                var changeClass = 'neutral';
-                var changeText = '$0';
+                var priceMin = showTaxInclusive ? (item.price_tax_min || item.price_min || price) : (item.price_min || price);
+                var priceMax = showTaxInclusive ? (item.price_tax_max || item.price_max || price) : (item.price_max || price);
+                var changeClass = showTaxInclusive
+                    ? normalizePriceDirection(item.trend_tax || '', item.change_tax || 0)
+                    : normalizePriceDirection(item.trend || '', item.change || 0);
+                var latestText = formatDisplayPriceRange(priceMin, priceMax, price);
+                var latestArrow = buildPriceDirectionArrow(changeClass, 'prices-table__arrow');
 
-                if (change > 0) {
-                    changeClass = 'up';
-                    changeText = '+$' + formatNumber(change);
-                } else if (change < 0) {
-                    changeClass = 'down';
-                    changeText = '-$' + formatNumber(Math.abs(change));
-                } else {
-                    changeText = '$0';
-                }
-
-                var canView = pageData.canViewHistory;
                 var homeUrl = (window.ippgiData && window.ippgiData.homeUrl) || '/';
-                var subscribeUrl = (window.ippgiData && window.ippgiData.subscribeUrl) || '/subscribe/';
-                var detailUrl = canView
-                    ? homeUrl + 'price-detail/?type=' + encodeURIComponent(currentType) + '&spec=' + encodeURIComponent(item.product_spec || item.dimensions)
-                    : subscribeUrl;
+                var detailUrl = homeUrl + 'price-detail/?type=' + encodeURIComponent(currentType) + '&spec=' + encodeURIComponent(item.product_spec || item.dimensions);
 
                 // Extract product name from product_spec (format: "categoryId_width_thickness_材料名称")
                 // Only show product name for HRC and AL (they have consistent naming)
@@ -1689,8 +1923,7 @@
                 html +=
                     '<tr>' +
                     '<td>' + escapeHtml(displayDimensions) + '</td>' +
-                    '<td class="prices-table__price--' + changeClass + '">$' + formatNumber(price) + '</td>' +
-                    '<td class="prices-table__change--' + changeClass + '">' + changeText + '</td>' +
+                    '<td><span class="prices-table__price prices-table__price--' + changeClass + '">' + latestText + latestArrow + '</span></td>' +
                     '<td>' +
                     '<a href="' + escapeHtml(detailUrl) + '" class="prices-table__view-btn">' +
                     'Trend <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
@@ -1707,14 +1940,6 @@
             var div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        function formatNumber(num) {
-            var n = parseFloat(num);
-            if (isNaN(n)) return '0';
-            // Round to 2 decimal places, remove trailing zeros
-            var str = n.toFixed(2).replace(/\.?0+$/, '');
-            return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
 
         // Initial render

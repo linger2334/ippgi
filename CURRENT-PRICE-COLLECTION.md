@@ -2,17 +2,17 @@
 
 ## 功能说明
 
-在每天早上 9:00 清除缓存并刷新材料列表之前，系统会自动采集并保存所有当前的原材料价格到数据库中。这确保了价格数据的连续性和完整性。
+当前文档描述的是手动采集脚本本身。生产环境里，价格快照通常由插件的 `00:10` 午夜任务自动保存；这个脚本主要用于手动补采或排查。这确保了价格数据的连续性和完整性。
 
 ## 工作原理
 
 ### 1. 数据来源
 
-- **API 接口：** 材料列表 API (`https://api.rendui.com/v1/jec/rendui/prices/daily`)
+- **API 接口：** 材料列表 API (`https://www.rendui.com/api/v1/jec/rendui/prices/daily`)
 - **数据字段映射：**
-  - API 字段 `lastprice` → 数据库字段 `price_cny`
-  - API 字段 `lastpriceTax` → 数据库字段 `price_tax_cny`
-  - 自动转换为 USD：`price_usd` 和 `price_tax_usd`
+  - API 字段 `lastprice` → 转换后落库到 `price_usd`
+  - API 字段 `lastpriceTax` → 转换后落库到 `price_tax_usd`
+  - 人民币原始价格仅用于当次换算，不再落库保存
 
 ### 2. 采集内容
 
@@ -48,9 +48,9 @@ cd /Users/linger3048/Sites/php81.test/ippgi
 php collect-current-prices.php
 ```
 
-### 定时任务（推荐）
+### 定时任务（仅在需要独立补采时）
 
-在 crontab 中添加定时任务，每天早上 8:00 运行（在 9:00 清除缓存之前）：
+如需脱离插件 WP-Cron 单独运行这个脚本，可在 crontab 中手动配置；常规线上流程不依赖这里的 8:00 旧方案：
 
 ```bash
 # 编辑 crontab
@@ -112,9 +112,7 @@ GI:
 | `product_spec` | varchar(255) | 产品规格字符串 |
 | `statistics_time` | datetime | 统计时间 |
 | `timestamp` | bigint | Unix 时间戳 |
-| `price_cny` | decimal(10,2) | 价格（人民币） |
 | `price_usd` | decimal(10,2) | 价格（美元） |
-| `price_tax_cny` | decimal(10,2) | 含税价格（人民币） |
 | `price_tax_usd` | decimal(10,2) | 含税价格（美元） |
 | `exchange_rate` | decimal(10,6) | 汇率 |
 | `site_id` | varchar(50) | 站点 ID |
@@ -139,7 +137,7 @@ GI:
 
 - **来源：** 材料列表 API
 - **字段名：** `lastprice` 和 `lastpriceTax`
-- **频率：** 每天早上 8:00
+- **频率：** 按需手动执行或单独配置
 - **记录数：** 每次约 398 条（所有当前规格）
 
 ### 数据整合

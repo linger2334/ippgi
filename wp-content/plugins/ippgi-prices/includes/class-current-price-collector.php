@@ -43,9 +43,12 @@ class IPPGI_Prices_Current_Price_Collector {
      * Collect and save current prices for all materials
      *
      * @param bool $force_refresh Force refresh from API
+     * @param bool $allow_exchange_rate_refresh Whether a missing exchange rate may be refreshed from Aliyun
+     * @param bool $save_exchange_rate_snapshot Whether to persist a daily exchange-rate snapshot row
+     * @param bool $require_cached_price_list Whether this run must use existing cache and never fall back to API fetch
      * @return array Results summary
      */
-    public function collect_all_current_prices($force_refresh = true) {
+    public function collect_all_current_prices($force_refresh = true, $allow_exchange_rate_refresh = true, $save_exchange_rate_snapshot = true, $require_cached_price_list = false) {
         global $wpdb;
 
         $start_time = microtime(true);
@@ -58,7 +61,15 @@ class IPPGI_Prices_Current_Price_Collector {
         );
 
         // Fetch price list from API (or cache)
-        $price_list = $this->api_client->fetch_price_list($force_refresh);
+        $price_list = $require_cached_price_list
+            ? $this->api_client->get_cached_price_list()
+            : $this->api_client->fetch_price_list($force_refresh);
+
+        if (false === $price_list) {
+            $results['success'] = false;
+            $results['errors'][] = 'Cached price list is missing for this run.';
+            return $results;
+        }
 
         if (is_wp_error($price_list)) {
             $results['success'] = false;
@@ -71,9 +82,22 @@ class IPPGI_Prices_Current_Price_Collector {
         $exchange_rate = $this->extract_exchange_rate_from_price_list($price_list);
 
         if (false === $exchange_rate) {
-            // Fallback: get current exchange rate if not found in cache
-            $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate();
-            error_log('IPPGI Prices: Exchange rate not found in cache, using current rate: ' . $exchange_rate);
+            // Prefer the cached transient when we are not allowed to refresh at this time slot.
+            if (!$allow_exchange_rate_refresh) {
+                $exchange_rate = get_transient(IPPGI_Prices_Currency_Converter::CACHE_KEY);
+                if (false !== $exchange_rate && (float) $exchange_rate > 0) {
+                    $exchange_rate = (float) $exchange_rate;
+                    error_log('IPPGI Prices: Exchange rate not found in price list cache, using cached transient rate: ' . $exchange_rate);
+                } else {
+                    $results['success'] = false;
+                    $results['errors'][] = 'Exchange rate not found in cached price data and refresh is disabled for this run.';
+                    return $results;
+                }
+            } else {
+                // Fallback: get current exchange rate if not found in cache
+                $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate();
+                error_log('IPPGI Prices: Exchange rate not found in cache, using current rate: ' . $exchange_rate);
+            }
         } else {
             error_log('IPPGI Prices: Using cached exchange rate from price list: ' . $exchange_rate);
         }
@@ -83,8 +107,10 @@ class IPPGI_Prices_Current_Price_Collector {
             ? date('Y-m-d', strtotime($price_list['fetched_at']))
             : current_time('Y-m-d');
 
-        // Save exchange rate to database
-        $this->save_exchange_rate($rate_date, $exchange_rate);
+        // Save exchange rate snapshot only when this run explicitly needs it.
+        if ($save_exchange_rate_snapshot) {
+            $this->save_exchange_rate($rate_date, $exchange_rate);
+        }
 
         $current_time = current_time('mysql');
         $statistics_date = isset($price_list['date']) ? $price_list['date'] : current_time('Y-m-d H:i:s');
@@ -251,10 +277,12 @@ class IPPGI_Prices_Current_Price_Collector {
                         '%s',  // product_spec
                         '%s',  // statistics_time
                         '%d',  // timestamp
-                        '%f',  // price_cny
                         '%f',  // price_usd
-                        '%f',  // price_tax_cny
+                        '%f',  // price_usd_min
+                        '%f',  // price_usd_max
                         '%f',  // price_tax_usd
+                        '%f',  // price_tax_usd_min
+                        '%f',  // price_tax_usd_max
                         '%f',  // exchange_rate
                         '%s',  // site_id
                         '%s',  // category_id
@@ -304,24 +332,25 @@ class IPPGI_Prices_Current_Price_Collector {
             ? IPPGI_Prices_API_Client::CATEGORY_IDS[$material_type]
             : '';
 
-        // Get prices - IMPORTANT: Use _cny fields since lastprice has been converted to USD by API client
-        // The API client's convert_price_data() stores original CNY in lastprice_cny and changes lastprice to USD
-        $price_cny = isset($item['lastprice_cny']) ? floatval($item['lastprice_cny']) : 0;
-        $price_tax_cny = isset($item['lastpriceTax_cny']) ? floatval($item['lastpriceTax_cny']) : 0;
-
-        // If _cny fields don't exist (shouldn't happen but fallback), use the pre-converted USD values directly
-        if ($price_cny <= 0 && isset($item['lastprice_usd'])) {
-            // Data already converted, use USD values directly
-            $price_usd = floatval($item['lastprice_usd']);
-            $price_tax_usd = isset($item['lastpriceTax_usd']) ? floatval($item['lastpriceTax_usd']) : 0;
-            // Reverse calculate CNY from USD for storage
-            $price_cny = IPPGI_Prices_Currency_Converter::usd_to_cny($price_usd, $exchange_rate);
-            $price_tax_cny = IPPGI_Prices_Currency_Converter::usd_to_cny($price_tax_usd, $exchange_rate);
-        } else {
-            // Normal case: convert CNY to USD
-            $price_usd = IPPGI_Prices_Currency_Converter::cny_to_usd($price_cny, $exchange_rate);
-            $price_tax_usd = IPPGI_Prices_Currency_Converter::cny_to_usd($price_tax_cny, $exchange_rate);
-        }
+        // The API client defaults price payloads to USD, so we only persist USD values now.
+        $price_usd = isset($item['lastprice_usd'])
+            ? floatval($item['lastprice_usd'])
+            : (isset($item['lastprice']) ? floatval($item['lastprice']) : 0);
+        $price_usd_min = isset($item['lastprice_range_min_usd'])
+            ? floatval($item['lastprice_range_min_usd'])
+            : $price_usd;
+        $price_usd_max = isset($item['lastprice_range_max_usd'])
+            ? floatval($item['lastprice_range_max_usd'])
+            : $price_usd;
+        $price_tax_usd = isset($item['lastpriceTax_usd'])
+            ? floatval($item['lastpriceTax_usd'])
+            : (isset($item['lastpriceTax']) ? floatval($item['lastpriceTax']) : 0);
+        $price_tax_usd_min = isset($item['lastpriceTax_range_min_usd'])
+            ? floatval($item['lastpriceTax_range_min_usd'])
+            : $price_tax_usd;
+        $price_tax_usd_max = isset($item['lastpriceTax_range_max_usd'])
+            ? floatval($item['lastpriceTax_range_max_usd'])
+            : $price_tax_usd;
 
         // Convert statistics_date to timestamp
         $timestamp = strtotime($statistics_date);
@@ -331,10 +360,12 @@ class IPPGI_Prices_Current_Price_Collector {
             'product_spec' => $product_spec,
             'statistics_time' => $statistics_date,
             'timestamp' => $timestamp,
-            'price_cny' => $price_cny,
             'price_usd' => $price_usd,
-            'price_tax_cny' => $price_tax_cny,
+            'price_usd_min' => $price_usd_min,
+            'price_usd_max' => $price_usd_max,
             'price_tax_usd' => $price_tax_usd,
+            'price_tax_usd_min' => $price_tax_usd_min,
+            'price_tax_usd_max' => $price_tax_usd_max,
             'exchange_rate' => $exchange_rate,
             'site_id' => $site_id,
             'category_id' => $category_id,

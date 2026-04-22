@@ -21,7 +21,6 @@ $user_phone = get_user_meta($current_user->ID, 'phone', true);
 
 // Get subscription info
 $subscription_status = ippgi_get_subscription_status($current_user->ID);
-$subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user->ID);
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -72,53 +71,6 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                     <?php esc_html_e('Subscription information', 'ippgi'); ?>
                 </div>
                 <div class="profile-section__body">
-                    <p class="profile-section__label"><?php esc_html_e('Subscription status:', 'ippgi'); ?></p>
-
-                    <?php if ($subscription_status === 'active') : ?>
-                        <!-- 1. Active Subscription (not cancelled) -->
-                        <p class="profile-section__value"><?php esc_html_e('Active', 'ippgi'); ?></p>
-                        <p class="profile-section__value">
-                            <?php printf(esc_html__('Next billing date: %s', 'ippgi'), esc_html($subscription_end_date)); ?>
-                        </p>
-                        <div class="profile-section__action">
-                            <a href="#" class="profile-btn" id="cancel-subscription-btn">
-                                <?php esc_html_e('Cancel Subscription', 'ippgi'); ?>
-                                <span>&gt;</span>
-                            </a>
-                        </div>
-
-                    <?php elseif ($subscription_status === 'bonus') : ?>
-                        <!-- 2. Active bonus access period -->
-                        <p class="profile-section__value"><?php esc_html_e('Active', 'ippgi'); ?></p>
-                        <p class="profile-section__value"><?php esc_html_e('You are currently using your bonus days.', 'ippgi'); ?></p>
-                        <div class="profile-section__action">
-                            <a href="<?php echo esc_url(home_url('/subscribe')); ?>" class="profile-btn">
-                                <?php esc_html_e('Subscribe', 'ippgi'); ?>
-                                <span>&gt;</span>
-                            </a>
-                        </div>
-
-                    <?php elseif ($subscription_status === 'cancelled') : ?>
-                        <!-- 3. Cancelled but not expired -->
-                        <p class="profile-section__value"><?php esc_html_e('Cancelled', 'ippgi'); ?></p>
-                        <p class="profile-section__value">
-                            <?php printf(esc_html__('Your subscription ends on %s', 'ippgi'), esc_html($subscription_end_date)); ?>
-                        </p>
-
-                    <?php else : ?>
-                        <!-- 4. No subscription or expired -->
-                        <p class="profile-section__value"><?php esc_html_e('Terminated', 'ippgi'); ?></p>
-                        <p class="profile-section__value">
-                            <?php esc_html_e('Your subscription has ended. To continue access, please click the Subscribe button below.', 'ippgi'); ?>
-                        </p>
-                        <div class="profile-section__action">
-                            <a href="<?php echo esc_url(home_url('/subscribe')); ?>" class="profile-btn">
-                                <?php esc_html_e('Subscribe', 'ippgi'); ?>
-                                <span>&gt;</span>
-                            </a>
-                        </div>
-                    <?php endif; ?>
-
                     <?php
                     // Calculate remaining bonus days
                     // If using bonus access: calculate days from now to end date
@@ -141,7 +93,6 @@ $subscription_end_date = ippgi_get_formatted_subscription_end_date($current_user
                     }
                     ?>
                     <div class="profile-bonus-section">
-                        <div class="profile-bonus-section__divider"></div>
                         <h3 class="profile-bonus-section__title"><?php esc_html_e('Remaining Bonus Days', 'ippgi'); ?></h3>
                         <p class="profile-bonus-section__number"><?php echo intval($remaining_bonus_days); ?></p>
                         <p class="profile-bonus-section__desc">

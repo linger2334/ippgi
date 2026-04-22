@@ -14,6 +14,11 @@ if (!defined('ABSPATH')) {
 class IPPGI_Prices_Database {
 
     /**
+     * Schema version for one-time table migrations.
+     */
+    const SCHEMA_VERSION = '2026-04-23-full-usd-range-history';
+
+    /**
      * Table names (without prefix)
      */
     const TABLES = array(
@@ -42,10 +47,12 @@ class IPPGI_Prices_Database {
                 product_spec varchar(255) NOT NULL,
                 statistics_time datetime NOT NULL,
                 timestamp bigint(20) NOT NULL,
-                price_cny decimal(10,2) NOT NULL,
                 price_usd decimal(10,2) NOT NULL,
-                price_tax_cny decimal(10,2) NOT NULL,
+                price_usd_min decimal(10,2) DEFAULT NULL,
+                price_usd_max decimal(10,2) DEFAULT NULL,
                 price_tax_usd decimal(10,2) NOT NULL,
+                price_tax_usd_min decimal(10,2) DEFAULT NULL,
+                price_tax_usd_max decimal(10,2) DEFAULT NULL,
                 exchange_rate decimal(10,6) NOT NULL,
                 site_id varchar(50) NOT NULL,
                 category_id varchar(50) NOT NULL,
@@ -69,6 +76,115 @@ class IPPGI_Prices_Database {
 
         // Log table creation
         error_log('IPPGI Prices: Created ' . count(self::TABLES) . ' historical price tables and exchange rates table');
+    }
+
+    /**
+     * Ensure the current schema exists and run one-time migrations when needed.
+     *
+     * @return void
+     */
+    public static function maybe_upgrade_schema() {
+        $current_version = get_option('ippgi_prices_schema_version', '');
+
+        if (self::SCHEMA_VERSION === $current_version) {
+            return;
+        }
+
+        self::create_tables();
+        self::drop_legacy_cny_columns();
+        self::ensure_usd_range_columns();
+
+        update_option('ippgi_prices_schema_version', self::SCHEMA_VERSION);
+    }
+
+    /**
+     * Drop legacy RMB columns from historical price tables once we only store USD values.
+     *
+     * @return void
+     */
+    private static function drop_legacy_cny_columns() {
+        global $wpdb;
+
+        foreach (self::TABLES as $table_name) {
+            $table_full_name = $wpdb->prefix . $table_name;
+            $columns = $wpdb->get_col("SHOW COLUMNS FROM {$table_full_name}", 0);
+
+            if (empty($columns) || !is_array($columns)) {
+                continue;
+            }
+
+            $drops = array();
+
+            if (in_array('price_cny', $columns, true)) {
+                $drops[] = 'DROP COLUMN price_cny';
+            }
+
+            if (in_array('price_tax_cny', $columns, true)) {
+                $drops[] = 'DROP COLUMN price_tax_cny';
+            }
+
+            if (empty($drops)) {
+                continue;
+            }
+
+            $result = $wpdb->query("ALTER TABLE {$table_full_name} " . implode(', ', $drops));
+
+            if (false === $result) {
+                error_log(sprintf('IPPGI Prices: Failed to drop legacy RMB columns from %s: %s', $table_full_name, $wpdb->last_error));
+                continue;
+            }
+
+            error_log(sprintf('IPPGI Prices: Dropped legacy RMB columns from %s', $table_full_name));
+        }
+    }
+
+    /**
+     * Add USD range columns to historical price tables when missing.
+     *
+     * @return void
+     */
+    private static function ensure_usd_range_columns() {
+        global $wpdb;
+
+        foreach (self::TABLES as $table_name) {
+            $table_full_name = $wpdb->prefix . $table_name;
+            $columns = $wpdb->get_col("SHOW COLUMNS FROM {$table_full_name}", 0);
+
+            if (empty($columns) || !is_array($columns)) {
+                continue;
+            }
+
+            $adds = array();
+
+            if (!in_array('price_usd_min', $columns, true)) {
+                $adds[] = 'ADD COLUMN price_usd_min decimal(10,2) DEFAULT NULL AFTER price_usd';
+            }
+
+            if (!in_array('price_usd_max', $columns, true)) {
+                $adds[] = 'ADD COLUMN price_usd_max decimal(10,2) DEFAULT NULL AFTER price_usd_min';
+            }
+
+            if (!in_array('price_tax_usd_min', $columns, true)) {
+                $adds[] = 'ADD COLUMN price_tax_usd_min decimal(10,2) DEFAULT NULL AFTER price_tax_usd';
+            }
+
+            if (!in_array('price_tax_usd_max', $columns, true)) {
+                $adds[] = 'ADD COLUMN price_tax_usd_max decimal(10,2) DEFAULT NULL AFTER price_tax_usd_min';
+            }
+
+            if (empty($adds)) {
+                continue;
+            }
+
+            $result = $wpdb->query("ALTER TABLE {$table_full_name} " . implode(', ', $adds));
+
+            if (false === $result) {
+                error_log(sprintf('IPPGI Prices: Failed to add USD range columns to %s: %s', $table_full_name, $wpdb->last_error));
+                continue;
+            }
+
+            error_log(sprintf('IPPGI Prices: Added USD range columns to %s', $table_full_name));
+        }
     }
 
     /**

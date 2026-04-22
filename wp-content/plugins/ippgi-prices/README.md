@@ -83,32 +83,33 @@ Manually triggers the scheduled task (clear cache + fetch price list).
 The plugin schedules:
 
 - 1 daily snapshot task at `00:10`
-- 14 daily FX repricing tasks at `01:10-08:10` and `18:10-23:10`
 - 9 daily business-hour refresh tasks at `09:10-17:10`
 
 Business-hour refresh tasks:
 
 1. **Clears real-time price and exchange-rate caches** (keeps the price list cache)
 2. **Fetches price list** from API and caches it
-3. **Logs execution** details for debugging
+3. **Preserves the previous USD cache** for any category whose upstream fetch fails
+4. **Logs execution** details for debugging
 
-Off-hours FX repricing tasks refresh the exchange rate and reprice cached USD values for both price-list and real-time payloads without fetching new market data.
+Midnight snapshot tasks save the cached business-date price list and its exchange-rate snapshot into the historical tables without refreshing exchange rates and without repricing cached USD values. If the cache is missing, the collector may fall back to the latest upstream price list.
 
 ### Caching Strategy
 
 - **Price List**: Stored as per-category transients plus a tiny metadata transient until scheduled workflows replace them
-- **Real-time Prices**: Stored in transients and repriced hourly; refreshed on-demand when frontend requests miss cache
-- Business-hour refresh runs at `09:10-17:10`; FX-only repricing runs at the remaining hours' `:10`
+- **Real-time Prices**: Stored in transients and refreshed on-demand when frontend requests miss cache
+- **Historical Price Tables**: Persist only `price_usd`, `price_tax_usd`, and `exchange_rate`; RMB source prices are not stored after conversion
+- Business-hour refresh runs at `09:10-17:10`; there are no off-hours FX-only repricing tasks
 
 ### API Integration
 
 **Price List API:**
-- URL: `https://api.rendui.com/v1/jec/rendui/prices/daily`
+- URL: `https://www.rendui.com/api/v1/jec/rendui/prices/daily`
 - Method: GET
-- Headers: `userid: 33249`, `referer: https://servicewechat.com/...`
+- Headers: none
 
 **Real-time Price API:**
-- URL: `https://api.rendui.com/v1/jec/rendui/daily/getByProductSpecAndDate`
+- URL: `https://www.rendui.com/api/v1/jec/rendui/daily/getByProductSpecAndDate`
 - Method: POST
 - Headers: `phone: 13792171909`
 - Body: `{ productType, width, thickness, date }`

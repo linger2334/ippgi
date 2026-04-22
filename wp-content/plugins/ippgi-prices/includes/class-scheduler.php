@@ -29,7 +29,8 @@ class IPPGI_Prices_Scheduler {
     const CRON_HOOK_MIDNIGHT = 'ippgi_prices_midnight_collection';
 
     /**
-     * Cron hook name for off-hours exchange-rate repricing
+     * Legacy cron hook name kept so old off-hours exchange-rate repricing events
+     * can be unscheduled cleanly after deployment.
      */
     const CRON_HOOK_EXCHANGE_REPRICE = 'ippgi_prices_exchange_rate_reprice';
 
@@ -54,9 +55,10 @@ class IPPGI_Prices_Scheduler {
     private $schedule_hours = array(9, 10, 11, 12, 13, 14, 15, 16, 17);
 
     /**
-     * Hours to run off-hours exchange-rate repricing (excluding 00:10 and 09:10-17:10)
+     * Legacy off-hours exchange-rate repricing hours.
+     * Off-hours tasks are disabled, but we keep the hook name so old events can be unscheduled cleanly.
      */
-    private $exchange_reprice_hours = array(1, 2, 3, 4, 5, 6, 7, 8, 18, 19, 20, 21, 22, 23);
+    private $exchange_reprice_hours = array();
 
     /**
      * Constructor
@@ -102,7 +104,7 @@ class IPPGI_Prices_Scheduler {
     }
 
     /**
-     * Schedule all events (:10 snapshot + 09:10-17:10 refresh + off-hours FX repricing)
+     * Schedule all events (:10 snapshot + 09:10-17:10 refresh)
      * in Beijing time (Asia/Shanghai)
      */
     public function schedule_events() {
@@ -141,24 +143,10 @@ class IPPGI_Prices_Scheduler {
             wp_schedule_event($schedule_time, 'daily', self::CRON_HOOK, array($hour));
         }
 
-        // Schedule off-hours exchange-rate repricing events
-        foreach ($this->exchange_reprice_hours as $hour) {
-            $schedule_dt = new DateTime(sprintf('%s %02d:%02d:00', $today, $hour, self::SCHEDULE_MINUTE), $timezone);
-            $schedule_time = $schedule_dt->getTimestamp();
-
-            if ($schedule_time < $current_timestamp) {
-                $schedule_dt->modify('+1 day');
-                $schedule_time = $schedule_dt->getTimestamp();
-            }
-
-            wp_schedule_event($schedule_time, 'daily', self::CRON_HOOK_EXCHANGE_REPRICE, array($hour));
-        }
-
         // Log scheduling
         error_log(sprintf(
-            'IPPGI Prices: Scheduled %d business-hour events, %d off-hours FX repricing events, plus midnight collection',
+            'IPPGI Prices: Scheduled %d business-hour events plus midnight collection',
             count($this->schedule_hours),
-            count($this->exchange_reprice_hours)
         ));
     }
 
@@ -177,13 +165,9 @@ class IPPGI_Prices_Scheduler {
             }
         }
 
-        if (!$needs_reschedule) {
-            foreach ($this->exchange_reprice_hours as $hour) {
-                if (!$this->is_event_aligned(self::CRON_HOOK_EXCHANGE_REPRICE, array($hour), $hour)) {
-                    $needs_reschedule = true;
-                    break;
-                }
-            }
+        if (!$needs_reschedule && false !== wp_next_scheduled(self::CRON_HOOK_EXCHANGE_REPRICE)) {
+            // Clean up legacy off-hours exchange-rate repricing events after deployment.
+            $needs_reschedule = true;
         }
 
         if ($needs_reschedule) {
@@ -323,36 +307,33 @@ class IPPGI_Prices_Scheduler {
     }
 
     /**
-     * Run midnight price collection task
-     * This is called by WP-Cron at 00:10 to save yesterday's prices
+     * Run the midnight snapshot task.
+     * This is called by WP-Cron at 00:10 to persist the cached business-date
+     * price list and exchange-rate snapshot into the historical tables.
      */
     public function run_midnight_collection() {
         $start_time = microtime(true);
 
         error_log(sprintf(
-            'IPPGI Prices: Starting midnight price collection at %s',
+            'IPPGI Prices: Starting midnight snapshot task at %s',
             current_time('Y-m-d H:i:s')
         ));
 
-        // Step 1: Refresh exchange rate and reprice all cached USD views.
-        $repricing_results = $this->refresh_cached_prices_with_latest_exchange_rate('midnight', $hour = 0);
-        $exchange_rate = $repricing_results['exchange_rate'];
-        $price_list_reprice = $repricing_results['price_list_reprice'];
-        $realtime_reprice = $repricing_results['realtime_reprice'];
-
-        // Step 4: Collect and save current prices to database.
-        // At midnight, this saves the cached business-date prices after repricing them with the latest FX rate.
-        $collection_results = $this->price_collector->collect_all_current_prices(false);
+        // At midnight, save the business-date price snapshot and the corresponding exchange-rate snapshot.
+        // This run intentionally does not force-refresh exchange rates and does not reprice cached USD values.
+        // If the price list cache is missing, it may fall back to the latest available upstream price list.
+        $collection_results = $this->price_collector->collect_all_current_prices(false, false, true, false);
+        $exchange_rate = isset($collection_results['exchange_rate']) ? $collection_results['exchange_rate'] : null;
 
         if ($collection_results['success']) {
             error_log(sprintf(
-                'IPPGI Prices: Midnight collection saved %d price records (%.2f seconds)',
+                'IPPGI Prices: Midnight snapshot saved %d price records (%.2f seconds)',
                 $collection_results['total_saved'],
                 $collection_results['duration']
             ));
         } else {
             error_log(sprintf(
-                'IPPGI Prices: Midnight collection failed - %d errors',
+                'IPPGI Prices: Midnight snapshot failed - %d errors',
                 count($collection_results['errors'])
             ));
         }
@@ -361,7 +342,7 @@ class IPPGI_Prices_Scheduler {
         $execution_time = microtime(true) - $start_time;
 
         error_log(sprintf(
-            'IPPGI Prices: Completed midnight collection in %.2f seconds',
+            'IPPGI Prices: Completed midnight snapshot task in %.2f seconds',
             $execution_time
         ));
 
@@ -371,8 +352,8 @@ class IPPGI_Prices_Scheduler {
             'datetime' => current_time('Y-m-d H:i:s'),
             'execution_time' => $execution_time,
             'exchange_rate' => $exchange_rate,
-            'repriced_price_list' => !is_wp_error($price_list_reprice),
-            'repriced_realtime_prices' => $realtime_reprice['updated'],
+            'repriced_price_list' => false,
+            'repriced_realtime_prices' => 0,
             'prices_collected' => $collection_results['success'],
             'prices_saved' => $collection_results['total_saved'],
             'errors' => $collection_results['errors'],
@@ -380,8 +361,9 @@ class IPPGI_Prices_Scheduler {
     }
 
     /**
-     * Run the off-hours exchange-rate repricing task.
-     * This is called by WP-Cron on every remaining :10 slot outside 00:10 and 09:10-17:10.
+     * Run the legacy off-hours exchange-rate repricing task.
+     * This path is kept only for backwards compatibility and manual debugging.
+     * It should no longer be scheduled automatically.
      *
      * @param int|null $hour The hour this task is running for.
      */
@@ -499,7 +481,7 @@ class IPPGI_Prices_Scheduler {
                     );
                 }
             }
-            // Check off-hours exchange repricing hook
+            // Check legacy off-hours exchange repricing hook
             if (isset($cron[self::CRON_HOOK_EXCHANGE_REPRICE])) {
                 foreach ($cron[self::CRON_HOOK_EXCHANGE_REPRICE] as $event) {
                     $hour = isset($event['args'][0]) ? $event['args'][0] : null;
@@ -548,14 +530,14 @@ class IPPGI_Prices_Scheduler {
     }
 
     /**
-     * Manually trigger midnight collection (for testing)
+     * Manually trigger the midnight snapshot task (for testing)
      */
     public function trigger_midnight_collection() {
         $this->run_midnight_collection();
     }
 
     /**
-     * Manually trigger off-hours exchange-rate repricing (for testing)
+     * Manually trigger the legacy off-hours exchange-rate repricing task.
      */
     public function trigger_exchange_rate_reprice() {
         $current_hour = (int) current_time('H');

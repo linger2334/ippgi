@@ -348,6 +348,92 @@
    ========================================================================== */
 
 @media (max-width: 767px) {
+    .my-prices__quote-cta {
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        font-size: 13px;
+    }
+
+    .quote-modal {
+        padding: 10px;
+        align-items: center;
+    }
+
+    .quote-modal__content {
+        width: 100%;
+        max-height: calc(100vh - 20px);
+        border-radius: 6px;
+        padding: 12px 12px 14px;
+    }
+
+    .quote-modal__close {
+        top: 6px;
+        right: 6px;
+        width: 30px;
+        height: 30px;
+    }
+
+    .quote-modal__title {
+        font-size: 20px;
+        margin-bottom: 6px;
+        padding-right: 34px;
+    }
+
+    .quote-modal__description {
+        margin-bottom: 10px;
+        font-size: 13px;
+        line-height: 1.28;
+    }
+
+    .quote-form {
+        gap: 8px;
+    }
+
+    .quote-form__input,
+    .quote-form__textarea {
+        font-size: 14px;
+    }
+
+    .quote-form__input {
+        min-height: 40px;
+        padding: 7px 24px 7px 8px;
+    }
+
+    .quote-form__textarea {
+        min-height: 92px;
+        padding: 7px 8px;
+    }
+
+    .quote-form__required {
+        right: 7px;
+        font-size: 26px;
+        line-height: 0.9;
+    }
+
+    .quote-form__submit {
+        width: auto;
+        min-width: 132px;
+        min-height: 36px;
+        font-size: 13px;
+    }
+
+    .quote-card {
+        padding: 12px 12px 16px;
+        border-radius: 6px;
+    }
+
+    .quote-card__title {
+        font-size: 20px;
+        margin-bottom: 6px;
+    }
+
+    .quote-card__description {
+        margin-bottom: 10px;
+        font-size: 13px;
+        line-height: 1.28;
+    }
+
     .price-table-wrapper {
         margin: 0 calc(var(--spacing-md) * -1);
     }
@@ -400,6 +486,22 @@
     .price-table th:first-child {
         background-color: var(--color-table-header);
     }
+
+    /* 首页价格轮播现为三列：Products、Dimensions、Latest */
+    .price-carousel .price-table th:nth-child(1),
+    .price-carousel .price-table td:nth-child(1) {
+        width: 26%;
+    }
+
+    .price-carousel .price-table th:nth-child(2),
+    .price-carousel .price-table td:nth-child(2) {
+        width: 42%;
+    }
+
+    .price-carousel .price-table th:nth-child(3),
+    .price-carousel .price-table td:nth-child(3) {
+        width: 32%;
+    }
 }
 
 /* ==========================================================================
@@ -419,22 +521,17 @@
 
     .prices-table th:nth-child(1),
     .prices-table td:nth-child(1) {
-        width: 30%;
+        width: 36%;
     }
 
     .prices-table th:nth-child(2),
     .prices-table td:nth-child(2) {
-        width: 22%;
+        width: 30%;
     }
 
     .prices-table th:nth-child(3),
     .prices-table td:nth-child(3) {
-        width: 20%;
-    }
-
-    .prices-table th:nth-child(4),
-    .prices-table td:nth-child(4) {
-        width: 28%;
+        width: 34%;
     }
 
     .prices-table__view-btn {

@@ -10,7 +10,7 @@ This project is a custom WordPress-based platform for displaying and managing ra
   - **Plugin:** `wp-content/plugins/ippgi-prices` - Handles core business logic, including price collection, caching, REST API endpoints, and scheduled tasks.
   - **Database:** Uses custom tables with the `ippgi_` prefix (e.g., `ippgi_prices_gi`, `ippgi_prices_exchange_rates`).
 - **External Integrations:**
-  - Price APIs from `api.rendui.com`.
+  - Price APIs from `www.rendui.com/api`.
   - Currency conversion APIs via Aliyun Market.
   - Membership via Simple Membership Plugin (SWPM).
   - Payments via PayPal and Stripe.
@@ -22,7 +22,7 @@ This project is a custom WordPress-based platform for displaying and managing ra
 - **Logged-in redirect rule:** Logged-in users visiting `/login/` or `/membership-login/` should be redirected to the home page through centralized theme logic.
 - **Membership levels in active use:** The project only uses SWPM `Basic (2)` and `Plus (4)` for live membership state. Trial `Level 3` has been retired from business logic, and all temporary gifted access is handled through the bonus meta mechanism.
 - **Rendui header rules:**
-  - `prices/daily` uses `userid` and `referer` headers only. It should not send a `phone` header.
+  - `prices/daily` should not send custom headers.
   - `daily/getByProductSpecAndDate` and `prices/statistics` require `phone: 13792171909`.
 - **Membership mail responsibilities:**
   - SWPM auto-sends `Registration Complete`, `Account Upgrade Notification`, and `Subscription Payment Canceled or Expired` emails.
@@ -74,23 +74,23 @@ Toggle `IPPGI_DEV_MODE` in `wp-content/themes/ippgi/functions.php` to simulate p
 - **`wp-content/plugins/wp-mail-smtp/`**: Handles email delivery via Gmail API.
 - **`collect-current-prices.php`**: Root script for manual/scheduled price collection.
 - **`import-historical-data.php`**: Maintenance script for populating historical records.
-- **`backfill-aliyun-rates-and-reprice.php`**: Maintenance script for backfilling Aliyun exchange rates and repricing historical database records.
+- **`backfill-aliyun-rates-and-reprice.php`**: Legacy maintenance script that is now intentionally disabled because historical rows no longer retain RMB source columns for safe repricing.
 - **`resource/` & `screenshot/`**: Design assets, requirements, and UI references.
 
 ## Scheduled Tasks (WP-Cron)
 
-- **00:10 (UTC+8):** Refresh the latest Aliyun exchange rate, reprice all cached price-list data and cached single-spec detail data with the newest FX rate, then save the price snapshot and exchange-rate snapshot into the database. RMB values stay unchanged; only USD values are recalculated.
-- **01:10 - 08:10 and 18:10 - 23:10 (UTC+8):** Hourly FX-only repricing. These jobs refresh the latest Aliyun exchange rate and reprice both cache layers in memory/transients without collecting fresh market prices.
-- **09:10 - 17:10 (UTC+8):** Hourly price refresh. Uses an incremental strategy: keep existing category caches, fetch each category one by one, preserve old category data when the upstream price API fails, and still force USD repricing by the newest FX rate so the whole site stays on one exchange-rate basis.
+- **00:10 (UTC+8):** Save the historical price snapshot and exchange-rate snapshot from the existing cached business-date price list directly into the database. This task does not refresh the Aliyun exchange rate and does not reprice cached USD values. If the cache is missing, it may fall back to the latest upstream price list.
+- **01:10 - 08:10 and 18:10 - 23:10 (UTC+8):** Removed. No off-hours FX refresh or cached USD repricing runs anymore.
+- **09:10 - 17:10 (UTC+8):** Hourly price refresh. Uses an incremental strategy: keep existing category caches, fetch each category one by one, and preserve the previous USD cache for any category whose upstream fetch fails.
 
 ## Cache Strategy
 
 - **Price List Cache:** No longer stored as one large transient. It is split by category using keys like `ippgi_prices_price_list_category_ppgi`, plus a lightweight metadata transient `ippgi_prices_price_list_meta`.
-- **Single-spec Detail Cache:** Latest detail payloads are cached separately and are also repriced during the midnight and off-hours FX refresh jobs.
+- **Single-spec Detail Cache:** Latest detail payloads are cached separately and are no longer repriced by midnight/off-hours background jobs.
 - **REST Compatibility:** The `/prices` endpoint still returns the same overall structure; the server assembles the full response from per-category caches.
 - **Reason for Split Cache:** This avoids oversized transient payloads that can fail to persist when the serialized value approaches MySQL packet limits.
 
 ## Exchange Rate Source
 
 - **Unified Source:** Current exchange-rate fetching is standardized on the Aliyun Market API.
-- **Historical Backfill:** When historical FX data must be repaired or unified, use `backfill-aliyun-rates-and-reprice.php` to fetch historical Aliyun rates, update the exchange-rate table, and recalculate stored historical USD price fields from preserved RMB values.
+- **Historical Backfill:** Historical price rows no longer retain RMB source columns. If history needs repair, re-import the affected date range from the source API instead of trying to reprice stored rows from historical FX alone.

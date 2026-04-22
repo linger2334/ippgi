@@ -35,7 +35,7 @@ $test_url = add_query_arg(array(
     'from' => '2026-01-13 00:00:00',
     'to' => '2026-01-23 00:00:00',
     'categoryId' => '1457211766760558593',
-), 'https://api.rendui.com/v1/jec/rendui/prices/statistics');
+), IPPGI_Prices_API_Client::STATISTICS_URL);
 
 echo "Test URL: {$test_url}\n";
 

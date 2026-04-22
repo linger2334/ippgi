@@ -6,8 +6,6 @@
  * @since 1.0.0
  */
 
-get_header();
-
 // Get filter from URL
 // Support both ?type=ppgi and ?category=PPGI (from homepage redirect)
 $current_type = '';
@@ -27,10 +25,21 @@ if (isset($_GET['type'])) {
     $raw_category = sanitize_text_field($_GET['category']);
     $current_type = $category_to_type[$raw_category] ?? strtolower($raw_category);
 }
+
+$current_type = ippgi_normalize_product_type($current_type);
+
 if (empty($current_type)) {
     $current_type = 'ppgi';
 }
+
+if (!ippgi_is_visible_product_type($current_type)) {
+    wp_safe_redirect(add_query_arg('type', 'ppgi', home_url('/prices/')));
+    exit;
+}
+
 $current_width = isset($_GET['width']) ? sanitize_text_field($_GET['width']) : '';
+
+get_header();
 
 // Product types with their display names
 // Note: attributes_template uses %s placeholders for thickness and width ranges
@@ -54,12 +63,6 @@ $product_types = [
         'widths' => [1000, 1200],
         'attributes_template' => 'Thickness: 0.13–0.60 mm; Width: 1000–1200 mm; Coating Weight: AZ20–AZ170 g/m² (55% Al, 43.4% Zn, 1.6% Si); Surface Treatment: Anti-fingerprint / Passivation; Coil ID: 508 mm; Coil Weight: 3–5 MT per coil; Applications: Construction Materials, Home Appliances.',
     ],
-    'hrc' => [
-        'name' => ippgi_get_product_display_name('hrc'),
-        'full_name' => 'Hot Rolled Coil',
-        'widths' => [1010, 1500],
-        'attributes_template' => 'Thickness: 3.00–4.75 mm; Width: 1010–1500 mm; Steel Grade: SPHC, Q195L, Q195, Q235B, Q355B; Surface: Bright; Coil ID: 508 mm / 610 mm; Coil Weight: 15–22 MT per coil; Applications: Machinery manufacturing, fabrication, and further processing.',
-    ],
     'crc' => [
         'name' => ippgi_get_product_display_name('crc'),
         'full_name' => 'Cold Rolled Hard Coil',
@@ -82,7 +85,6 @@ $category_mapping = [
     'ppgi'     => 'PPGI',
     'gi'       => 'GI',
     'gl'       => 'GL',
-    'hrc'      => 'HRC',
     'crc'      => 'CRC Hard',
     'aluminum' => 'AL',
 ];
@@ -106,6 +108,12 @@ if ($cached_data && isset($cached_data['result'])) {
                     // Keep /prices "Latest" aligned with homepage: use Rendui lastprice fields.
                     'price'        => $item['lastprice_usd'] ?? ($item['price_usd'] ?? 0),
                     'price_tax'    => $item['lastpriceTax_usd'] ?? ($item['priceTax_usd'] ?? 0),
+                    'price_min'    => $item['lastprice_range_min_usd'] ?? ($item['price_range_min_usd'] ?? 0),
+                    'price_max'    => $item['lastprice_range_max_usd'] ?? ($item['price_range_max_usd'] ?? 0),
+                    'price_tax_min'=> $item['lastpriceTax_range_min_usd'] ?? ($item['priceTax_range_min_usd'] ?? 0),
+                    'price_tax_max'=> $item['lastpriceTax_range_max_usd'] ?? ($item['priceTax_range_max_usd'] ?? 0),
+                    'trend'        => $item['lastprice_range_direction_usd'] ?? 'neutral',
+                    'trend_tax'    => $item['lastpriceTax_range_direction_usd'] ?? 'neutral',
                     'change'       => $item['riseAndFall_usd'] ?? 0,
                     'change_tax'   => $item['riseAndFallTax_usd'] ?? 0,
                     'product_spec' => $item['productSpec'] ?? '',
@@ -230,13 +238,12 @@ $attributes_html = str_replace(
                         <tr>
                             <th><?php esc_html_e('Dimensions(mm)', 'ippgi'); ?></th>
                             <th><?php esc_html_e('Latest($)', 'ippgi'); ?></th>
-                            <th><?php esc_html_e('Change($)', 'ippgi'); ?></th>
                             <th><?php esc_html_e('Historical', 'ippgi'); ?></th>
                         </tr>
                     </thead>
                     <tbody id="prices-table-body">
                         <tr>
-                            <td colspan="4" class="prices-table__loading">
+                            <td colspan="3" class="prices-table__loading">
                                 <div class="spinner"></div>
                                 <span><?php esc_html_e('Loading prices...', 'ippgi'); ?></span>
                             </td>
@@ -250,8 +257,8 @@ $attributes_html = str_replace(
         <div class="prices-disclaimer">
             <p class="prices-disclaimer__text">
                 <strong class="prices-disclaimer__label"><?php esc_html_e('Disclaimer:', 'ippgi'); ?></strong>
-                <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
-                <span class="prices-disclaimer__notice"><?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?></span>
+                <?php esc_html_e('iPPGI strives to provide accurate and objective data, information, and opinions; however, we make no representations or warranties regarding their accuracy, completeness, or timeliness. Prices are derived from multiple market sources, including public market data, supplier quotations, and internal estimation models. All information is for informational purposes only and does not constitute financial, investment, trading, or professional advice.', 'ippgi'); ?>
+                <?php esc_html_e('Prices are subject to change without notice.', 'ippgi'); ?>
                 <?php esc_html_e('Users should exercise independent judgment and conduct their own due diligence; iPPGI shall not be held liable for any loss or damage arising from the use of this information. All content is the exclusive intellectual property of iPPGI. Any unauthorized reproduction, distribution, or copying without prior written consent is strictly prohibited. iPPGI reserves all rights to pursue legal action for any infringement.', 'ippgi'); ?>
             </p>
         </div>

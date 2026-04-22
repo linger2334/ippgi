@@ -101,6 +101,7 @@ require_once IPPGI_THEME_DIR . '/inc/enqueue.php';
 require_once IPPGI_THEME_DIR . '/inc/customizer.php';
 require_once IPPGI_THEME_DIR . '/inc/template-functions.php';
 require_once IPPGI_THEME_DIR . '/inc/membership.php';
+require_once IPPGI_THEME_DIR . '/inc/quote-requests.php';
 require_once IPPGI_THEME_DIR . '/inc/announcement.php';
 require_once IPPGI_THEME_DIR . '/inc/admin-settings.php';
 
@@ -154,7 +155,7 @@ add_action('template_redirect', function() {
 /**
  * Protect prices pages:
  * - /prices requires login only
- * - /price-detail requires Plus/bonus
+ * - /price-detail requires login only
  */
 add_action('template_redirect', function() {
     $is_prices_page = is_page_template('page-templates/page-prices.php') || is_page('prices');
@@ -173,11 +174,6 @@ add_action('template_redirect', function() {
         }
         $login_url = add_query_arg('redirect_to', $current_url, ippgi_get_login_url());
         wp_redirect($login_url);
-        exit;
-    }
-
-    if ($is_price_detail_page && !ippgi_user_has_plus()) {
-        wp_redirect(ippgi_get_subscribe_url());
         exit;
     }
 }, 5);

@@ -69,23 +69,10 @@ $prices = apply_filters('ippgi_price_table_data', $sample_prices);
                 <th><?php esc_html_e('Products', 'ippgi'); ?></th>
                 <th><?php esc_html_e('Dimensions(mm)', 'ippgi'); ?></th>
                 <th><?php esc_html_e('Latest($)', 'ippgi'); ?></th>
-                <th><?php esc_html_e('Change($)', 'ippgi'); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($prices as $price) : ?>
-                <?php
-                $change_value = (float) $price['change'];
-                $change_class = 'neutral';
-                $change_prefix = '$';
-                if ($change_value > 0) {
-                    $change_class = 'up';
-                    $change_prefix = '+$';
-                } elseif ($change_value < 0) {
-                    $change_class = 'down';
-                    $change_prefix = '-$';
-                }
-                ?>
                 <tr>
                     <td data-label="<?php esc_attr_e('Products', 'ippgi'); ?>">
                         <span class="price-table__product"><?php echo esc_html($price['product']); ?></span>
@@ -95,11 +82,6 @@ $prices = apply_filters('ippgi_price_table_data', $sample_prices);
                     </td>
                     <td data-label="<?php esc_attr_e('Latest($)', 'ippgi'); ?>">
                         <span class="price-table__price">$<?php echo esc_html(number_format($price['price'])); ?></span>
-                    </td>
-                    <td data-label="<?php esc_attr_e('Change($)', 'ippgi'); ?>">
-                        <span class="price-table__change price-table__change--<?php echo esc_attr($change_class); ?>">
-                            <?php echo esc_html($change_prefix . number_format(abs($change_value), 2)); ?>
-                        </span>
                     </td>
                 </tr>
             <?php endforeach; ?>

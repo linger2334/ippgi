@@ -99,4 +99,24 @@ foreach ($results['materials'] as $material => $material_results) {
     );
 }
 
+if (!empty($results['failures'])) {
+    echo "\n失败明细:\n";
+    echo str_repeat('-', 50) . "\n";
+
+    foreach ($results['failures'] as $failure) {
+        $date_info = !empty($failure['date'])
+            ? $failure['date']
+            : (!empty($failure['date_range']) ? $failure['date_range'] : '-');
+
+        echo sprintf(
+            "[%s] 日期: %s | 规格: %s | 阶段: %s | 原因: %s\n",
+            isset($failure['material']) ? strtoupper($failure['material']) : '-',
+            $date_info,
+            isset($failure['product_spec']) && '' !== $failure['product_spec'] ? $failure['product_spec'] : '-',
+            isset($failure['stage']) ? $failure['stage'] : '-',
+            isset($failure['message']) ? $failure['message'] : '-'
+        );
+    }
+}
+
 echo "\n完成!\n";

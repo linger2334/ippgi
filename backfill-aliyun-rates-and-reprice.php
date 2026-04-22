@@ -1,6 +1,8 @@
 <?php
 /**
- * Backfill recent historical exchange rates from Aliyun and reprice historical price records.
+ * Legacy maintenance script.
+ * Historical price repricing is no longer supported because RMB source columns
+ * are no longer stored in the history tables.
  *
  * Usage:
  *   php backfill-aliyun-rates-and-reprice.php
@@ -47,9 +49,9 @@ foreach ($args as $arg) {
         echo "用法:\n";
         echo "  php backfill-aliyun-rates-and-reprice.php [开始日期] [结束日期] [--dry-run] [--yes]\n\n";
         echo "说明:\n";
-        echo "  - 默认处理最近半年的数据（站点时区 Asia/Shanghai）\n";
-        echo "  - 从阿里云重新获取每一天的 USD/CNY 历史汇率\n";
-        echo "  - 用新汇率重算 6 张价格历史表中的 USD 价格和 exchange_rate 字段\n\n";
+        echo "  - 该脚本已停用。\n";
+        echo "  - 历史价格表不再保留人民币底稿字段，无法安全重算历史 USD 价格。\n";
+        echo "  - 如需补历史价格，请使用 import-missing-days.php 重新按原始 API 数据补数。\n\n";
         echo "示例:\n";
         echo "  php backfill-aliyun-rates-and-reprice.php\n";
         echo "  php backfill-aliyun-rates-and-reprice.php 2025-09-23 2026-03-23\n";
@@ -80,6 +82,9 @@ if ($start > $end) {
     fwrite(STDERR, "错误: 开始日期不能晚于结束日期。\n");
     exit(1);
 }
+
+fwrite(STDERR, "错误: backfill-aliyun-rates-and-reprice.php 已停用。历史价格表不再保留人民币底稿字段，无法安全重算历史 USD 价格。请改用 php import-missing-days.php [开始日期] [结束日期] 重新补数。\n");
+exit(1);
 
 $total_days = (int) $start->diff($end)->format('%a') + 1;
 

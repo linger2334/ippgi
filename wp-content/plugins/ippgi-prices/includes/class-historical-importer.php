@@ -16,7 +16,7 @@ class IPPGI_Prices_Historical_Importer {
     /**
      * Statistics API endpoint
      */
-    const STATISTICS_URL = 'https://api.rendui.com/v1/jec/rendui/prices/statistics';
+    const STATISTICS_URL = IPPGI_Prices_API_Client::STATISTICS_URL;
 
     /**
      * API client instance
@@ -46,6 +46,7 @@ class IPPGI_Prices_Historical_Importer {
             'failed' => 0,
             'skipped' => 0,
             'materials' => array(),
+            'failures' => array(),
         );
 
         error_log(sprintf(
@@ -53,17 +54,42 @@ class IPPGI_Prices_Historical_Importer {
             $from,
             $to
         ));
+        $this->output_progress(sprintf(
+            '[补数进度] 开始导入历史价格: %s -> %s',
+            $this->extract_date($from),
+            $this->extract_date($to)
+        ));
 
         // First, get price list to know what product specs exist
         $price_list = $this->api_client->get_price_list();
 
         if (is_wp_error($price_list)) {
             error_log('IPPGI Prices: Failed to get price list for import');
+            $results['failed']++;
+            $results['failures'][] = array(
+                'material' => 'ALL',
+                'product_spec' => '',
+                'date' => '',
+                'date_range' => $this->format_date_range($from, $to),
+                'stage' => 'price_list',
+                'message' => $price_list->get_error_message(),
+            );
             return $results;
         }
 
         // Iterate through each material category
+        $material_types = array_keys(IPPGI_Prices_API_Client::CATEGORY_IDS);
+        $material_total = count($material_types);
+        $material_index = 0;
+
         foreach (IPPGI_Prices_API_Client::CATEGORY_IDS as $material_type => $category_id) {
+            $material_index++;
+            $this->output_progress(sprintf(
+                '[补数进度] 品类 %d/%d: %s',
+                $material_index,
+                $material_total,
+                strtoupper($material_type)
+            ));
             $material_results = $this->import_material_data(
                 $material_type,
                 $category_id,
@@ -77,6 +103,7 @@ class IPPGI_Prices_Historical_Importer {
             $results['successful'] += $material_results['successful'];
             $results['failed'] += $material_results['failed'];
             $results['skipped'] += $material_results['skipped'];
+            $results['failures'] = array_merge($results['failures'], $material_results['failures']);
         }
 
         error_log(sprintf(
@@ -107,6 +134,7 @@ class IPPGI_Prices_Historical_Importer {
             'failed' => 0,
             'skipped' => 0,
             'product_specs' => array(),
+            'failures' => array(),
         );
 
         // Get product specs for this material from price list
@@ -124,7 +152,15 @@ class IPPGI_Prices_Historical_Importer {
         ));
 
         // Fetch historical data for each product spec
-        foreach ($product_specs as $product_spec) {
+        $total_specs = count($product_specs);
+        foreach ($product_specs as $index => $product_spec) {
+            $this->output_progress(sprintf(
+                '[补数进度] %s 规格 %d/%d: %s',
+                strtoupper($material_type),
+                $index + 1,
+                $total_specs,
+                $product_spec
+            ));
             $spec_results = $this->fetch_and_store_historical_data(
                 $material_type,
                 $category_id,
@@ -138,6 +174,7 @@ class IPPGI_Prices_Historical_Importer {
             $results['successful'] += $spec_results['successful'];
             $results['failed'] += $spec_results['failed'];
             $results['skipped'] += $spec_results['skipped'];
+            $results['failures'] = array_merge($results['failures'], $spec_results['failures']);
 
             // Add small delay to avoid overwhelming the API
             usleep(100000); // 100ms delay
@@ -190,7 +227,136 @@ class IPPGI_Prices_Historical_Importer {
             'successful' => 0,
             'failed' => 0,
             'skipped' => 0,
+            'failures' => array(),
         );
+
+        $error_message = '';
+        $list = $this->fetch_historical_list($category_id, $product_spec, $from, $to, $error_message);
+
+        if (false === $list) {
+            if ($this->is_multi_day_range($from, $to)) {
+                error_log(sprintf(
+                    'IPPGI Prices: Falling back to daily import for %s after range request failed: %s',
+                    $product_spec,
+                    $error_message
+                ));
+                $this->output_progress(sprintf(
+                    '[补数进度] 区间请求失败，切换按天补数: %s | 原因: %s',
+                    $product_spec,
+                    $error_message
+                ));
+
+                return $this->fetch_and_store_historical_data_by_day(
+                    $material_type,
+                    $category_id,
+                    $product_spec,
+                    $from,
+                    $to
+                );
+            }
+
+            $results['failed']++;
+            $this->add_failure(
+                $results,
+                $material_type,
+                $product_spec,
+                $this->extract_date($from),
+                '',
+                'fetch',
+                $error_message
+            );
+            return $results;
+        }
+
+        $results['total_records'] = count($list);
+        $this->store_historical_records($material_type, $product_spec, $list, $results);
+
+        return $results;
+    }
+
+    /**
+     * Fetch and store historical data one day at a time.
+     *
+     * @param string $material_type Material type
+     * @param string $category_id Category ID
+     * @param string $product_spec Product specification
+     * @param string $from Start date
+     * @param string $to End date
+     * @return array Results for this product spec
+     */
+    private function fetch_and_store_historical_data_by_day($material_type, $category_id, $product_spec, $from, $to) {
+        $results = array(
+            'total_records' => 0,
+            'successful' => 0,
+            'failed' => 0,
+            'skipped' => 0,
+            'failures' => array(),
+        );
+
+        $dates = $this->get_dates_in_range($from, $to);
+        if (empty($dates)) {
+            $results['failed']++;
+            $this->add_failure(
+                $results,
+                $material_type,
+                $product_spec,
+                '',
+                $this->format_date_range($from, $to),
+                'date_parse',
+                'Unable to split failed range into daily imports'
+            );
+            return $results;
+        }
+
+        $total_dates = count($dates);
+        foreach ($dates as $index => $date) {
+            $this->output_progress(sprintf(
+                '[补数进度] %s 按天回退 %d/%d: %s',
+                $product_spec,
+                $index + 1,
+                $total_dates,
+                $date
+            ));
+            $day_start = $date . ' 00:00:00';
+            $day_end = $date . ' 23:59:59';
+            $error_message = '';
+            $list = $this->fetch_historical_list($category_id, $product_spec, $day_start, $day_end, $error_message);
+
+            if (false === $list) {
+                $results['failed']++;
+                $this->add_failure(
+                    $results,
+                    $material_type,
+                    $product_spec,
+                    $date,
+                    '',
+                    'fetch',
+                    $error_message
+                );
+                usleep(100000);
+                continue;
+            }
+
+            $results['total_records'] += count($list);
+            $this->store_historical_records($material_type, $product_spec, $list, $results);
+            usleep(100000);
+        }
+
+        return $results;
+    }
+
+    /**
+     * Fetch historical list data from API.
+     *
+     * @param string $category_id Category ID
+     * @param string $product_spec Product specification
+     * @param string $from Start date
+     * @param string $to End date
+     * @param string $error_message Error message output
+     * @return array|false Historical list or false on failure
+     */
+    private function fetch_historical_list($category_id, $product_spec, $from, $to, &$error_message) {
+        $error_message = '';
 
         // Build URL with query parameters
         $url = add_query_arg(array(
@@ -201,32 +367,64 @@ class IPPGI_Prices_Historical_Importer {
             'categoryId' => $category_id,
         ), self::STATISTICS_URL);
 
-        // Make API request
-        $response = wp_remote_get($url, array(
-            'headers' => array(
-                'phone' => IPPGI_Prices_API_Client::API_PHONE,
-            ),
-            'timeout' => 60,
-        ));
+        $max_attempts = 3;
+        $response = false;
 
-        if (is_wp_error($response)) {
-            error_log("IPPGI Prices: Failed to fetch historical data for {$product_spec}: " . $response->get_error_message());
-            $results['failed']++;
-            return $results;
+        for ($attempt = 1; $attempt <= $max_attempts; $attempt++) {
+            // Make API request
+            $response = wp_remote_get($url, array(
+                'headers' => array(
+                    'phone' => IPPGI_Prices_API_Client::API_PHONE,
+                ),
+                'timeout' => 60,
+            ));
+
+            if (!is_wp_error($response)) {
+                break;
+            }
+
+            $error_message = $response->get_error_message();
+            if (!$this->should_retry_historical_request($error_message) || $attempt === $max_attempts) {
+                error_log("IPPGI Prices: Failed to fetch historical data for {$product_spec}: " . $error_message);
+                return false;
+            }
+
+            $this->output_progress(sprintf(
+                '[补数进度] 瞬时网络错误，准备重试 %d/%d: %s | 原因: %s',
+                $attempt + 1,
+                $max_attempts,
+                $product_spec,
+                $error_message
+            ));
+            usleep($attempt * 300000);
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
 
         if (!isset($data['success']) || !$data['success'] || !isset($data['result']['list'])) {
+            $error_message = 'Invalid response';
+            if (isset($data['message'])) {
+                $error_message .= ': ' . (string) $data['message'];
+            } elseif (isset($data['msg'])) {
+                $error_message .= ': ' . (string) $data['msg'];
+            }
             error_log("IPPGI Prices: Invalid response for {$product_spec}");
-            $results['failed']++;
-            return $results;
+            return false;
         }
 
-        $list = $data['result']['list'];
-        $results['total_records'] = count($list);
+        return $data['result']['list'];
+    }
 
+    /**
+     * Store historical records and update result counters.
+     *
+     * @param string $material_type Material type
+     * @param string $product_spec Product specification
+     * @param array $list Historical record list
+     * @param array $results Results array passed by reference
+     */
+    private function store_historical_records($material_type, $product_spec, $list, &$results) {
         // Parse product spec to extract width and thickness
         $spec_parts = explode('_', $product_spec);
         $width = isset($spec_parts[1]) ? $spec_parts[1] : '';
@@ -241,8 +439,22 @@ class IPPGI_Prices_Historical_Importer {
                 continue;
             }
 
-            // Extract date from satisticsTime (format: YYYY-MM-DD HH:MM:SS)
-            $statistics_time = $record['satisticsTime'];
+            // Normalize statistics time because daily fallback responses may omit satisticsTime.
+            $statistics_time = $this->resolve_statistics_time($record);
+            if ('' === $statistics_time) {
+                $results['failed']++;
+                $this->add_failure(
+                    $results,
+                    $material_type,
+                    $product_spec,
+                    '',
+                    '',
+                    'normalize',
+                    'Missing satisticsTime and timestamp in historical record'
+                );
+                continue;
+            }
+
             $date = substr($statistics_time, 0, 10); // Extract YYYY-MM-DD
 
             // Get exchange rate for this specific date
@@ -257,9 +469,7 @@ class IPPGI_Prices_Historical_Importer {
                 'product_spec' => $record['productSpec'],
                 'statistics_time' => $statistics_time,
                 'timestamp' => $record['timestamp'],
-                'price_cny' => $record['price'],
                 'price_usd' => $price_usd,
-                'price_tax_cny' => $record['priceTax'],
                 'price_tax_usd' => $price_tax_usd,
                 'exchange_rate' => $exchange_rate,
                 'site_id' => $record['siteId'],
@@ -275,9 +485,173 @@ class IPPGI_Prices_Historical_Importer {
                 $results['successful']++;
             } else {
                 $results['failed']++;
+                global $wpdb;
+                $message = 'Database insert/update failed';
+                if (!empty($wpdb->last_error)) {
+                    $message .= ': ' . $wpdb->last_error;
+                }
+                $this->add_failure(
+                    $results,
+                    $material_type,
+                    $product_spec,
+                    $date,
+                    '',
+                    'database',
+                    $message
+                );
             }
         }
+    }
 
-        return $results;
+    /**
+     * Add a failure detail to the results array.
+     *
+     * @param array $results Results array passed by reference
+     * @param string $material_type Material type
+     * @param string $product_spec Product specification
+     * @param string $date Failed date
+     * @param string $date_range Failed date range
+     * @param string $stage Failure stage
+     * @param string $message Failure message
+     */
+    private function add_failure(&$results, $material_type, $product_spec, $date, $date_range, $stage, $message) {
+        $results['failures'][] = array(
+            'material' => $material_type,
+            'product_spec' => $product_spec,
+            'date' => $date,
+            'date_range' => $date_range,
+            'stage' => $stage,
+            'message' => $message,
+        );
+    }
+
+    /**
+     * Extract YYYY-MM-DD from a datetime string.
+     *
+     * @param string $datetime Datetime string
+     * @return string Date
+     */
+    private function extract_date($datetime) {
+        return substr((string) $datetime, 0, 10);
+    }
+
+    /**
+     * Print progress in CLI runs without affecting web requests.
+     *
+     * @param string $message Progress message
+     * @return void
+     */
+    private function output_progress($message) {
+        if (!$this->is_cli_context()) {
+            return;
+        }
+
+        echo $message . PHP_EOL;
+        if (function_exists('flush')) {
+            flush();
+        }
+    }
+
+    /**
+     * Determine whether importer is running in CLI context.
+     *
+     * @return bool
+     */
+    private function is_cli_context() {
+        return defined('STDIN') || 'cli' === PHP_SAPI || 'phpdbg' === PHP_SAPI;
+    }
+
+    /**
+     * Determine whether a historical API error is worth retrying.
+     *
+     * @param string $error_message Remote error message
+     * @return bool
+     */
+    private function should_retry_historical_request($error_message) {
+        $message = strtolower((string) $error_message);
+
+        return false !== strpos($message, 'curl error 35')
+            || false !== strpos($message, 'tls connect error')
+            || false !== strpos($message, 'unexpected eof while reading');
+    }
+
+    /**
+     * Resolve a usable statistics datetime from API payload.
+     *
+     * @param array $record Historical record
+     * @return string Datetime in Y-m-d H:i:s format, or empty string on failure
+     */
+    private function resolve_statistics_time($record) {
+        if (!empty($record['satisticsTime'])) {
+            return (string) $record['satisticsTime'];
+        }
+
+        if (empty($record['timestamp']) || !is_numeric($record['timestamp'])) {
+            return '';
+        }
+
+        $timestamp_seconds = (int) floor(((float) $record['timestamp']) / 1000);
+        if ($timestamp_seconds <= 0) {
+            return '';
+        }
+
+        try {
+            return (new DateTimeImmutable('@' . $timestamp_seconds))
+                ->setTimezone(wp_timezone())
+                ->format('Y-m-d H:i:s');
+        } catch (Exception $e) {
+            return '';
+        }
+    }
+
+    /**
+     * Format a date range for reporting.
+     *
+     * @param string $from Start datetime
+     * @param string $to End datetime
+     * @return string Date range
+     */
+    private function format_date_range($from, $to) {
+        return $this->extract_date($from) . ' 至 ' . $this->extract_date($to);
+    }
+
+    /**
+     * Check whether a date range spans more than one day.
+     *
+     * @param string $from Start datetime
+     * @param string $to End datetime
+     * @return bool True when range spans multiple dates
+     */
+    private function is_multi_day_range($from, $to) {
+        return $this->extract_date($from) !== $this->extract_date($to);
+    }
+
+    /**
+     * Get all dates in an inclusive date range.
+     *
+     * @param string $from Start datetime
+     * @param string $to End datetime
+     * @return array Dates in YYYY-MM-DD format
+     */
+    private function get_dates_in_range($from, $to) {
+        $timezone = wp_timezone();
+        $start_date = $this->extract_date($from);
+        $end_date = $this->extract_date($to);
+
+        $start = DateTimeImmutable::createFromFormat('Y-m-d', $start_date, $timezone);
+        $end = DateTimeImmutable::createFromFormat('Y-m-d', $end_date, $timezone);
+
+        if (!$start || !$end || $start > $end) {
+            return array();
+        }
+
+        $dates = array();
+        $current = $start;
+        while ($current <= $end) {
+            $dates[] = $current->format('Y-m-d');
+            $current = $current->modify('+1 day');
+        }
+
+        return $dates;
     }
 }

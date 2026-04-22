@@ -20,7 +20,7 @@ class IPPGI_Prices_Cache_Manager {
 
     /**
      * Cache expiration time (0 = never expires)
-     * Cache is cleared by the hourly refresh task at 09:00-17:00
+     * Cache is cleared by the hourly refresh task at 09:10-17:10
      */
     const CACHE_EXPIRATION = 0;
 

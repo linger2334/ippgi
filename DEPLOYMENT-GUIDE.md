@@ -74,21 +74,21 @@ wp cron event list --path=/home/html/www/ippgi --allow-root | grep ippgi
 ```
 
 应该看到 10 个任务：
-- 1 个午夜任务：`ippgi_prices_midnight_collection`（00:00）
-- 9 个小时任务：`ippgi_prices_hourly_update`（09:00-17:00）
+- 1 个午夜任务：`ippgi_prices_midnight_collection`（00:10）
+- 9 个小时任务：`ippgi_prices_hourly_update`（09:10-17:10）
 
 示例输出：
 ```
-ippgi_prices_midnight_collection    2026-01-28 00:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 09:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 10:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 11:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 12:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 13:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 14:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 15:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 16:00:00    1 day
-ippgi_prices_hourly_update          2026-01-28 17:00:00    1 day
+ippgi_prices_midnight_collection    2026-01-28 00:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 09:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 10:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 11:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 12:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 13:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 14:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 15:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 16:10:00    1 day
+ippgi_prices_hourly_update          2026-01-28 17:10:00    1 day
 ```
 
 ### 4. 手动调度任务（如果缺失）
@@ -112,21 +112,26 @@ foreach (\$cron as \$ts => \$hooks) {
             wp_unschedule_event(\$ts, 'ippgi_prices_midnight_collection', \$event['args']);
         }
     }
+    if (isset(\$hooks['ippgi_prices_exchange_rate_reprice'])) {
+        foreach (\$hooks['ippgi_prices_exchange_rate_reprice'] as \$key => \$event) {
+            wp_unschedule_event(\$ts, 'ippgi_prices_exchange_rate_reprice', \$event['args']);
+        }
+    }
 }
 echo \"Cleared existing tasks\n\";
 
 // 调度午夜任务
-\$tomorrow = strtotime('tomorrow 00:00:00');
+\$tomorrow = strtotime('tomorrow 00:10:00');
 wp_schedule_event(\$tomorrow, 'daily', 'ippgi_prices_midnight_collection');
 echo \"Scheduled midnight collection at: \" . date('Y-m-d H:i:s', \$tomorrow) . \"\n\";
 
-// 调度小时任务 (09:00 - 17:00)
+// 调度小时任务 (09:10 - 17:10)
 \$today = date('Y-m-d');
 \$now = current_time('timestamp');
 \$hours = [9, 10, 11, 12, 13, 14, 15, 16, 17];
 
 foreach (\$hours as \$hour) {
-    \$time = strtotime(\"\$today \$hour:00:00\");
+    \$time = strtotime(\"\$today \$hour:10:00\");
     if (\$time < \$now) {
         \$time = strtotime('+1 day', \$time);
     }
@@ -245,8 +250,8 @@ wp db query "SELECT COUNT(*) as count, DATE(created_at) as date FROM ippgi_price
 
 | 任务 | 执行时间 | 功能 |
 |------|----------|------|
-| `ippgi_prices_midnight_collection` | 每天 00:00 | 保存昨日价格数据到数据库 |
-| `ippgi_prices_hourly_update` | 每天 09:00-17:00 | 清除缓存并获取最新价格 |
+| `ippgi_prices_midnight_collection` | 每天 00:10 | 保存缓存中的业务日价格快照和汇率快照；若缓存缺失则回源抓取最新价格列表兜底 |
+| `ippgi_prices_hourly_update` | 每天 09:10-17:10 | 清除实时价/汇率缓存并获取最新价格 |
 
 ## 更新日志
 

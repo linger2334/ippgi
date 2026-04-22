@@ -318,8 +318,10 @@ Body: cancel_at_period_end=true
 - `product_spec` - 产品规格
 - `statistics_time` - 价格数据所属日期的凌晨时间（`YYYY-MM-DD 00:00:00`）
 - `timestamp` - `statistics_time` 的 Unix 时间戳
-- `price_cny` / `price_usd` - 价格（人民币/美元）
-- `price_tax_cny` / `price_tax_usd` - 含税价格
+- `price_usd` - 美元价格
+- `price_usd_min` / `price_usd_max` - 美元价格区间下限/上限（用于午夜快照落库）
+- `price_tax_usd` - 美元含税价格
+- `price_tax_usd_min` / `price_tax_usd_max` - 美元含税价格区间下限/上限（用于午夜快照落库）
 - `exchange_rate` - 汇率（从缓存的价格数据中提取）
 - `width` / `thickness` - 宽度/厚度
 - `created_at` - 记录创建时间（实际保存时的时间）
@@ -393,6 +395,11 @@ Body: cancel_at_period_end=true
 
 **注意**：`bonus` 状态单独展示，不再归类为 `terminated`。当用户处于奖励期（新注册奖励、邀请奖励激活、后台手动加天数后激活）时，Profile 页面会显示奖励期正在使用中。
 状态判断规则：统一以 `ippgi_bonus_access_end > 当前时间` 判断奖励期是否 active；`ippgi_unused_bonus_days` 仅作为库存天数。
+
+**当前 UI 状态（2026-04-23 更新）**：
+- `/profile` 页面当前已隐藏 `Subscription status` 这一整块状态展示内容，不再在页面中直接显示 `Active / Cancelled / Terminated / bonus` 文案。
+- `Subscription information` 区块当前仅保留 `Remaining Bonus Days` 内容，原先状态内容下方的灰色分割线也已移除。
+- 取消订阅弹窗 DOM、前端脚本以及 `ippgi_cancel_subscription` AJAX 逻辑仍保留在模板中，供后续重新开放取消订阅入口时直接复用；只是当前页面没有显示触发按钮。
 
 ### 工作流程
 1. 用户访问 `/invite` 页面获取邀请链接
@@ -652,7 +659,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 未登录用户访问 `/prices`：跳转登录页，并携带 `redirect_to`
 - 已登录用户访问 `/prices`：允许直接进入，不再要求 Plus 或 bonus
 - 首页价格表、Read More、Footer 产品价格链接、导航 `Prices & Trends` 跳转逻辑已统一为与直链访问 `/prices` 一致
-- 价格详情页 `/price-detail` 仍单独要求 Plus 或活跃 bonus 权限
+- 价格详情页 `/price-detail` 同样为登录即可访问，不再要求 Plus 或 bonus 权限
 
 **页面结构**：
 1. **页面标题**
@@ -685,10 +692,12 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 7. **价格表格**
    - 表头：Dimensions(mm) | Latest($) | Change($) | Historical
+   - `Latest($)` 显示美元区间值而非单点值；区间由每次价格列表刷新时统一生成的一组全局随机上下浮动因子计算
+   - 首页 Latest 颜色按不含税区间均价与上一轮不含税区间均价比较决定；`/prices` 页 Latest 颜色按当前默认显示口径（现为含税）对应区间均价与上一轮同口径区间均价比较决定
    - 蓝色表头背景（#e2f5fb）
    - Dimensions 列显示规则：
-     - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`（如 `0.4*1200`）
-     - **HRC, AL**：显示 `厚度*宽度 产品名称`（如 `2.0*1010 热卷`）
+      - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`（如 `0.4*1200`）
+      - **HRC, AL**：显示 `厚度*宽度 产品名称`（如 `2.0*1010 热卷`）
    - Change 列根据涨跌显示不同颜色
    - Historical 列显示 "Trend >" 按钮，跳转到价格详情页
 
@@ -740,26 +749,22 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
    - 收藏 ID 格式：`type-productSpec`（如 `ppgi-1482328115005964290_1000_0.11_彩涂`）
 
 4. **实时数据区域**
-   - 标题：`Real-Time Data`
-   - 圆形含税切换按钮，默认勾选
-   - 按钮文案：`Incl. China VAT`
-   - 默认展示含税价格（使用 `lastpriceTax_usd`、`priceTax_usd`、`riseAndFallTax_usd` 等税价字段）
-   - 涨跌值和百分比（涨绿跌红）
-   - 统计数据网格：
-     - Avg：使用 `price_usd` / `priceTax_usd`
-     - WoW：使用 `lastWeekDiff_usd` / `lastWeekDiffTax_usd`
-     - MoM：使用 `lastMonthDiff_usd` / `lastMonthDiffTax_usd`
-     - YoY：使用 `lastYearsDiff_usd` / `lastYearsDiffTax_usd`
+   - 标题：`Real-Time Price`
+   - 不再请求单规格 `/price` 实时接口，也不再显示含税切换按钮
+   - 默认直接显示该规格在价格列表缓存中的**含税美元价格区间**（优先读取 `lastpriceTax_range_min_usd` / `lastpriceTax_range_max_usd`，回退到单点税价字段）
+   - 不再显示涨跌值、涨跌百分比、Avg、WoW、MoM、YoY
+   - 实时价显示格式统一为 `$lower~$upper`，保留两位小数
 
 5. **价格图表区域**
    - **日期范围选择器**：日历图标 + "Start Date ~ End Date"，点击打开底部日期选择器
-   - 时间范围标签：TD | 1M | 6M | 1Y | 2Y | 3Y | 4Y（带滑动切换动画）
+   - 时间范围标签：`7D | 15D | 1M`（带滑动切换动画）
    - 图表标题：`{产品代码} Dimensions(mm):{规格}`
-   - **TD 标签**：Canvas 绘制当天价格走势图（9:00 AM 后从 `/statistics` API 获取数据）
-   - **1M/6M/1Y/2Y/3Y/4Y 标签**：从本地数据库 `/historical` API 获取历史数据
-   - **自定义日期范围**：通过日期选择器选择任意开始和结束日期
-   - **气球标记**：图表最高点和最低点显示 HTML 气球标记（椭圆形，亮蓝色 #7EE0FF）
-   - **X 轴标签**：TD 显示时间（09:00-18:00），历史数据显示日期（MM-DD 格式）
+   - 预设标签和自定义区间均统一从本地数据库 `/historical` API 获取历史数据；价格详情页前端已不再使用 `/statistics`
+   - 日期选择器已禁止“单日范围”确认，避免回退到旧的单日统计接口
+   - 图表改为**两条含税美元区间线**：下轨使用 `price_tax_usd_min`，上轨使用 `price_tax_usd_max`
+   - 两条线之间带淡色填充区域，触摸十字线时信息框显示 `$lower~$upper`
+   - 原最高点/最低点气球标签已隐藏
+   - **X 轴标签**：统一显示日期（MM-DD 格式），并按当前数据范围均匀抽样
    - **数据降采样**：数据量超过 300 点时自动降采样，保证图表流畅显示
 
 6. **日期选择器（底部弹出）**
@@ -767,28 +772,62 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
    - 支持选择开始日期和结束日期
    - 日历导航（上一月/下一月）
    - 禁止选择未来日期
+   - 禁止确认同一天的单日范围
    - Clear 按钮清空选择，Confirm 按钮确认并加载数据
-   - 选择自定义日期范围后，预设标签（TD/1M等）取消激活状态
+   - 选择自定义日期范围后，预设标签（7D/15D/1M）取消激活状态
    - 点击预设标签时，日期选择器文本重置为 "Start Date ~ End Date"
 
-7. **Disclaimer**
-   - 动态产品名称
+7. **询价卡片**
+   - 新增内嵌 `Request a Quote` 卡片，位置在图表下方、Disclaimer 上方
+   - 复用公共模板 `template-parts/quote-request-form.php`
+   - `Steel Product of Interest` 会自动预填当前产品代码与规格（如 `GL 0.13*1000`）
+   - 描述文案使用单个段落加 `<br>` 手动换行，避免段落间距过大
+
+8. **Disclaimer**
+   - 使用与价格列表页一致的整段免责声明文案与样式
 
 **URL 参数**：
 - `?type=ppgi&spec=categoryId_width_thickness_材料名称` - 从价格列表页跳转
 - `?material=gi` - 旧版兼容
 
+**访问控制与容错**：
+- `/price-detail` 当前为“登录即可访问”
+- 页面会先执行 `ippgi_normalize_product_type()`；如果产品类型不存在或当前被标记为不可见（如已隐藏的 HRC），直接返回 404，而不是回退显示默认产品
+
 **数据来源**：
-- 实时数据通过 REST API `/wp-json/ippgi-prices/v1/price` 获取
-- 客户端发送：`productSpec`、`categoryId`（不再传 `date`）
-- 服务器按业务日期规则补全日期（北京时间 9:00 前用昨天，9:00 及之后用今天），并添加 `siteId` 后转发到 api.rendui.com
-- 响应数据自动转换为 USD 并缓存
+- 单规格实时价格 REST API `/wp-json/ippgi-prices/v1/price` 已停用；如收到请求，服务端直接返回错误，不再向上游转发
 
 **CSS 样式**：位于 `/assets/css/components.css`
 - `.detail-product-info` / `.detail-product-table` - 产品信息表格
 - `.detail-realtime` - 实时数据区域
 - `.detail-chart-section` - 图表区域
 - `.detail-chart__range-tabs` - 时间范围标签
+- `.quote-card` / `.quote-form` - 价格详情页内嵌询价卡片
+
+### 询价表单（Quote Request）
+
+**公共模板**：
+- `template-parts/quote-request-form.php` - 询价表单主体
+- `template-parts/quote-request-modal.php` - 首页弹窗容器
+
+**当前入口**：
+1. 首页价格区 `Read More` 下方文案 `Looking for a lower price or customized specs? Get an Official Quote.` 点击后打开询价弹窗
+2. 价格详情页图表下方直接展示内嵌询价卡片（非弹窗）
+
+**表单字段**：
+- 必填：`Name`、`Email / WhatsApp`、`Company`、`Steel Product of Interest`
+- 选填：`Additional Details (Optional)`
+
+**提交逻辑**：
+- 首页弹窗与价格详情页内嵌卡片共用同一套前端提交逻辑（`assets/js/main.js`）
+- 后端统一走 `ippgi_submit_quote_request` AJAX action
+- `source` 当前支持：
+  - `homepage`
+  - `price_detail`
+
+**校验说明**：
+- 前端仍使用浏览器原生 `required` 校验提示，提示语言取决于用户浏览器/系统语言，而不是站点语言
+- 输入框文字颜色、标题颜色、描述颜色当前统一使用 `var(--color-text-primary)`（`#333333`）
 
 ---
 
@@ -799,22 +838,18 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/wp-json/ippgi-prices/v1/prices` | GET | 获取所有材料价格列表 |
-| `/wp-json/ippgi-prices/v1/price` | GET | 获取特定规格实时价格 |
+| `/wp-json/ippgi-prices/v1/price` | GET | 已停用，返回错误 |
 | `/wp-json/ippgi-prices/v1/statistics` | GET | 获取价格历史统计（用于 TD 图表，从外部 API） |
 | `/wp-json/ippgi-prices/v1/historical` | GET | 获取历史价格数据（用于 1M-4Y 图表，从本地数据库） |
 
-**实时价格接口参数** (`/price`)：
-| 参数 | 必填 | 说明 |
-|------|------|------|
-| `productSpec` | 是 | 完整产品规格（如 `1482328115005964290_1000_0.11_彩涂`） |
-| `categoryId` | 是 | 分类 ID |
-| `date` | 否 | 日期（YYYY-MM-DD 格式，默认按业务日期：9:00 前昨天，9:00 及之后今天） |
+**实时价格接口** (`/price`)：
+- 该接口已停用；如收到请求，服务端直接返回错误，不再向上游转发。
 
 **数据流程**：
 1. 客户端发送 `productSpec`、`categoryId`（默认不传 `date`）
 2. 服务器按业务日期规则生成请求日期，并添加 `siteId`
 3. 检查缓存（最新价缓存键：`md5(productSpec)`）
-4. 缓存未命中则转发请求到 `api.rendui.com`
+4. 缓存未命中则转发请求到 `www.rendui.com/api`
 5. 响应数据自动进行货币转换（CNY → USD）
 6. 转换后数据缓存并返回
 
@@ -830,7 +865,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 1. 客户端发送 `productSpec`、`categoryId`、`from`、`to`
 2. 服务器生成缓存键：`ippgi_stats_` + `md5(productSpec + '_' + from + '_' + to)`
 3. 缓存命中直接返回（带 `cached: true` 标识）
-4. 缓存未命中则添加 `siteId` 和 `phone` 头转发到 `api.rendui.com/v1/jec/rendui/prices/statistics`
+4. 缓存未命中则添加 `siteId` 和 `phone` 头转发到 `www.rendui.com/api/v1/jec/rendui/prices/statistics`
 5. 响应数据自动进行货币转换（CNY → USD），包括 `list` 数组和 `rangeAvgPrice`
 6. 转换后数据缓存 1 小时（3600 秒）并返回
 
@@ -878,27 +913,26 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 ### 凌晨 00:10 任务流程（北京时间）
 1. **保存昨日数据**
-   - 先强制刷新最新汇率（Aliyun）
    - 读取缓存的价格列表（通常为昨日 17:00 的数据）
-   - 使用最新汇率重算价格列表中的所有美元字段，人民币字段保持不变
-   - 同步重算已缓存单规格详情中的所有美元字段，确保 `/prices` 与 `/price` 使用同一汇率口径
-   - 从重算后的价格列表中提取汇率（`exchange_rate` 字段）
-   - 保存汇率到 `ippgi_prices_exchange_rates` 表
-   - 保存重算后的价格数据到各材料表
+   - 直接按缓存中的原始价格口径保存历史价格快照到各材料表
+   - 从缓存价格列表中提取汇率并保存到 `ippgi_prices_exchange_rates` 表
+   - 不刷新最新汇率
+   - 不重算价格列表缓存中的美元字段
+   - 不重算已缓存单规格详情中的美元字段
+   - 若缓存缺失，允许回源抓取最新价格列表作为兜底
 
-**注意**：00:10 任务不会刷新新的商品行情，但会刷新最新汇率，并基于现有行情缓存统一重算美元价格。缓存中仍保留上一版商品行情，供 00:10-09:10 期间使用。
+**注意**：00:10 任务不会主动刷新最新汇率，也不会统一重算美元价格。缓存中仍保留上一版商品行情，供 00:10-09:10 期间使用；仅在缓存缺失时允许回源抓取最新价格列表兜底。
 
 ### 01:10-08:10、18:10-23:10 每小时汇率刷新（北京时间，共14次）
-1. 强制刷新最新汇率（Aliyun）
-2. 使用最新汇率重算价格列表缓存中的所有美元字段，人民币字段保持不变
-3. 使用最新汇率重算已缓存单规格详情中的所有美元字段，人民币字段保持不变
-4. 不刷新新的商品行情数据，只更新缓存中的美元价格口径
+该批 off-hours 汇率刷新任务已移除，当前不会在这些时段自动刷新汇率，也不会自动重算缓存中的 USD 值。
 
 ### 09:10-17:10 每小时更新（北京时间，共9次）
 1. 清除实时价格缓存和汇率缓存，保留价格列表缓存
 2. 刷新汇率缓存（Aliyun）
-3. 从外部 API 获取最新价格数据
-4. 重新缓存数据
+3. 生成一组“本次刷新共用”的随机区间因子（下限 `0.1%~0.5%`，上限 `1%~2%`）
+4. 从外部 API 逐个分类获取最新价格数据；成功的分类会立刻按最新汇率转换为 USD
+5. 若某分类获取失败，则直接保留该分类的旧 USD 缓存，不再按最新汇率重算
+6. 对本次最终结果中的全部分类统一重算 `Latest($)` 区间上下限，再整体写回价格列表缓存
 
 ### 时区实现说明
 - 使用 `wp_timezone()` 和 `DateTime` 对象计算正确的 Unix 时间戳
@@ -922,25 +956,23 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 **实现位置**：
 - 首页：`/assets/js/main.js` 单次请求 `/prices`（无 `date`），并将结果写入 `sessionStorage`
-- 价格详情页：`/page-templates/page-price-detail.php` 请求 `/price?productSpec=...&categoryId=...`（无 `date`）
+- 价格详情页：不再请求 `/price`，单规格实时价格链路已停用
 
 **服务端支持**：
 - 服务端业务日期函数：北京时间 9:00 前用昨天，9:00 及之后用今天
 - 价格列表缓存键不含日期；按分类拆分为 `ippgi_prices_price_list_category_{category}`，元数据键为 `ippgi_prices_price_list_meta`
 - 价格详情“最新价”缓存键不含日期（`md5(productSpec)`）
-- `/prices/category` 与 `/price` 仍保留可选 `date` 参数，便于运维/调试时覆盖默认日期
+- `/prices/category` 仍保留可选 `date` 参数，便于运维/调试时覆盖默认日期；`/price` 已停用
 
 ---
 
 ## 外部 API 集成
 
 ### 价格数据 API
-- **价格列表**：`GET https://api.rendui.com/v1/jec/rendui/prices/daily`
-  - 请求头：`userid` + `referer`
-  - 注意：**不传 `phone`**
-- **实时价格**：`POST https://api.rendui.com/v1/jec/rendui/daily/getByProductSpecAndDate`
-  - 请求头：`Content-Type: application/json` + `phone: 13792171909`
-- **历史数据**：`GET https://api.rendui.com/v1/jec/rendui/prices/statistics`
+- **价格列表**：`GET https://www.rendui.com/api/v1/jec/rendui/prices/daily`
+  - 不传自定义请求头
+- **实时价格**：`daily/getByProductSpecAndDate` 已停用，服务端不再请求该接口
+- **历史数据**：`GET https://www.rendui.com/api/v1/jec/rendui/prices/statistics`
   - 请求头：`phone: 13792171909`
 
 ### 汇率数据 API
@@ -1022,7 +1054,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 时间范围标签（TD、1M、6M、1Y、2Y、3Y、4Y）
 
 #### 11. 实时价格 API 重构 ✅
-- 重构数据流：客户端 → 服务器 REST API → 缓存检查 → api.rendui.com
+- 重构数据流：客户端 → 服务器 REST API → 缓存检查 → www.rendui.com/api
 - “最新价”缓存键改为仅包含 `productSpec`（`md5(productSpec)`）
 - 自动货币转换（CNY → USD），支持含税/不含税价格
 - 处理 API 响应边缘情况（如 `lastYearsDiff` 为 "-" 字符串）
@@ -1043,8 +1075,8 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 #### 14. 午夜定时任务优化 ✅
 - 00:10 任务仅保存数据，移除了缓存清除和获取新数据步骤
 - 保留 17:10 缓存数据供 00:10-09:10 期间使用
-- 00:10 任务会先刷新最新汇率，再重算价格列表和已缓存单规格详情的美元价格后落库
-- 01:10-08:10、18:10-23:10 每小时新增汇率刷新任务，仅重算价格列表和已缓存单规格详情中的美元价格，不抓取新行情
+- 00:10 任务直接按现有缓存落历史价格快照，并同步保存缓存中的汇率快照；不刷新最新汇率，也不重算价格列表和已缓存单规格详情的美元价格
+- 01:10-08:10、18:10-23:10 的每小时汇率刷新任务已取消
 
 #### 15. 客户端日期参数移除与服务端业务日期统一 ✅
 - 首页价格表和价格详情页请求不再传 `date`
@@ -1053,7 +1085,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - `class-api-client.php` 统一实现业务日期函数供价格列表与价格详情请求复用
 
 #### 16. 价格图表 - TD（当天）数据 ✅
-- `/statistics` REST API 端点：转发请求到 `api.rendui.com/v1/jec/rendui/prices/statistics`
+- `/statistics` REST API 端点：转发请求到 `www.rendui.com/api/v1/jec/rendui/prices/statistics`
 - 服务端自动进行货币转换（CNY → USD），包含 `price`、`priceTax`、`rangeAvgPrice`
 - 缓存策略：键为 `ippgi_stats_` + `md5(productSpec + '_' + from + '_' + to)`，过期时间 1 小时
 - 客户端 TD 标签逻辑：北京时间 9:00 之前不请求数据；9:00 之后请求当天 00:00:00 ~ 当前时间的统计数据
@@ -1391,7 +1423,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **行为确认**：
   - 未登录 → 弹出登录模态框（PC）或跳转登录页（移动）
   - 已登录 → 正常跳转到价格页面
-  - `/price-detail` 详情页仍由服务端单独校验 Plus 或 Bonus 权限
+  - `/price-detail` 详情页同样只校验登录状态
 - **代码逻辑**（`navigateToPrices()` 函数）：
   ```javascript
   if (!ippgiData.hasPremium) {
@@ -1477,7 +1509,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - 修改 09:10-17:10 定时任务逻辑：保留 `price_list` 缓存不预先清理。
 - 实现 `refresh_price_list_incrementally()` 方法，按产品分类逐个获取新价格。
 - 采用“差异覆盖”策略：新获取成功的分类覆盖旧数据。
-- **汇率一致性保障**：获取失败或为空的分类保留旧数据，但会强制使用当前最新的汇率重新计算美元价格，确保全站 6 类产品的汇率字段和计算逻辑完全统一。
+- 获取失败或为空的分类保留旧 USD 缓存原样，不再按当前最新汇率重算；但在本次刷新结束时，系统仍会对全部最终结果统一重算 `Latest($)` 区间上下限。
 
 #### 57. 登录入口统一与重复跳转逻辑收敛 ✅
 - **主入口调整**：`/login/` 作为主登录页；`/membership-login/` 仅保留兼容用途。
@@ -1489,16 +1521,37 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 首次注册成功后的 bonus、推荐关系处理、成功弹窗逻辑仍由既有 SWPM hook + user meta 驱动，不依赖旧的 `/membership-login/` slug
 
 #### 58. Rendui API `phone` 请求头统一调整 ✅
-- **背景**：人堆价格接口中，价格列表接口不需要 `phone`；实时价格和统计接口需要。
+- **背景**：人堆价格接口中，价格列表接口不需要自定义请求头；当前仅统计接口需要 `phone`。
 - **当前规则**：
-  - `prices/daily`：不传 `phone`
-  - `daily/getByProductSpecAndDate`：传 `phone: 13792171909`
+  - `prices/daily`：不传自定义请求头
+  - `daily/getByProductSpecAndDate`：已停用，服务端不再请求
   - `prices/statistics`：传 `phone: 13792171909`
 - **实现方式**：将需要的号码统一收敛到 `IPPGI_Prices_API_Client::API_PHONE`，并同步更新历史导入测试脚本与插件文档，避免下次改号时漏改。
-- 确保在外部 API 不稳定时，前端仍能展示最后一版有效的价格列表且汇率实时准确。
-- 底层货币转换逻辑优先使用已保留的 `*_cny` 原始人民币字段，避免缓存重算时对已转换的 USD 值重复换算。
+- 确保在外部 API 不稳定时，前端仍能展示最后一版有效的价格列表。
+- 价格转换后不再保留 `*_cny` 原始人民币字段；历史价格表也仅保留 USD 价格和汇率字段。
 
-#### 59. WordPress 6.7+ 国际化加载时机 Notice 修复 ✅
+#### 59. Latest 区间颜色改为按区间均价比较 ✅
+- **背景**：价格列表已改为显示区间值，前台不再展示 `Change` 列，因此 `Latest($)` 颜色不再适合继续依赖 `riseAndFall` / `change` 字段。
+- **当前规则**：
+  - 首页默认显示不含税 `lastprice` 区间，颜色按“本次不含税区间均价”与“上一轮不含税区间均价”比较决定。
+  - `/prices` 页默认显示含税 `lastpriceTax` 区间，颜色按“本次含税区间均价”与“上一轮含税区间均价”比较决定。
+  - 本次均价公式：`(上限 + 下限) / 2`
+  - 当前均价高于上一轮：绿色 `up`
+  - 当前均价低于上一轮：红色 `down`
+  - 相等或缺少上一轮数据：`neutral`
+- **实现细节**：
+  - 仅为当前实际展示口径生成方向字段：`lastprice_range_direction_usd`、`lastpriceTax_range_direction_usd`
+  - 不再为 `price` / `priceTax` 单独生成方向字段
+  - 首页和 `/prices` 页前端优先读取这两个方向字段；旧的 `change` 值只作为兼容兜底
+
+#### 60. /prices 页面 Loading 卡住修复 ✅
+- **现象**：从首页 `Read More` 跳转到 `/prices` 后，价格表可能一直停留在 `Loading prices...`
+- **根因**：`/prices` 页渲染逻辑调用了价格区间格式化函数，但这些函数原本只定义在首页价格轮播的局部作用域中，导致价格页初始化时报 `ReferenceError`，表格渲染中断。
+- **修复动作**：
+  - 将价格区间格式化函数提升到共享作用域，供首页与 `/prices` 页共用
+  - `/prices` 页渲染逻辑改为调用共享格式化函数，避免再次因作用域问题中断
+
+#### 61. WordPress 6.7+ 国际化加载时机 Notice 修复 ✅
 - **现象**：`debug.log` 出现 `_load_textdomain_just_in_time was called incorrectly`，提示 `ippgi-prices` 文本域加载过早。
 - **根因**：
   - `ippgi-prices` 插件之前未显式在 `init` 阶段调用 `load_plugin_textdomain()`。
@@ -1509,7 +1562,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 主题 `ippgi` 也补充了 `after_setup_theme` 阶段的 `load_theme_textdomain('ippgi', ...)`，减少后续同类风险
 - **排查结论**：主题内未发现新的“文件加载阶段直接调用翻译函数”的明显同类隐患；主要风险点已修复。
 
-#### 60. 首页中部 Banner 等比显示修正 ✅
+#### 62. 首页中部 Banner 等比显示修正 ✅
 - **问题**：首页中间 banner 之前使用固定高度（移动端 80px、平板 100px、桌面 150px）加 `object-fit: cover`，在手机、平板、PC 上都会裁剪图片内容。
 - **排查结果**：
   - 模板位于 `wp-content/themes/ippgi/front-page.php`
@@ -1522,7 +1575,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **当前行为**：banner 现为“宽度填满容器，高度按原图比例等比放大”，不会裁剪上下内容。
 - **注意事项**：由于现有 banner 原图分辨率偏小，大屏下虽然比例正确，但清晰度可能一般；后续若替换素材，建议保持相同比例并提供更高分辨率版本。
 
-#### 61. 升级通知邮件收件人改为站内会员资料邮箱 ✅
+#### 63. 升级通知邮件收件人改为站内会员资料邮箱 ✅
 - **背景**：SWPM 插件默认会把 `Account Upgrade Notification` 发送到支付网关回调中的 `payer_email`，当 PayPal/Stripe 付款邮箱与站内会员资料邮箱不一致时，用户可能收不到站内账号对应的升级通知。
 - **实现方式**：
   - 保持 SWPM 插件自动发信职责不变，不改第三方插件源码。
@@ -1530,14 +1583,14 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 通过 WordPress `wp_mail` 过滤器拦截 SWPM 紧随其后的升级通知，并将收件人改写为 `SwpmMemberUtils::get_user_by_id($member_id)->email`。
 - **回退策略**：若 SWPM 会员资料邮箱为空或非法，则保留原始收件人，不阻断邮件发送。
 
-#### 62. 午夜 Cron 取消/到期邮件手动补发移除 ✅
+#### 64. 午夜 Cron 取消/到期邮件手动补发移除 ✅
 - **背景**：项目现已统一采用 SWPM 插件自动发送 `Subscription Payment Canceled or Expired` 邮件，不再需要主题在午夜 Cron 降级时手动补发。
 - **修复动作**：
   - 从 `ippgi_check_expired_cancelled_subscriptions()` 中移除手动发信调用。
   - 删除主题中的 `ippgi_send_subscription_cancelled_email()` 辅助函数，避免后续误用。
 - **当前行为**：午夜 Cron 现在只负责检查到期、执行降级、激活 bonus（如有）并清理取消状态 meta；取消/过期邮件完全由 SWPM 内置逻辑负责。
 
-#### 63. SWPM 国家下拉 PHP 8.1 Deprecated 兼容修复 ✅
+#### 65. SWPM 国家下拉 PHP 8.1 Deprecated 兼容修复 ✅
 - **问题**：`simple-membership/classes/class.swpm-utils-misc.php` 的 `get_countries_dropdown()` 在 PHP 8.1+ 环境下可能收到 `null` 的国家值，并将其直接传给 `strtolower()`，导致 `Passing null to parameter #1 ($string) of type string is deprecated` 日志。
 - **修复动作**：
   - 在 `SwpmMiscUtils::get_countries_dropdown()` 中将传入的 `$country` 统一兜底为字符串。
@@ -1546,7 +1599,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - **影响范围**：仅为兼容性修复，不改变国家下拉的原有显示和匹配逻辑。
 - **注意事项**：此次修复位于第三方插件 `simple-membership` 源码中，后续升级插件时需要留意该补丁是否被覆盖。
 
-#### 64. Trial(Level 3) 残留清理与删除确认 ✅
+#### 66. Trial(Level 3) 残留清理与删除确认 ✅
 - **结论**：当前项目代码已经不再使用 Trial (Level 3)；赠送访问统一走 bonus 机制，实际使用的 SWPM 等级仅为 Basic (2) 与 Plus (4)。
 - **数据库核查结果**：
   - `swpm_membership_tbl` 中仍存在 `Trial` 等级记录。
@@ -1670,7 +1723,12 @@ php import-missing-days.php
 **功能**：
 - 从外部 API 获取历史价格数据
 - 自动获取对应日期的历史汇率
-- 将数据保存到数据库
+- 将数据保存到数据库（仅单点美元价，不直接补区间字段）
+
+### 历史美元区间回填工具
+**文件**：`/backfill-historical-usd-ranges.php`
+
+用于按日期范围回填历史价格表中的 `price_usd_min` / `price_usd_max` / `price_tax_usd_min` / `price_tax_usd_max`。脚本会按“每天单独生成一组随机因子、当天全表共用”的规则计算；若现有值为空或不在限定区间内，则重算并写回。
 
 ---
 

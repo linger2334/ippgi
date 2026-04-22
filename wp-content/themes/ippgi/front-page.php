@@ -54,10 +54,19 @@ get_header();
                             <polyline points="9 18 15 12 9 6"></polyline>
                         </svg>
                     </a>
+
+                    <p class="my-prices__quote-cta">
+                        <span><?php esc_html_e('Looking for a lower price or customized specs?', 'ippgi'); ?></span>
+                        <button type="button" class="my-prices__quote-link" id="quote-request-trigger">
+                            <?php esc_html_e('Get an Official Quote.', 'ippgi'); ?>
+                        </button>
+                    </p>
                 </div>
             </div>
         </div>
     </section>
+
+    <?php get_template_part('template-parts/quote-request-modal'); ?>
 
     <!-- Banner Carousel Section -->
     <section class="section section--banner">
@@ -124,7 +133,7 @@ get_header();
                     </div>
                     <div class="promo-banner__text">
                         <h3 class="promo-banner__title"><?php esc_html_e('Real-Time Steel Price Tracking', 'ippgi'); ?></h3>
-                        <p class="promo-banner__desc"><?php esc_html_e('Access live prices for PPGI, GI, GL, HRC, CRC and Aluminum. Updated hourly from China\'s largest steel trading hub.', 'ippgi'); ?></p>
+                        <p class="promo-banner__desc"><?php esc_html_e('Access live prices for PPGI, GI, GL, CRC and Aluminum. Updated hourly from China\'s largest steel trading hub.', 'ippgi'); ?></p>
                     </div>
                 </div>
                 <div class="promo-banner__action">

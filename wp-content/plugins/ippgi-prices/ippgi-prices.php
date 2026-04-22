@@ -90,6 +90,9 @@ class IPPGI_Prices {
     private function init() {
         add_action('init', array($this, 'load_textdomain'));
 
+        // Keep custom history-table schema in sync after deployments.
+        IPPGI_Prices_Database::maybe_upgrade_schema();
+
         // Initialize components
         $this->cache_manager = new IPPGI_Prices_Cache_Manager();
         $this->api_client = new IPPGI_Prices_API_Client($this->cache_manager);
@@ -117,8 +120,8 @@ class IPPGI_Prices {
      * Plugin activation
      */
     public function activate() {
-        // Create database tables
-        IPPGI_Prices_Database::create_tables();
+        // Create or upgrade database tables.
+        IPPGI_Prices_Database::maybe_upgrade_schema();
 
         // Schedule cron events
         $this->scheduler->schedule_events();

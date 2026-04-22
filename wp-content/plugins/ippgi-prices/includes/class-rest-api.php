@@ -293,24 +293,11 @@ class IPPGI_Prices_REST_API {
      * @return WP_REST_Response|WP_Error Response object
      */
     public function get_realtime_price($request) {
-        $product_spec = $request->get_param('productSpec');
-        $category_id = $request->get_param('categoryId');
-        $date = $request->get_param('date');
-
-        $data = $this->api_client->get_realtime_price($product_spec, $category_id, $date);
-
-        if (is_wp_error($data)) {
-            return new WP_Error(
-                $data->get_error_code(),
-                $data->get_error_message(),
-                array('status' => 500)
-            );
-        }
-
-        return new WP_REST_Response(array(
-            'success' => true,
-            'data' => $data,
-        ), 200);
+        return new WP_Error(
+            'realtime_price_disabled',
+            'The realtime price endpoint has been disabled because single-spec price-detail requests are no longer supported.',
+            array('status' => 410)
+        );
     }
 
     /**
@@ -345,7 +332,7 @@ class IPPGI_Prices_REST_API {
             'from' => $from,
             'to' => $to,
             'siteId' => '1457210664971423746',
-        ), 'https://api.rendui.com/v1/jec/rendui/prices/statistics');
+        ), IPPGI_Prices_API_Client::STATISTICS_URL);
 
         // Make API request
         $response = wp_remote_get($api_url, array(
@@ -386,17 +373,14 @@ class IPPGI_Prices_REST_API {
             $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate();
             foreach ($data['result']['list'] as $index => $item) {
                 if (isset($item['price'])) {
-                    $data['result']['list'][$index]['price_cny'] = $item['price'];
                     $data['result']['list'][$index]['price_usd'] = IPPGI_Prices_Currency_Converter::cny_to_usd($item['price'], $exchange_rate);
                 }
                 if (isset($item['priceTax'])) {
-                    $data['result']['list'][$index]['priceTax_cny'] = $item['priceTax'];
                     $data['result']['list'][$index]['priceTax_usd'] = IPPGI_Prices_Currency_Converter::cny_to_usd($item['priceTax'], $exchange_rate);
                 }
             }
             // Also convert rangeAvgPrice
             if (isset($data['result']['rangeAvgPrice'])) {
-                $data['result']['rangeAvgPrice_cny'] = $data['result']['rangeAvgPrice'];
                 $data['result']['rangeAvgPrice_usd'] = IPPGI_Prices_Currency_Converter::cny_to_usd($data['result']['rangeAvgPrice'], $exchange_rate);
             }
             $data['result']['exchange_rate'] = $exchange_rate;
@@ -463,28 +447,19 @@ class IPPGI_Prices_REST_API {
             $from_date = clone $today;
 
             switch ($range) {
-                case '1m':
-                    $from_date->modify('-1 month');
+                case '7d':
+                    $from_date->modify('-6 days');
                     break;
-                case '6m':
-                    $from_date->modify('-6 months');
+                case '15d':
+                    $from_date->modify('-14 days');
                     break;
-                case '1y':
-                    $from_date->modify('-1 year');
-                    break;
-                case '2y':
-                    $from_date->modify('-2 years');
-                    break;
-                case '3y':
-                    $from_date->modify('-3 years');
-                    break;
-                case '4y':
-                    $from_date->modify('-4 years');
+                case '30d':
+                    $from_date->modify('-29 days');
                     break;
                 default:
                     return new WP_Error(
                         'invalid_range',
-                        'Invalid range: ' . $range . '. Valid ranges: 1m, 6m, 1y, 2y, 3y, 4y',
+                        'Invalid range: ' . $range . '. Valid ranges: 7d, 15d, 30d',
                         array('status' => 400)
                     );
             }
@@ -505,11 +480,13 @@ class IPPGI_Prices_REST_API {
         $from_datetime = $from_date->format('Y-m-d') . ' 00:00:00';
         $to_datetime = $to_date->format('Y-m-d') . ' 00:00:00';
 
+        $history_cache_version = 'v2_tax_range_lines';
+
         // Generate cache key (include from/to for custom ranges)
         if ($range === 'custom') {
-            $cache_key = 'ippgi_hist_' . md5($product_spec . '_' . $category . '_' . $from_datetime . '_' . $to_datetime);
+            $cache_key = 'ippgi_hist_' . md5($product_spec . '_' . $category . '_' . $from_datetime . '_' . $to_datetime . '_' . $history_cache_version);
         } else {
-            $cache_key = 'ippgi_hist_' . md5($product_spec . '_' . $category . '_' . $range);
+            $cache_key = 'ippgi_hist_' . md5($product_spec . '_' . $category . '_' . $range . '_' . $history_cache_version);
         }
 
         // Check cache first
@@ -524,7 +501,7 @@ class IPPGI_Prices_REST_API {
 
         // Query historical prices from database
         $query = $wpdb->prepare(
-            "SELECT statistics_time, price_usd, price_tax_usd, timestamp
+            "SELECT statistics_time, price_usd, price_tax_usd, price_tax_usd_min, price_tax_usd_max, timestamp
              FROM {$table_name}
              WHERE product_spec = %s
              AND statistics_time >= %s
@@ -560,6 +537,8 @@ class IPPGI_Prices_REST_API {
         $current_date = clone $from_date;
         $last_price_usd = 0.0;
         $last_price_tax_usd = 0.0;
+        $last_price_tax_usd_min = 0.0;
+        $last_price_tax_usd_max = 0.0;
         $has_real_data = false;
 
         while ($current_date <= $to_date) {
@@ -571,22 +550,30 @@ class IPPGI_Prices_REST_API {
                 $row = $date_map[$date_key];
                 $last_price_usd = (float) $row['price_usd'];
                 $last_price_tax_usd = (float) $row['price_tax_usd'];
+                $last_price_tax_usd_min = isset($row['price_tax_usd_min']) ? (float) $row['price_tax_usd_min'] : $last_price_tax_usd;
+                $last_price_tax_usd_max = isset($row['price_tax_usd_max']) ? (float) $row['price_tax_usd_max'] : $last_price_tax_usd;
                 $has_real_data = true;
                 $list[] = array(
                     'statisticsTime' => $row['statistics_time'],
                     'timestamp' => (int) $row['timestamp'],
                     'price_usd' => $last_price_usd,
                     'priceTax_usd' => $last_price_tax_usd,
+                    'price_tax_usd_min' => $last_price_tax_usd_min,
+                    'price_tax_usd_max' => $last_price_tax_usd_max,
                 );
             } else {
                 // No data for this date
                 $fill_price = $has_real_data ? $last_price_usd : 0.0;
                 $fill_price_tax = $has_real_data ? $last_price_tax_usd : 0.0;
+                $fill_price_tax_min = $has_real_data ? $last_price_tax_usd_min : 0.0;
+                $fill_price_tax_max = $has_real_data ? $last_price_tax_usd_max : 0.0;
                 $list[] = array(
                     'statisticsTime' => $datetime,
                     'timestamp' => $current_date->getTimestamp(),
                     'price_usd' => $fill_price,
                     'priceTax_usd' => $fill_price_tax,
+                    'price_tax_usd_min' => $fill_price_tax_min,
+                    'price_tax_usd_max' => $fill_price_tax_max,
                 );
             }
 
@@ -656,7 +643,7 @@ class IPPGI_Prices_REST_API {
             'from' => $from,
             'to' => $to,
             'siteId' => '1457210664971423746',
-        ), 'https://api.rendui.com/v1/jec/rendui/prices/statistics');
+        ), IPPGI_Prices_API_Client::STATISTICS_URL);
 
         // Make API request
         $response = wp_remote_get($api_url, array(
@@ -697,17 +684,14 @@ class IPPGI_Prices_REST_API {
             $exchange_rate = IPPGI_Prices_Currency_Converter::get_exchange_rate();
             foreach ($data['result']['list'] as $index => $item) {
                 if (isset($item['price'])) {
-                    $data['result']['list'][$index]['price_cny'] = $item['price'];
                     $data['result']['list'][$index]['price_usd'] = IPPGI_Prices_Currency_Converter::cny_to_usd($item['price'], $exchange_rate);
                 }
                 if (isset($item['priceTax'])) {
-                    $data['result']['list'][$index]['priceTax_cny'] = $item['priceTax'];
                     $data['result']['list'][$index]['priceTax_usd'] = IPPGI_Prices_Currency_Converter::cny_to_usd($item['priceTax'], $exchange_rate);
                 }
             }
             // Also convert rangeAvgPrice
             if (isset($data['result']['rangeAvgPrice'])) {
-                $data['result']['rangeAvgPrice_cny'] = $data['result']['rangeAvgPrice'];
                 $data['result']['rangeAvgPrice_usd'] = IPPGI_Prices_Currency_Converter::cny_to_usd($data['result']['rangeAvgPrice'], $exchange_rate);
             }
             $data['result']['exchange_rate'] = $exchange_rate;

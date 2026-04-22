@@ -22,7 +22,6 @@ $material_types = [
     'gl' => ippgi_get_product_display_name('gl'),
     'al' => ippgi_get_product_display_name('aluminum'),
     'crc_hard' => ippgi_get_product_display_name('crc'),
-    'hrc' => ippgi_get_product_display_name('hrc'),
 ];
 
 get_header();

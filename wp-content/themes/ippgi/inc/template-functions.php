@@ -12,6 +12,54 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Normalize product type aliases used across templates, favorites, and URLs.
+ *
+ * @param string $product_type Raw product type.
+ * @return string
+ */
+function ippgi_normalize_product_type($product_type) {
+    $product_type = strtolower((string) $product_type);
+
+    $aliases = array(
+        'crc_hard' => 'crc',
+        'al'       => 'aluminum',
+    );
+
+    return isset($aliases[$product_type]) ? $aliases[$product_type] : $product_type;
+}
+
+/**
+ * Get product types that are allowed to appear on the frontend.
+ *
+ * HRC remains available in backend data collection, but is intentionally hidden from the site UI.
+ *
+ * @return string[]
+ */
+function ippgi_get_visible_product_types() {
+    return array(
+        'ppgi',
+        'gi',
+        'gl',
+        'crc',
+        'aluminum',
+    );
+}
+
+/**
+ * Check whether a product type is visible on the frontend.
+ *
+ * @param string $product_type Product type or alias.
+ * @return bool
+ */
+function ippgi_is_visible_product_type($product_type) {
+    return in_array(
+        ippgi_normalize_product_type($product_type),
+        ippgi_get_visible_product_types(),
+        true
+    );
+}
+
+/**
  * Custom Nav Walker for desktop navigation
  */
 class IPPGI_Nav_Walker extends Walker_Nav_Menu {
@@ -232,6 +280,10 @@ function ippgi_get_user_favorites($user_id = null) {
         $parts = explode('-', $favorite_id, 2);
         $type = $parts[0] ?? '';
         $spec = $parts[1] ?? '';
+
+        if (!ippgi_is_visible_product_type($type)) {
+            continue;
+        }
 
         if (isset($material_types[$type])) {
             // Parse spec into human-readable display

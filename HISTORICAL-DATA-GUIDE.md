@@ -69,7 +69,7 @@ CREATE TABLE wp_prices_gi (
 
 **数据来源API:**
 ```
-GET https://api.rendui.com/v1/jec/rendui/prices/statistics
+GET https://www.rendui.com/api/v1/jec/rendui/prices/statistics
 ```
 
 **参数:**

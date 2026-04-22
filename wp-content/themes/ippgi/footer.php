@@ -17,7 +17,6 @@
                 <a href="#" class="site-footer__product-link" data-category="GL"><?php echo esc_html(ippgi_get_product_display_name('gl')); ?></a>
                 <a href="#" class="site-footer__product-link" data-category="AL"><?php echo esc_html(ippgi_get_product_display_name('aluminum')); ?></a>
                 <a href="#" class="site-footer__product-link" data-category="CRC_HARD"><?php echo esc_html(ippgi_get_product_display_name('crc')); ?></a>
-                <a href="#" class="site-footer__product-link" data-category="HRC"><?php echo esc_html(ippgi_get_product_display_name('hrc')); ?></a>
             </div>
             <button type="button" class="site-footer__back-to-top" aria-label="<?php esc_attr_e('Back to top', 'ippgi'); ?>">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -46,13 +45,6 @@
 // Include login modal for non-logged-in users
 if (!is_user_logged_in()) {
     get_template_part('template-parts/login-modal');
-}
-?>
-
-<?php
-// Show upgrade prompt for non-subscribed logged-in users (except on subscribe page)
-if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe')) {
-    get_template_part('template-parts/upgrade-prompt');
 }
 ?>
 
