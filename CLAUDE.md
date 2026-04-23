@@ -299,6 +299,31 @@ Body: cancel_at_period_end=true
 - `membership.php` - 会员系统集成
 - `announcement.php` - 公告系统
 
+### 首页公告系统
+
+**核心文件**：
+- `inc/announcement.php` - 公告 CPT、时间/可见性过滤、用户权限判断
+- `template-parts/announcement-banner.php` - 首页公告条模板
+- `front-page.php` - 公告条当前插入在首页 `site-main` 顶部
+
+**当前显示方式（2026-04-23 更新）**：
+- 公告条当前只在首页显示
+- 公告条已改为参与首页正常文档流，不再使用固定悬浮定位覆盖在内容上方
+- 公告条当前位于首页 `MyPrices` 卡片上方，并通过轻微负 margin 贴紧 header 下边界分割线
+
+**可见性规则**：
+- `All Users (Public)`：所有用户可见
+- `Logged-in Users Only`：仅登录用户可见
+- `Subscribers Only (Paid Members)`：仅当前 SWPM `Plus(4)` 用户可见
+
+**实现说明**：
+- 新增通用 helper：`ippgi_is_paid_member($user_id = null)`
+- `ippgi_is_paid_member()` 当前只认 SWPM 等级 `4`，不把 Basic(2) 或 bonus-only 用户视为 paid member
+- 因此公告的 `Subscribers Only` 与 `ippgi_user_has_plus()` / `ippgi_is_user_subscribed()` 不同；后两者会把 bonus 有效期用户也算作具备 Plus 访问权限
+
+**补充说明**：
+- 仓库内默认插件 `Hello Dolly`（`wp-content/plugins/hello.php`）当前未启用，也不参与任何业务逻辑；如需清理可直接删除
+
 ---
 
 ## 数据库表结构

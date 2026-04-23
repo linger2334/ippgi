@@ -219,6 +219,31 @@ function ippgi_announcement_columns($columns) {
 add_filter('manage_ippgi_announcement_posts_columns', 'ippgi_announcement_columns');
 
 /**
+ * Check whether the current user should be treated as a paid member for announcement visibility.
+ *
+ * "Subscribers Only (Paid Members)" should only include users currently on SWPM Plus (Level 4),
+ * and should exclude Basic users and bonus-only users.
+ *
+ * @param int|null $user_id WordPress user ID.
+ * @return bool
+ */
+function ippgi_is_paid_member($user_id = null) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+
+    if (!$user_id) {
+        return false;
+    }
+
+    $level = function_exists('ippgi_get_user_membership_level')
+        ? ippgi_get_user_membership_level($user_id)
+        : null;
+
+    return in_array($level, ['4', 4], true);
+}
+
+/**
  * Populate custom columns
  */
 function ippgi_announcement_column_content($column, $post_id) {
@@ -316,35 +341,16 @@ function ippgi_can_user_view_announcement($post_id) {
             return is_user_logged_in();
 
         case 'subscriber':
-            // In dev mode, check if level is bonus or plus
+            // In dev mode, only Plus should be treated as a paid member.
             if ($is_dev_mode) {
-                return in_array($dev_level, ['bonus', 'plus']);
+                return $dev_level === 'plus';
             }
 
-            // Check if user is a paid member using Simple Membership
             if (!is_user_logged_in()) {
                 return false;
             }
 
-            // Check for Simple Membership Plugin
-            if (class_exists('SwpmMemberUtils')) {
-                $user_id = get_current_user_id();
-                $member = SwpmMemberUtils::get_user_by_user_name(wp_get_current_user()->user_login);
-                if ($member) {
-                    // Get membership level - assuming Plus level (level 2) is the paid subscription
-                    // Adjust this logic based on your membership level IDs
-                    $membership_level = SwpmMemberUtils::get_member_field_by_id($member->member_id, 'membership_level');
-                    // You can customize which levels are considered "subscribers"
-                    // For now, any membership level > 1 is considered a paid subscriber
-                    return intval($membership_level) > 1;
-                }
-            }
-
-            // Fallback: check WordPress role
-            $user = wp_get_current_user();
-            return in_array('subscriber', $user->roles) ||
-                   in_array('administrator', $user->roles) ||
-                   in_array('editor', $user->roles);
+            return ippgi_is_paid_member(get_current_user_id());
 
         default:
             return true;

@@ -1081,36 +1081,13 @@
    ========================================================================== */
 
 .announcement-banner {
-    position: fixed;
-    top: calc(40px + var(--header-height-mobile));
-    left: 0;
-    right: 0;
-    z-index: calc(var(--z-sticky) - 1);
     background-color: #FFEE58;
     border-bottom: 2px solid #e0e0e0;
     padding: var(--spacing-sm) 0;
 }
 
-/* Adjust for WordPress admin bar */
-.admin-bar .announcement-banner {
-    top: calc(32px + 40px + var(--header-height-mobile));
-}
-
-@media screen and (max-width: 782px) {
-    .admin-bar .announcement-banner {
-        top: calc(46px + 40px + var(--header-height-mobile));
-    }
-}
-
-/* Desktop header height adjustment */
-@media (min-width: 1024px) {
-    .announcement-banner {
-        top: calc(40px + var(--header-height-desktop));
-    }
-
-    .admin-bar .announcement-banner {
-        top: calc(32px + 40px + var(--header-height-desktop));
-    }
+.site-main > .announcement-banner:first-child {
+    margin-top: calc(var(--spacing-sm) * -1);
 }
 
 .announcement-banner__content {

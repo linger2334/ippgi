@@ -10,6 +10,8 @@ get_header();
 ?>
 
 <main id="main-content" class="site-main">
+    <?php get_template_part('template-parts/announcement', 'banner'); ?>
+
     <!-- My Prices Section -->
     <section class="section section--prices">
         <div class="container">

@@ -614,27 +614,14 @@
     transition: padding-top 0.2s ease;
 }
 
-/* Adjust main content when announcement is active */
-.has-announcement .site-main {
-    padding-top: calc(40px + var(--header-height-mobile) + 80px + var(--spacing-sm));
-}
-
 /* Adjust for WordPress admin bar */
 .admin-bar .site-main {
     padding-top: calc(32px + 40px + var(--header-height-mobile) + var(--spacing-sm));
 }
 
-.admin-bar.has-announcement .site-main {
-    padding-top: calc(32px + 40px + var(--header-height-mobile) + 80px + var(--spacing-sm));
-}
-
 @media screen and (max-width: 782px) {
     .admin-bar .site-main {
         padding-top: calc(46px + 40px + var(--header-height-mobile) + var(--spacing-sm));
-    }
-
-    .admin-bar.has-announcement .site-main {
-        padding-top: calc(46px + 40px + var(--header-height-mobile) + 80px + var(--spacing-sm));
     }
 }
 

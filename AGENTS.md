@@ -23,6 +23,10 @@
 - 页面访问权限：
   - `/prices` 价格列表页当前为“登录即可访问”。
   - `/price-detail` 价格详情页当前为“登录即可访问”。
+- 首页公告系统：
+  - 公告条当前只在首页显示，且已改为参与正常文档流，不再使用 fixed 悬浮覆盖首页内容。
+  - 公告条当前插在 `front-page.php` 的 `site-main` 顶部，并通过轻微负 margin 贴紧 header 下边界。
+  - 公告后台 `Subscribers Only (Paid Members)` 当前只认 SWPM Plus(4)；不要把 Basic(2) 或 bonus-only 用户计入 paid member。
 - 邮件系统：使用 WP Mail SMTP 插件通过 Gmail API 发送邮件。发件人必须与 Gmail 认证账号一致。
 - 升级通知邮件收件人：SWPM 自动发出的 `Account Upgrade Notification` 在本站当前实现中应优先发送到 SWPM 会员资料里的邮箱；若支付网关返回邮箱与站内资料邮箱不一致，也以站内资料邮箱为准。
 - 邮件通知逻辑（职责分工）：

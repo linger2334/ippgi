@@ -179,6 +179,3 @@
     <!-- Mobile Menu Dropdown (appears below header on mobile) -->
     <?php get_template_part('template-parts/header', 'mobile'); ?>
 </header>
-
-<!-- Announcement Banner -->
-<?php get_template_part('template-parts/announcement', 'banner'); ?>
