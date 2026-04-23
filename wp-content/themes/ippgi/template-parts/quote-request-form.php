@@ -13,18 +13,6 @@ if (!defined('ABSPATH')) {
 $quote_args = isset($args) && is_array($args) ? $args : array();
 $form_id = isset($quote_args['form_id']) ? sanitize_html_class((string) $quote_args['form_id']) : 'quote-request-form';
 $form_source = isset($quote_args['source']) ? sanitize_key((string) $quote_args['source']) : 'homepage';
-$product_interest_value = isset($quote_args['product_interest']) ? (string) $quote_args['product_interest'] : '';
-
-$current_user = wp_get_current_user();
-$prefill_name = '';
-$prefill_contact = '';
-$prefill_company = '';
-
-if ($current_user instanceof WP_User && $current_user->exists()) {
-    $prefill_name = $current_user->display_name;
-    $prefill_contact = $current_user->user_email;
-    $prefill_company = get_user_meta($current_user->ID, 'company_name', true);
-}
 ?>
 
 <form
@@ -46,25 +34,25 @@ if ($current_user instanceof WP_User && $current_user->exists()) {
 
     <div class="quote-form__field">
         <label class="screen-reader-text" for="<?php echo esc_attr($form_id); ?>_name"><?php esc_html_e('Name', 'ippgi'); ?></label>
-        <input type="text" id="<?php echo esc_attr($form_id); ?>_name" name="name" class="quote-form__input" placeholder="<?php esc_attr_e('Name', 'ippgi'); ?>" value="<?php echo esc_attr($prefill_name); ?>" required>
+        <input type="text" id="<?php echo esc_attr($form_id); ?>_name" name="name" class="quote-form__input" placeholder="<?php esc_attr_e('Name', 'ippgi'); ?>" value="" required>
         <span class="quote-form__required" aria-hidden="true">*</span>
     </div>
 
     <div class="quote-form__field">
         <label class="screen-reader-text" for="<?php echo esc_attr($form_id); ?>_contact"><?php esc_html_e('Email / WhatsApp', 'ippgi'); ?></label>
-        <input type="text" id="<?php echo esc_attr($form_id); ?>_contact" name="contact" class="quote-form__input" placeholder="<?php esc_attr_e('Email / WhatsApp', 'ippgi'); ?>" value="<?php echo esc_attr($prefill_contact); ?>" required>
+        <input type="text" id="<?php echo esc_attr($form_id); ?>_contact" name="contact" class="quote-form__input" placeholder="<?php esc_attr_e('Email / WhatsApp', 'ippgi'); ?>" value="" required>
         <span class="quote-form__required" aria-hidden="true">*</span>
     </div>
 
     <div class="quote-form__field">
         <label class="screen-reader-text" for="<?php echo esc_attr($form_id); ?>_company"><?php esc_html_e('Company', 'ippgi'); ?></label>
-        <input type="text" id="<?php echo esc_attr($form_id); ?>_company" name="company" class="quote-form__input" placeholder="<?php esc_attr_e('Company', 'ippgi'); ?>" value="<?php echo esc_attr($prefill_company); ?>" required>
+        <input type="text" id="<?php echo esc_attr($form_id); ?>_company" name="company" class="quote-form__input" placeholder="<?php esc_attr_e('Company', 'ippgi'); ?>" value="" required>
         <span class="quote-form__required" aria-hidden="true">*</span>
     </div>
 
     <div class="quote-form__field">
         <label class="screen-reader-text" for="<?php echo esc_attr($form_id); ?>_product"><?php esc_html_e('Steel Product of Interest', 'ippgi'); ?></label>
-        <input type="text" id="<?php echo esc_attr($form_id); ?>_product" name="product_interest" class="quote-form__input" placeholder="<?php esc_attr_e('Steel Product of Interest', 'ippgi'); ?>" value="<?php echo esc_attr($product_interest_value); ?>" required>
+        <input type="text" id="<?php echo esc_attr($form_id); ?>_product" name="product_interest" class="quote-form__input" placeholder="<?php esc_attr_e('Steel Product of Interest', 'ippgi'); ?>" value="" required>
         <span class="quote-form__required" aria-hidden="true">*</span>
     </div>
 

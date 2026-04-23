@@ -718,7 +718,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 7. **价格表格**
    - 表头：Dimensions(mm) | Latest($) | Change($) | Historical
    - `Latest($)` 显示美元区间值而非单点值；区间由每次价格列表刷新时统一生成的一组全局随机上下浮动因子计算
-   - 首页 Latest 颜色按不含税区间均价与上一轮不含税区间均价比较决定；`/prices` 页 Latest 颜色按当前默认显示口径（现为含税）对应区间均价与上一轮同口径区间均价比较决定
+   - 首页与 `/prices` 页当前都默认按含税美元区间显示，Latest 颜色也统一按含税区间均价与上一轮含税区间均价比较决定
    - 蓝色表头背景（#e2f5fb）
    - Dimensions 列显示规则：
       - **PPGI, GI, GL, CRC Hard**：只显示 `厚度*宽度`（如 `0.4*1200`）
@@ -805,7 +805,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 7. **询价卡片**
    - 新增内嵌 `Request a Quote` 卡片，位置在图表下方、Disclaimer 上方
    - 复用公共模板 `template-parts/quote-request-form.php`
-   - `Steel Product of Interest` 会自动预填当前产品代码与规格（如 `GL 0.13*1000`）
+   - 当前不再自动预填任何字段；首页弹窗与价格详情页内嵌卡片打开时均默认为空表单
    - 描述文案使用单个段落加 `<br>` 手动换行，避免段落间距过大
 
 8. **Disclaimer**
@@ -842,6 +842,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 **表单字段**：
 - 必填：`Name`、`Email / WhatsApp`、`Company`、`Steel Product of Interest`
 - 选填：`Additional Details (Optional)`
+- 当前行为：所有字段默认留空，不再根据登录用户信息或当前产品规格自动填入
 
 **提交逻辑**：
 - 首页弹窗与价格详情页内嵌卡片共用同一套前端提交逻辑（`assets/js/main.js`）
@@ -1558,7 +1559,7 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 #### 59. Latest 区间颜色改为按区间均价比较 ✅
 - **背景**：价格列表已改为显示区间值，前台不再展示 `Change` 列，因此 `Latest($)` 颜色不再适合继续依赖 `riseAndFall` / `change` 字段。
 - **当前规则**：
-  - 首页默认显示不含税 `lastprice` 区间，颜色按“本次不含税区间均价”与“上一轮不含税区间均价”比较决定。
+  - 首页默认显示含税 `lastpriceTax` 区间，颜色按“本次含税区间均价”与“上一轮含税区间均价”比较决定。
   - `/prices` 页默认显示含税 `lastpriceTax` 区间，颜色按“本次含税区间均价”与“上一轮含税区间均价”比较决定。
   - 本次均价公式：`(上限 + 下限) / 2`
   - 当前均价高于上一轮：绿色 `up`

@@ -392,7 +392,6 @@
         const trigger = document.getElementById('quote-request-trigger');
         const form = document.getElementById('quote-request-form');
         const closeButtons = modal ? modal.querySelectorAll('[data-quote-modal-close]') : [];
-        const productInput = form ? form.querySelector('[name="product_interest"]') : null;
 
         if (!modal || !trigger || !form) {
             return;
@@ -401,17 +400,8 @@
         form.dataset.quoteModalForm = 'true';
         let lastFocusedElement = null;
 
-        function prefillProductInterest() {
-            if (!productInput || productInput.value.trim() !== '') {
-                return;
-            }
-
-            productInput.value = currentPriceCategory || 'PPGI';
-        }
-
         function openModal() {
             lastFocusedElement = document.activeElement;
-            prefillProductInterest();
             modal.hidden = false;
             document.body.style.overflow = 'hidden';
 
@@ -1328,13 +1318,13 @@
                 items.forEach(item => {
                     const thickness = item.thickness || '';
                     const dimensions = thickness + '*' + width;
-                    // Homepage Latest should follow Rendui "lastprice" as primary source.
-                    const priceUsd = item.lastprice_usd || item.lastprice || item.price_usd || item.price || 0;
-                    const priceMinUsd = item.lastprice_range_min_usd || item.price_range_min_usd || priceUsd || 0;
-                    const priceMaxUsd = item.lastprice_range_max_usd || item.price_range_max_usd || priceUsd || 0;
+                    // Homepage Latest should match /prices by preferring tax-inclusive USD values.
+                    const priceUsd = item.lastpriceTax_usd || item.lastpriceTax || item.priceTax_usd || item.priceTax || item.lastprice_usd || item.lastprice || item.price_usd || item.price || 0;
+                    const priceMinUsd = item.lastpriceTax_range_min_usd || item.priceTax_range_min_usd || item.lastprice_range_min_usd || item.price_range_min_usd || priceUsd || 0;
+                    const priceMaxUsd = item.lastpriceTax_range_max_usd || item.priceTax_range_max_usd || item.lastprice_range_max_usd || item.price_range_max_usd || priceUsd || 0;
                     const direction = normalizePriceDirection(
-                        item.lastprice_range_direction_usd || '',
-                        item.riseAndFall || item.riseAndFall_usd || item.change || 0
+                        item.lastpriceTax_range_direction_usd || item.lastprice_range_direction_usd || '',
+                        item.riseAndFallTax || item.riseAndFallTax_usd || item.change_tax || item.riseAndFall || item.riseAndFall_usd || item.change || 0
                     );
                     const parsedPrice = parseFloat(priceUsd);
                     const parsedPriceMin = parseFloat(priceMinUsd);
