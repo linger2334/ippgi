@@ -1,4 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(wp db *)",
+      "Bash(grep -n \"^####\\\\|^###\\\\|^---$\\\\|^## \" /home/html/www/ippgi/CLAUDE.md)",
+      "Bash(grep -n \"^#### 6[0-9]\\\\|^### Phase 2\\\\|^## 部署\\\\|^---$\" /home/html/www/ippgi/CLAUDE.md)",
+      "Bash(git ls-tree *)"
+    ]
+  },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "figma",

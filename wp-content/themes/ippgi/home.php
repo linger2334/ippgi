@@ -129,7 +129,7 @@ get_header();
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
             </button>
-            <span class="date-picker-sheet__month" id="date-picker-month"><?php echo esc_html(date_i18n('F Y')); ?></span>
+            <span class="date-picker-sheet__month" id="date-picker-month" data-no-translation></span>
             <button type="button" class="date-picker-sheet__nav-btn" id="date-picker-next" aria-label="<?php esc_attr_e('Next month', 'ippgi'); ?>">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="9 18 15 12 9 6"></polyline>

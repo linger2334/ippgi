@@ -142,6 +142,14 @@ add_filter('wp_image_editors', function($editors) {
 });
 
 /**
+ * Force TranslatePress to register its gettext filter early (on wp_loaded)
+ * instead of the default wp_head priority 100 — otherwise __('May', 'ippgi')
+ * called from wp_enqueue_scripts (e.g., wp_localize_script) returns the
+ * original English because TP's filter isn't loaded yet at that point.
+ */
+add_filter('trp_apply_gettext_early', '__return_true');
+
+/**
  * Redirect logged-in users from login pages to home
  * This handles the redirect after Google/social login
  */

@@ -86,6 +86,8 @@ function ippgi_enqueue_scripts() {
         true
     );
 
+    $strings = ippgi_get_js_i18n_strings();
+
     // Localize script with data
     wp_localize_script('ippgi-main', 'ippgiData', [
         'ajaxUrl'       => admin_url('admin-ajax.php'),
@@ -106,13 +108,7 @@ function ippgi_enqueue_scripts() {
             'CRC_HARD' => ippgi_get_product_display_name('crc'),
             'AL'       => ippgi_get_product_display_name('aluminum'),
         ],
-        'strings'       => [
-            'loading'   => __('Loading...', 'ippgi'),
-            'error'     => __('An error occurred. Please try again.', 'ippgi'),
-            'copied'    => __('Copied!', 'ippgi'),
-            'added'     => __('Added to favorites', 'ippgi'),
-            'removed'   => __('Removed from favorites', 'ippgi'),
-        ],
+        'strings'       => $strings,
     ]);
 
     // Comment reply script (only on single posts)

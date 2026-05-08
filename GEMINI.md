@@ -32,6 +32,24 @@ This project is a custom WordPress-based platform for displaying and managing ra
 - **Translation loading timing:** On WordPress 6.7+, both the plugin and theme should load their textdomains explicitly at the proper hook timing (`init` for plugin, `after_setup_theme` for theme). The `ippgi-prices` scheduler also guards its `cron_schedules` label to avoid triggering translations before `init`.
 - **PHP 8.1 compatibility note for SWPM:** `simple-membership/classes/class.swpm-utils-misc.php::get_countries_dropdown()` has a local compatibility patch that normalizes `null` country values to empty strings before calling `strtolower()`, preventing deprecated notices when profile/admin country fields are empty.
 - **Homepage middle banner rendering:** The homepage carousel banner should fill the available container width and preserve the source image aspect ratio with `height: auto`; do not reintroduce fixed heights or `object-fit: cover` cropping. The currently uploaded banner images are roughly `485/486 x 120`, so larger desktop layouts may benefit from higher-resolution replacements later.
+- **Multilingual (TranslatePress):**
+  - 4 active languages: default English on the root path; `/fr/`, `/ru/`, `/es/` as subdirectories. Do not add a subdirectory prefix to the default English path.
+  - Automatic translation engine is **Google Translate v2** (TP's own AI quota is 0 on the Developer license — do not switch back to TP AI).
+  - The header top-bar language switcher is a custom implementation in `header.php` lines 35-78 + `assets/css/layout.css` + `initLanguageSwitcher()` in `main.js`. The TP-bundled floating switcher is disabled in the admin and should stay disabled.
+  - `.top-bar` uses `z-index: calc(var(--z-sticky) + 1)` so the switcher dropdown can render above `.site-header`. Do not revert to plain `var(--z-sticky)`.
+- **JS string i18n contract:**
+  - All user-visible English strings emitted from JavaScript must be looked up via `ippgiData.strings.<key>`. Do not hard-code English literals inside JS or inline PHP that runs in JS context.
+  - The dictionary is built in `inc/template-functions.php::ippgi_get_js_i18n_strings()`. When adding a key, call `$tr('English source')` directly. **Never wrap with `$tr(__('...', 'ippgi'))`** — `$tr` already does gettext lookup internally and falling through `__()` first triggers a double-translation bug (e.g. `Mai → Peut`, `May → номер`).
+  - Whenever the dictionary's logic changes or keys are added/removed, bump the `v5` segment of `$cache_key` to invalidate stale transients.
+  - All translated values must pass through the `$sanitize` closure (strips `<translate-press>` editor wrap tags and runs `html_entity_decode`). Both gettext and `trp_translate` paths must call it; missing it on either branch corrupts the JSON output.
+- **TranslatePress hook ordering:**
+  - The line `add_filter('trp_apply_gettext_early', '__return_true');` in `functions.php` is required. Without it, TP registers its gettext filter at `wp_head` priority 100, which is later than `wp_enqueue_scripts`, so any `__('...', 'ippgi')` called from `wp_localize_script` returns the original English. Removing this line silently regresses every JS dictionary entry to machine-translated values.
+- **Avoid PHP-rendered month names that TP will mistranslate:**
+  - Do not use `date_i18n('F Y')` (or similar) directly in templates that ship to TP's HTML translation buffer. Standalone short words like "May" get mistranslated to `номер`/`Peut`/`Puede` because Google interprets them as the modal verb.
+  - Defer date/month rendering to JS using `ippgiData.strings.months` (see `home.php`'s `<span data-no-translation></span>` placeholder and `renderCalendar()` in `initDatePicker()`).
+- **After editing translations, always clear cache and hard-refresh:**
+  - `cd /home/html/www/ippgi && wp transient delete --all --allow-root`, then `Cmd+Shift+R` / `Ctrl+Shift+F5`. A regular refresh serves the browser's cached HTML containing the stale `ippgiData` JSON and looks like the change failed.
+  - When debugging a "translation didn't update" report, compare `ippgiData.strings.<key>` (live dictionary value) against `document.getElementById(...).textContent` (current DOM value) in the browser console. A mismatch points either to a server-side PHP path that won the race or to JS that hasn't run yet.
 
 ## Building and Running
 

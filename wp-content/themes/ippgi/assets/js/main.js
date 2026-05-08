@@ -7,6 +7,19 @@
 (function() {
     'use strict';
 
+    // i18n helper — reads localized strings from ippgiData.strings (PHP-injected, TP-translatable)
+    function t(key, fallback) {
+        var strings = (window.ippgiData && window.ippgiData.strings) || {};
+        return (strings[key] !== undefined) ? strings[key] : (fallback !== undefined ? fallback : key);
+    }
+
+    // HTML escape helper — safe for innerHTML interpolation
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    }
+
     // Global close functions for mutual exclusion
     let closeMobileMenu = null;
     let closeSearchOverlay = null;
@@ -32,7 +45,32 @@
         initPriceCarousel();
         initPriceTableClick();
         initBannerCarousel();
+        initLanguageSwitcher();
     });
+
+    function initLanguageSwitcher() {
+        const trigger = document.querySelector('.language-selector__trigger');
+        const menu = document.querySelector('.language-selector__menu');
+        if (!trigger || !menu) return;
+
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = trigger.getAttribute('aria-expanded') === 'true';
+            trigger.setAttribute('aria-expanded', String(!isOpen));
+            if (isOpen) {
+                menu.setAttribute('hidden', '');
+            } else {
+                menu.removeAttribute('hidden');
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!trigger.contains(e.target) && !menu.contains(e.target)) {
+                trigger.setAttribute('aria-expanded', 'false');
+                menu.setAttribute('hidden', '');
+            }
+        });
+    }
 
     /**
      * Initialize mobile menu functionality
@@ -213,8 +251,8 @@
                         // Show toast (2 seconds)
                         if (typeof ippgiToast !== 'undefined') {
                             var msg = isAdded
-                                ? 'The dataset has been added to your favorites.'
-                                : 'The dataset has been removed from your favorites.';
+                                ? t('favoriteAddedFull', 'The dataset has been added to your favorites.')
+                                : t('favoriteRemovedFull', 'The dataset has been removed from your favorites.');
                             ippgiToast.success(msg, 2000);
                         }
                     }
@@ -334,7 +372,7 @@
                 }
 
                 submitButton.disabled = true;
-                submitButton.textContent = form.dataset.submittingText || 'Submitting...';
+                submitButton.textContent = form.dataset.submittingText || t('submitting', 'Submitting...');
 
                 const formData = new FormData(form);
 
@@ -695,11 +733,11 @@
         let endDate = null;
         let selectingStart = true;
 
-        // Month names
-        const monthNames = [
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'
-        ];
+        // Month names — read from i18n dict, fall back to English
+        const monthNames = (window.ippgiData && window.ippgiData.strings && Array.isArray(window.ippgiData.strings.months) && window.ippgiData.strings.months.length === 12)
+            ? window.ippgiData.strings.months
+            : ['January', 'February', 'March', 'April', 'May', 'June',
+               'July', 'August', 'September', 'October', 'November', 'December'];
 
         function openDatePicker() {
             dateSheet.classList.add('is-active');
@@ -852,7 +890,7 @@
                 } else if (startDate) {
                     filterText.textContent = formatDateShort(startDate) + ' ~';
                 } else {
-                    filterText.textContent = 'Start Date ~ End Date';
+                    filterText.textContent = t('startDateEndDate', 'Start Date ~ End Date');
                 }
             }
 
@@ -954,6 +992,8 @@
 
         // Initialize
         initFromUrl();
+        // Pre-fill month label so it shows correctly even before the picker is opened
+        renderCalendar();
     }
 
     /**
@@ -1253,12 +1293,12 @@
                     applyPricesData(freshData);
                     writeCachedPrices(freshData);
                 } else if (!hasCachedData) {
-                    showError('No price data available');
+                    showError(t('noPriceData', 'No price data available'));
                 }
             } catch (error) {
                 console.error('Failed to fetch prices:', error);
                 if (!hasCachedData) {
-                    showError('Failed to load prices');
+                    showError(t('failedLoadPrices', 'Failed to load prices'));
                 }
             }
         }
@@ -1346,9 +1386,9 @@
 
             // Generate HTML
             let html = '<table class="price-table"><thead><tr>';
-            html += '<th>Products</th>';
-            html += '<th>Dimensions(mm)</th>';
-            html += '<th>Latest($)</th>';
+            html += '<th>' + escapeHtml(t('thProducts', 'Products')) + '</th>';
+            html += '<th>' + escapeHtml(t('thDimensions', 'Dimensions(mm)')) + '</th>';
+            html += '<th>' + escapeHtml(t('thLatest', 'Latest($)')) + '</th>';
             html += '</tr></thead><tbody>';
 
             rows.forEach(row => {
@@ -1489,7 +1529,7 @@
             // Update timestamp
             const categoryData = pricesData[displayCategories[currentIndex]];
             if (updatedLabel && categoryData && categoryData.fetchedAt) {
-                updatedLabel.textContent = 'Updated: ' + categoryData.fetchedAt + ' (UTC+8)';
+                updatedLabel.textContent = t('updatedLabel', 'Updated:') + ' ' + categoryData.fetchedAt + ' ' + t('timezoneSuffix', '(UTC+8)');
             }
 
             // Update dots
@@ -1878,7 +1918,7 @@
             if (items.length === 0) {
                 pricesTableBody.innerHTML =
                     '<tr><td colspan="3" class="prices-table__loading">' +
-                    '<span>No price data available for this width.</span>' +
+                    '<span>' + escapeHtml(t('noPriceDataWidth', 'No price data available for this width.')) + '</span>' +
                     '</td></tr>';
                 return;
             }
@@ -1916,20 +1956,13 @@
                     '<td><span class="prices-table__price prices-table__price--' + changeClass + '">' + latestText + latestArrow + '</span></td>' +
                     '<td>' +
                     '<a href="' + escapeHtml(detailUrl) + '" class="prices-table__view-btn">' +
-                    'Trend <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+                    escapeHtml(t('trend', 'Trend')) + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
                     '</a>' +
                     '</td>' +
                     '</tr>';
             });
 
             pricesTableBody.innerHTML = html;
-        }
-
-        // Helper functions
-        function escapeHtml(text) {
-            var div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
 
         // Initial render

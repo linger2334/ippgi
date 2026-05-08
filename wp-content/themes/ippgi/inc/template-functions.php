@@ -665,3 +665,124 @@ function ippgi_format_dimensions_range($range) {
         'width'     => $range['min_width'] . '-' . $range['max_width'] . 'mm',
     ];
 }
+
+/**
+ * Build the i18n strings dictionary used by main.js.
+ *
+ * Strings are pre-translated server-side via TranslatePress because TP skips
+ * JSON content inside <script> tags when scanning HTML for translation.
+ *
+ * Result is cached in a transient per language to avoid running the full TP
+ * pipeline (and any synchronous Google Translate calls) on every page load.
+ * Cache lives 12 hours; on default language we skip translation entirely.
+ *
+ * @return array
+ */
+function ippgi_get_js_i18n_strings() {
+    static $memo = [];
+
+    $current_lang = !empty($GLOBALS['TRP_LANGUAGE']) ? $GLOBALS['TRP_LANGUAGE'] : 'default';
+    if (isset($memo[$current_lang])) {
+        return $memo[$current_lang];
+    }
+
+    $tp_active   = function_exists('trp_translate');
+    $default_lng = $tp_active ? null : 'default';
+    if ($tp_active) {
+        $trp = TRP_Translate_Press::get_trp_instance();
+        $tp_settings = $trp->get_component('settings')->get_settings();
+        $default_lng = isset($tp_settings['default-language']) ? $tp_settings['default-language'] : 'en_US';
+    }
+
+    // Default language never needs TP processing — return raw __() output
+    $needs_translation = $tp_active && ($current_lang !== $default_lng) && ($current_lang !== 'default');
+
+    // Bump the version segment to invalidate stale caches when this code changes.
+    $cache_key = 'ippgi_js_i18n_v5_' . md5($current_lang);
+    if ($needs_translation) {
+        $cached = get_transient($cache_key);
+        if (is_array($cached)) {
+            $memo[$current_lang] = $cached;
+            return $cached;
+        }
+    }
+
+    // Translates an English source string. Tries gettext first (controlled by
+    // user via "Translate Strings → Gettext"); only falls back to TP regular
+    // string translation when gettext returned the original unchanged.
+    // This avoids double-translation bugs where a gettext result like "Mai"
+    // would otherwise be re-fed to TP/Google as if it were English.
+    //
+    // Both branches pass through preg_replace + html_entity_decode because TP
+    // can return values like S&#039;orienter or <translate-press>...</translate-press>
+    // wrappings, which would corrupt JSON output / cause double-encoding in JS.
+    $sanitize = function ($s) {
+        $s = preg_replace('#<translate-press[^>]*>(.*?)</translate-press>#s', '$1', $s);
+        return html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    };
+    $tr = function ($english) use ($needs_translation, $sanitize) {
+        $gettext = __($english, 'ippgi');
+        if (!$needs_translation || $gettext !== $english) {
+            return $sanitize($gettext);
+        }
+        return $sanitize(trp_translate($english, null, false));
+    };
+
+    $strings = [
+        'loading'             => $tr('Loading...'),
+        'loadingPrices'       => $tr('Loading prices...'),
+        'error'               => $tr('An error occurred. Please try again.'),
+        'copied'              => $tr('Copied!'),
+        'added'               => $tr('Added to favorites'),
+        'removed'             => $tr('Removed from favorites'),
+        'favoriteAddedFull'   => $tr('The dataset has been added to your favorites.'),
+        'favoriteRemovedFull' => $tr('The dataset has been removed from your favorites.'),
+        'submitting'          => $tr('Submitting...'),
+        'noPriceData'         => $tr('No price data available'),
+        'noPriceDataWidth'    => $tr('No price data available for this width.'),
+        'failedLoadPrices'    => $tr('Failed to load prices'),
+        'updatedLabel'        => $tr('Updated:'),
+        'timezoneSuffix'      => $tr('(UTC+8)'),
+        'trend'               => $tr('Trend'),
+        'startDateEndDate'    => $tr('Start Date ~ End Date'),
+        'thProducts'          => $tr('Products'),
+        'thDimensions'        => $tr('Dimensions(mm)'),
+        'thLatest'            => $tr('Latest($)'),
+        'months'              => [
+            $tr('January'),
+            $tr('February'),
+            $tr('March'),
+            $tr('April'),
+            $tr('May'),
+            $tr('June'),
+            $tr('July'),
+            $tr('August'),
+            $tr('September'),
+            $tr('October'),
+            $tr('November'),
+            $tr('December'),
+        ],
+    ];
+
+    if ($needs_translation) {
+        set_transient($cache_key, $strings, 12 * HOUR_IN_SECONDS);
+    }
+
+    $memo[$current_lang] = $strings;
+    return $strings;
+}
+
+/**
+ * Bust JS i18n strings cache when TP saves/edits translations.
+ */
+function ippgi_invalidate_js_i18n_cache() {
+    global $wpdb;
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_ippgi_js_i18n_%' OR option_name LIKE '_transient_timeout_ippgi_js_i18n_%'");
+    // Also flush object cache (Redis/Memcached) if active — transients route through it
+    if (function_exists('wp_cache_flush_group')) {
+        @wp_cache_flush_group('ippgi_i18n');
+    }
+}
+add_action('trp_save_editor_translations_regular_strings', 'ippgi_invalidate_js_i18n_cache');
+add_action('trp_save_editor_translations_gettext_strings', 'ippgi_invalidate_js_i18n_cache');
+add_action('trp_machine_translated_strings', 'ippgi_invalidate_js_i18n_cache');

@@ -56,6 +56,21 @@
 - 价格列表与首页的 `Latest($)` 当前显示美元区间值而非单点值。每次价格列表刷新时只生成一组全局随机上下浮动因子，并统一应用到本次刷新后的全部产品结果（含成功抓取的新分类与沿用旧缓存的失败分类）：下限因子区间 `0.1%~0.5%`、上限因子区间 `1%~2%`，均包含边界。
 - `Latest($)` 的颜色判断不再依赖 `Change` 列；首页与 `/prices` 页当前都默认按含税区间均价对比上一轮含税区间均价决定涨跌颜色。
 - 询价表单（首页弹窗与价格详情页内嵌卡片）当前默认所有字段留空，不再根据登录用户信息或当前产品规格自动预填。
+- 多语言（TranslatePress）：
+  - 当前启用 4 种语言：默认英文走根路径，`/fr/` `/ru/` `/es/` 走子目录；不要把英文也加上子目录前缀。
+  - 自动翻译走 Google Translate v2（Developer 版授权下 TP AI 配额为 0，不要切回 TP AI）。
+  - header `top-bar` 的语言切换器是主题自定义实现（`header.php` 35-78 + `assets/css/layout.css` + `main.js` 的 `initLanguageSwitcher()`）；TP 默认浮动切换器后台已关闭，不要再启用。
+  - `.top-bar` 的 z-index 是 `calc(var(--z-sticky) + 1)`（=201），目的是让语言切换器下拉覆盖 `.site-header`；不要回退到 `var(--z-sticky)`。
+- JS 字符串本地化：
+  - 所有 JS 中用户可见的英文字符串必须走 `ippgiData.strings.<key>`，不要在 JS / 内联 PHP 中直接写英文 literal。
+  - 字典定义在 `inc/template-functions.php::ippgi_get_js_i18n_strings()`；新增 key 时调用 `$tr('English source')`，**不要写 `$tr(__('...', 'ippgi'))`**——`$tr` 内部会先做 gettext 查表，再 fallback 到 `trp_translate`，外面再套 `__()` 会触发双重翻译产生乱译（如 `Mai → Peut`、`May → номер`）。
+  - 修改字典逻辑或新增/删除 key 时，必须把 `$cache_key` 中的 `v5` 段升一位，让旧缓存失效。
+  - 字典返回值必须经过 `$sanitize` 闭包：剥掉 `<translate-press>` 包裹标签 + `html_entity_decode`；gettext 路径和 trp_translate 路径都要走，不能漏其中一条。
+- TranslatePress 钩子前置：
+  - `functions.php` 中的 `add_filter('trp_apply_gettext_early', '__return_true');` 是必须的——否则 `wp_localize_script` 阶段调用的 `__('xxx', 'ippgi')` 全部返回原文（TP gettext 默认在 `wp_head` 优先级 100 才挂载，晚于 `wp_enqueue_scripts`）。删除这一行会导致全站 JS 字典回退到机翻，质量大幅下降。
+- 模板中的日期/月份渲染：
+  - 不要在 PHP 模板里用 `date_i18n('F Y')` 这类输出英文月份名给 TP 翻译——TP 常规字符串机翻会把单独的 "May" 误译成 `номер`/`Peut`/`Puede` 等。
+  - 月份 / 日期相关 UI 应留给 JS 通过 `ippgi.strings.months` 渲染（参考 `home.php` 的 `<span data-no-translation>` 占位 + `main.js` 的 `renderCalendar()`）。
 
 ## 5) 代码实现约定
 - PHP 侧：
@@ -65,6 +80,9 @@
   - 若改 REST 返回结构，必须同步改调用处（首页、价格页、详情页）。
   - 涉及会员可见性的 UI 变更，需覆盖 guest/basic/bonus/plus 状态。
   - 首页中间 banner（`front-page.php` + `assets/css/components.css`）当前要求为“宽度填满容器，按原图比例自动撑高，不裁剪”；避免重新引入固定高度 + `object-fit: cover` 的裁剪方案。
+- TranslatePress 翻译变更后的验证：
+  - 在 TP 后台改翻译后，**必须**清缓存 + 浏览器硬刷新才能看到效果：`wp transient delete --all --allow-root` + `Cmd+Shift+R`/`Ctrl+Shift+F5`。普通刷新会拿浏览器缓存的旧 HTML（含旧 `ippgiData`）。
+  - 排查"翻译没生效"时，先用 Console `ippgiData.strings.<key>` 看字典实际值；和 `document.getElementById(...).textContent` 看 DOM 实际值。两者不一致说明 JS 渲染时机或服务端 PHP 渲染抢先输出了未翻译版本。
 
 ## 6) 变更前后检查清单
 - 语法与基础检查：

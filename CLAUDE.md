@@ -1028,6 +1028,172 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 
 ---
 
+## 国际化 / 多语言（TranslatePress）
+
+### 插件与版本
+- `translatepress-multilingual` —— TP 主插件
+- `translatepress-developer` —— Pro Developer 外壳，含付费 add-ons：
+  - `automatic-language-detection`
+  - `browse-as-other-roles`
+  - `deepl`
+  - `multiple-domains`（暂未启用，子目录模式不需要）
+  - `navigation-based-on-language`
+  - `translator-accounts`
+
+### URL 结构（子目录模式）
+- 默认语言英文走根路径，**Use a subdirectory for the default language = No**
+- `/fr/...` `/ru/...` `/es/...` 三个翻译语种走子目录
+- TP 自动改写所有内链；切换器 `<a>` 用 `url_converter->get_url_for_language($code)` 生成
+
+### 自动翻译引擎
+- **Google Translate v2**（不用 TP 自带 AI——Developer 版授权下 AI 配额为 0；DeepL 也可，作为备选）
+- TP 设置：`Settings → TranslatePress → Automatic Translation`
+- 重要选项：
+  - `Block Crawlers from Translating: Yes`（避免爬虫触发翻译消耗配额）
+  - `Characters per day` 设保守值兜底
+- 短词无上下文时机翻常常错（如 `Trend` → `S'orienter`、`May` → `Peut`/`номер`/`Puede`），需要在 TP gettext 表里手动校正
+
+### 自定义语言切换器
+**位置**：`header.php:35-78` —— top-bar 区域（移动端 / 桌面端共用同一段）
+
+**实现方式**：
+- 用 `class_exists('TRP_Translate_Press')` 兜底
+- 从 `$trp_settings['publish-languages']` 读已发布语言
+- 从 `$GLOBALS['TRP_LANGUAGE']` 读当前语言
+- 内置 4 种语言映射数组（语言代码 → 国旗 SVG + 标签）
+- ≥2 种语言时才渲染切换器；当前语言用 `is-current` 类高亮
+
+**国旗资源**：
+- `assets/images/flag-uk.svg` `flag-fr.svg` `flag-es.svg` `flag-ru.svg`
+- 矩形 SVG，60×30 viewBox，前端展示 20×14 + 圆角 2px
+
+**CSS**：`assets/css/layout.css` `.language-selector` `.language-selector__menu` 一套样式
+
+**JS**：`main.js` 里的 `initLanguageSwitcher()`，复用产品下拉那套 `aria-expanded` + 外点关闭模式
+
+**z-index 注意**：`.top-bar` 用 `calc(var(--z-sticky) + 1)`（=201），下拉菜单才能覆盖在 `.site-header`（200）之上，否则下拉的第一个选项会被站点 header 挡住。
+
+### JS 字符串字典（`ippgiData.strings`）
+
+**问题**：TP 的 HTML 输出层翻译只解析可见文本节点，**会跳过 `<script>` 标签内的 JSON**。所以 JS 里通过 `ippgiData.strings.xxx` 读到的字符串必须**服务端预翻译**好。
+
+**实现位置**：`inc/template-functions.php` 中的 `ippgi_get_js_i18n_strings()`
+
+**翻译查找顺序**（避免双重翻译）：
+1. `__($english, 'ippgi')` —— 命中 TP gettext（用户在 `Settings → TP → Translate Strings → Gettext` 改的）
+2. 没改过 → `trp_translate($english, null, false)` —— 走 TP 常规字符串 / Google 自动翻译
+
+**返回值清洗**（关键）：
+所有返回值都经过 `$sanitize` 闭包：
+- 剥掉 `<translate-press data-trp-translate-id="..."> ... </translate-press>` 编辑器包裹标签
+- `html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8')` —— 把 `S&#039;orienter` 还原成 `S'orienter`，否则 JS `escapeHtml()` 会二次编码成 `S&amp;#039;orienter`
+
+**缓存机制**：
+- 缓存键：`ippgi_js_i18n_v5_<md5(language_code)>`
+- TTL：12 小时
+- 默认语言（en_US）跳过缓存（直接返回原文）
+- 请求内 static memo 防止同一次请求多次读 transient
+- 修改函数逻辑时，把版本段 `v5` 升一位即可让旧缓存失效
+
+**自动失效 hook**：
+- `trp_save_editor_translations_regular_strings`
+- `trp_save_editor_translations_gettext_strings`
+- `trp_machine_translated_strings`
+- 触发时调 `ippgi_invalidate_js_i18n_cache()`，DELETE `_transient_ippgi_js_i18n_*`
+
+**手动清缓存**（admin 在 Settings → Translate Strings 页面改翻译时上面的 hook **不会**触发）：
+```bash
+cd /home/html/www/ippgi
+wp transient delete --all --allow-root
+```
+
+**字典字段清单**（截至 v5）：
+`loading / loadingPrices / error / copied / added / removed / favoriteAddedFull / favoriteRemovedFull / submitting / noPriceData / noPriceDataWidth / failedLoadPrices / updatedLabel / timezoneSuffix / trend / startDateEndDate / thProducts / thDimensions / thLatest / months[12]`
+
+新增字段时：
+1. 在 `ippgi_get_js_i18n_strings()` 加一行 `'<key>' => $tr('<English source>')`
+2. JS 里用 `t('<key>', '<English fallback>')` 读取（`t()` 是 `main.js` 顶部 IIFE 作用域里的辅助函数）
+3. 升缓存版本
+
+### 关键 BUG 与坑（务必看一遍再改 i18n 相关代码）
+
+**1. TP gettext 默认在 `wp_head` 优先级 100 才挂载——晚于 `wp_enqueue_scripts`**
+
+`functions.php` 必须有：
+```php
+add_filter('trp_apply_gettext_early', '__return_true');
+```
+否则 `wp_localize_script` 阶段调用的 `__('xxx', 'ippgi')` 全部返回原文（gettext 还没被 TP 接管），后果是字典被打 fallback 走机翻、翻译质量下降。
+
+**2. 双重翻译陷阱**
+
+不要写 `$tr(__('May', 'ippgi'))`：先 `__()` 拿到译文 `Mai`，再被 `trp_translate` 当英文翻译一次，结果是无意义乱翻（`Peut`/`номер`/`Puede` 都是这么来的）。
+
+`$tr` 的输入必须是**英文原文**，由 `$tr` 内部决定走 gettext 还是 trp_translate。
+
+**3. `trp_translate()` 返回的字符串可能带编辑器包裹标签或 HTML 实体**
+
+- 编辑器会话期间调用可能返回 `<translate-press data-trp-translate-id="421">Peut</translate-press>`，JSON 化后 JS `textContent =` 会把标签作为文字显示
+- 撇号会变成 `&#039;`，再经 JS `escapeHtml()` 变成 `&amp;#039;`，浏览器还原成可见 `&#039;`
+
+`$sanitize` 闭包把这两种污染一次性处理掉。**gettext 路径也要走 sanitize**（早期版本只在 `trp_translate` 路径处理，导致 gettext 译文中的撇号一直显示编码）。
+
+**4. 客户端 DOM 渲染 vs 服务端 PHP 渲染冲突**
+
+`home.php:132` 的日期选择器月份**之前**用 `<?php echo esc_html(date_i18n('F Y')); ?>`：
+- WordPress 没有 ippgi 主题域的俄语 .mo，PHP 输出 `May 2026`
+- TP HTML 输出层把 `May` 按"常规字符串"查表翻译成 `номер`（之前机翻的烂值入库了）
+- JS `renderCalendar()` 应该在打开选择器时覆盖，但若 JS 没及时跑完用户就看到 `номер`
+
+修复：`home.php` 里把 PHP 渲染改为空 `<span data-no-translation></span>`，`main.js` 的 `initDatePicker()` 末尾加 `renderCalendar()` 立即调用，让 JS 一开始就用 `ippgiData.strings.months` 填好。
+
+**5. 浏览器 HTML 缓存**
+
+服务端清缓存 + 重新生成翻译后，必须**硬刷新**（`Cmd+Shift+R` / `Ctrl+Shift+F5`）才能拿到新 HTML。普通刷新会用浏览器缓存的旧 HTML（含旧 `ippgiData`）。这是 90% "看起来没生效" 的原因。
+
+### TP gettext 数据库表
+
+| 表 | 用途 |
+|---|------|
+| `ippgi_trp_gettext_original_strings` | 主题/插件 `__()` 调用的源字符串 + textdomain 总表 |
+| `ippgi_trp_gettext_<lang>` | 各语言的 gettext 译文（如 `ippgi_trp_gettext_fr_fr`） |
+| `ippgi_trp_dictionary_en_us_<lang>` | 各语言的"常规字符串"译文（HTML 文本节点） |
+| `ippgi_trp_original_strings` / `_meta` | 常规字符串总表 |
+| `ippgi_trp_slug_originals` / `_translations` | URL slug 翻译（当前未启用 slug 翻译） |
+
+直接查 gettext 译文：
+```sql
+SELECT id, original, translated, domain
+FROM ippgi_trp_gettext_fr_fr
+WHERE original = 'May' AND domain = 'ippgi';
+```
+
+### 编辑翻译的两条路径
+
+| 入口 | 存哪 | 适用 |
+|------|------|------|
+| 前台 **Translate Page** 可视化编辑器 | 常规字符串表 / gettext 表（视点击的内容而定） | 所见即所得，最直观 |
+| 后台 **Settings → Translate Strings** | 常规字符串表 + Gettext 表分开管理 | 批量操作、按 textdomain 过滤 |
+
+我们的 JS 字典 (`__('xxx', 'ippgi')`) 的标准编辑入口是 **Settings → Translate Strings → Gettext → 搜源词 → 找 `domain=ippgi` 那行 → 改对应语言列**。
+
+### 已校对的高质量术语（gettext 用）
+
+| 英文 | 法语 | 俄语 | 西语 |
+|------|------|------|------|
+| May | Mai | Май | Mayo |
+| Trend | Tendance | Тренд | Tendencia |
+| Latest($) | Dernier ($) | Последний ($) | Último ($) |
+| Updated: | Mis à jour : | Обновлено: | Actualizado: |
+
+> 短词机翻经常翻不准（`Trend → S'orienter`、`Latest → Dernière version` 等），UI 类术语必须人工核对。
+
+### 注意：邮件不在 TP 翻译范围
+
+TP 只翻前端 HTML，**不翻邮件**。SWPM 注册欢迎、订阅升级 / 取消通知等邮件需要单独维护多语言模板（或全部统一英文发送）。当前策略待定。
+
+---
+
 ## 开发进度
 
 ### Phase 1 - 已完成 ✅
@@ -1635,6 +1801,17 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
   - 清理主题代码中最后一处 `Trial mechanism` 注释残留。
   - 文档统一更新为 bonus 机制口径，不再保留“旧 Trial 流程仍存在”的歧义。
 - **后台操作建议**：基于当前数据库状态，可以直接在 WordPress 后台删除 SWPM 的 Trial(Level 3) 等级；删除前后无需额外迁移现有会员数据。
+
+#### 67. TranslatePress 多语言系统接入 ✅
+- 启用 TranslatePress + Pro Developer 插件，支持 4 种语言：
+  - 默认：English (`en_US`)，根路径 `/`
+  - 法语 (`fr_FR`) → `/fr/`
+  - 俄语 (`ru_RU`) → `/ru/`
+  - 西语 (`es_ES`) → `/es/`
+- header `top-bar` 占位改为接入 TP `url_converter` 的真实语言切换器（顺序：English → Français → Русский → Español），关闭 TP 默认右下角浮动切换器
+- 自动翻译引擎：Google Translate v2（避开了 TP 自带 AI 0 字符配额问题）
+- 实现 `ippgiData.strings` JS 字典 + 服务端 transient 缓存，让 JS 渲染的字符串也能被 TP 翻译
+- 详见下文新增章节 [`国际化 / 多语言（TranslatePress）`](#国际化--多语言translatepress)
 
 
 ---

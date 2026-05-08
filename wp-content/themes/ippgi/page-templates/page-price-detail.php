@@ -479,7 +479,7 @@ window.ippgiPriceDetail = {
             '&from=' + encodeURIComponent(todayStr) +
             '&to=' + encodeURIComponent(todayStr);
 
-        showChartMessage('Loading chart data...');
+        showChartMessage('<?php echo esc_js(__('Loading chart data...', 'ippgi')); ?>');
 
         fetch(url)
             .then(function(res) {
@@ -496,7 +496,7 @@ window.ippgiPriceDetail = {
             })
             .catch(function(err) {
                 console.error('Failed to fetch chart data:', err);
-                showChartMessage('Failed to load chart data');
+                showChartMessage('<?php echo esc_js(__('Failed to load chart data', 'ippgi')); ?>');
             });
     }
 
@@ -754,7 +754,7 @@ window.ippgiPriceDetail = {
             '&category=' + encodeURIComponent(detail.category) +
             '&range=' + encodeURIComponent(range);
 
-        showChartMessage('Loading chart data...');
+        showChartMessage('<?php echo esc_js(__('Loading chart data...', 'ippgi')); ?>');
 
         fetch(url)
             .then(function(res) {
@@ -771,7 +771,7 @@ window.ippgiPriceDetail = {
             })
             .catch(function(err) {
                 console.error('Failed to fetch historical data:', err);
-                showChartMessage('Failed to load chart data');
+                showChartMessage('<?php echo esc_js(__('Failed to load chart data', 'ippgi')); ?>');
             });
     }
 
@@ -815,7 +815,7 @@ window.ippgiPriceDetail = {
 
             // Reset date picker trigger text when selecting a preset range
             var dpTriggerText = document.querySelector('#detail-date-picker span');
-            if (dpTriggerText) dpTriggerText.textContent = 'Start Date ~ End Date';
+            if (dpTriggerText) dpTriggerText.textContent = '<?php echo esc_js(__('Start Date ~ End Date', 'ippgi')); ?>';
 
             var range = this.dataset.range;
             loadChartData(range);
@@ -857,11 +857,11 @@ window.ippgiPriceDetail = {
         var dpEndDate = null;
         var dpSelectingStart = true;
 
-        // Month names
-        var monthNames = [
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'
-        ];
+        // Month names — read from i18n dict (TP-translated), fall back to English
+        var monthNames = (window.ippgiData && window.ippgiData.strings && Array.isArray(window.ippgiData.strings.months) && window.ippgiData.strings.months.length === 12)
+            ? window.ippgiData.strings.months
+            : ['January', 'February', 'March', 'April', 'May', 'June',
+               'July', 'August', 'September', 'October', 'November', 'December'];
 
         function openDatePicker() {
             datePickerSheet.classList.add('is-active');
@@ -1025,7 +1025,7 @@ window.ippgiPriceDetail = {
                 } else if (dpStartDate) {
                     triggerText.textContent = formatDateShortDP(dpStartDate) + ' ~';
                 } else {
-                    triggerText.textContent = 'Start Date ~ End Date';
+                    triggerText.textContent = '<?php echo esc_js(__('Start Date ~ End Date', 'ippgi')); ?>';
                 }
             }
 
@@ -1054,7 +1054,7 @@ window.ippgiPriceDetail = {
                 '&from=' + encodeURIComponent(fromStr) +
                 '&to=' + encodeURIComponent(toStr);
 
-            showChartMessage('Loading chart data...');
+            showChartMessage('<?php echo esc_js(__('Loading chart data...', 'ippgi')); ?>');
 
             fetch(url)
                 .then(function(res) {
@@ -1077,7 +1077,7 @@ window.ippgiPriceDetail = {
                 })
                 .catch(function(err) {
                     console.error('Failed to fetch custom range data:', err);
-                    showChartMessage('Failed to load chart data');
+                    showChartMessage('<?php echo esc_js(__('Failed to load chart data', 'ippgi')); ?>');
                 });
         }
 
@@ -1137,8 +1137,21 @@ window.ippgiPriceDetail = {
         var width = specParts.length >= 2 ? specParts[1] : '';
         var dimensionStr = thickness && width ? (thickness + '*' + width) : '';
 
-        // Month names for date formatting
-        var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        // Month names for date formatting (PHP-injected so TP can translate)
+        var monthNames = [
+            '<?php echo esc_js(__('Jan', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Feb', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Mar', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Apr', 'ippgi')); ?>',
+            '<?php echo esc_js(__('May', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Jun', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Jul', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Aug', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Sep', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Oct', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Nov', 'ippgi')); ?>',
+            '<?php echo esc_js(__('Dec', 'ippgi')); ?>'
+        ];
 
         function showCrosshair(touchX) {
             if (!chartRenderState || !chartRenderState.list.length) return;

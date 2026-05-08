@@ -33,16 +33,49 @@
             </a>
 
             <div class="top-bar__right">
-                <!-- Language Selector -->
+                <!-- Language Selector (TranslatePress) -->
+                <?php
+                if (class_exists('TRP_Translate_Press')) :
+                    $trp          = TRP_Translate_Press::get_trp_instance();
+                    $trp_settings = $trp->get_component('settings')->get_settings();
+                    $trp_url      = $trp->get_component('url_converter');
+                    $current_lang = !empty($GLOBALS['TRP_LANGUAGE']) ? $GLOBALS['TRP_LANGUAGE'] : $trp_settings['default-language'];
+                    $published    = isset($trp_settings['publish-languages']) ? $trp_settings['publish-languages'] : array();
+
+                    $supported = array(
+                        'en_US' => array('flag' => 'flag-uk.svg', 'label' => 'English',  'alt' => 'English'),
+                        'fr_FR' => array('flag' => 'flag-fr.svg', 'label' => 'Français', 'alt' => 'Français'),
+                        'ru_RU' => array('flag' => 'flag-ru.svg', 'label' => 'Русский',  'alt' => 'Русский'),
+                        'es_ES' => array('flag' => 'flag-es.svg', 'label' => 'Español',  'alt' => 'Español'),
+                    );
+                    $available = array_intersect_key($supported, array_flip($published));
+
+                    if (count($available) > 1 && isset($available[$current_lang])) :
+                        $current = $available[$current_lang];
+                ?>
                 <div class="language-selector">
-                    <button type="button" class="language-selector__trigger" aria-expanded="false">
-                        <img src="<?php echo esc_url(IPPGI_THEME_URI . '/assets/images/flag-uk.svg'); ?>" alt="English" width="20" height="14" class="language-selector__flag">
-                        <span><?php esc_html_e('English', 'ippgi'); ?></span>
+                    <button type="button" class="language-selector__trigger" aria-expanded="false" aria-haspopup="listbox">
+                        <img src="<?php echo esc_url(IPPGI_THEME_URI . '/assets/images/' . $current['flag']); ?>" alt="<?php echo esc_attr($current['alt']); ?>" width="20" height="14" class="language-selector__flag">
+                        <span><?php echo esc_html($current['label']); ?></span>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </button>
+                    <ul class="language-selector__menu" role="listbox" hidden>
+                        <?php foreach ($available as $code => $info) :
+                            $is_current = ($code === $current_lang);
+                            $url        = $trp_url->get_url_for_language($code);
+                        ?>
+                        <li class="language-selector__menu-item<?php echo $is_current ? ' is-current' : ''; ?>" role="option" aria-selected="<?php echo $is_current ? 'true' : 'false'; ?>">
+                            <a href="<?php echo esc_url($url); ?>" class="language-selector__menu-link" hreflang="<?php echo esc_attr(str_replace('_', '-', $code)); ?>">
+                                <img src="<?php echo esc_url(IPPGI_THEME_URI . '/assets/images/' . $info['flag']); ?>" alt="<?php echo esc_attr($info['alt']); ?>" width="20" height="14" class="language-selector__flag">
+                                <span><?php echo esc_html($info['label']); ?></span>
+                            </a>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
                 </div>
+                <?php endif; endif; ?>
 
                 <!-- Login/User -->
                 <?php if (!is_user_logged_in()) : ?>
