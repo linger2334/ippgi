@@ -14,7 +14,7 @@
 
 ## 3) 事实来源（Source of Truth）
 - 运行代码优先于文档描述。
-- `CLAUDE.md` 用于背景说明；若与代码冲突，以代码为准，并在提交说明里标注差异。
+- `CLAUDE.md`、`GEMINI.md` 用于背景说明；若与代码冲突，以代码为准，并在提交说明里标注差异。
 
 ## 4) 关键业务约束
 - 会员体系（SWPM）：Basic=2，Plus=4；赠送天数走 bonus 机制（用户 meta）。
@@ -23,6 +23,7 @@
 - 页面访问权限：
   - `/prices` 价格列表页当前为“登录即可访问”。
   - `/price-detail` 价格详情页当前为“登录即可访问”。
+- 手机号补全：已登录但 `phone` 为空的用户从首页等价格入口继续时显示可关闭的手机号弹窗，直达 `/prices` 不增加手机号硬拦截。弹窗和 `/edit-profile` 共用国家码表、拆分及校验规则；已有国际号码优先按号码前缀选择国家码，旧号码无前缀时再按用户资料中的 `country` 预选，资料为空或无法识别时保持未选择，不按 IP 或界面语言推断。保存格式统一为 `+国家码 本地号码纯数字`，手机号国家码不自动修改资料中的 Country/Region，当前不做短信验证。
 - 首页公告系统：
   - 公告条当前只在首页显示，且已改为参与正常文档流，不再使用 fixed 悬浮覆盖首页内容。
   - 公告条当前插在 `front-page.php` 的 `site-main` 顶部，并通过轻微负 margin 贴紧 header 下边界。
@@ -64,7 +65,7 @@
 - JS 字符串本地化：
   - 所有 JS 中用户可见的英文字符串必须走 `ippgiData.strings.<key>`，不要在 JS / 内联 PHP 中直接写英文 literal。
   - 字典定义在 `inc/template-functions.php::ippgi_get_js_i18n_strings()`；新增 key 时调用 `$tr('English source')`，**不要写 `$tr(__('...', 'ippgi'))`**——`$tr` 内部会先做 gettext 查表，再 fallback 到 `trp_translate`，外面再套 `__()` 会触发双重翻译产生乱译（如 `Mai → Peut`、`May → номер`）。
-  - 修改字典逻辑或新增/删除 key 时，必须把 `$cache_key` 中的 `v5` 段升一位，让旧缓存失效。
+  - 修改字典逻辑或新增/删除 key 时，必须把 `$cache_key` 中当前版本段升一位（当前为 `v7`），让旧缓存失效。
   - 字典返回值必须经过 `$sanitize` 闭包：剥掉 `<translate-press>` 包裹标签 + `html_entity_decode`；gettext 路径和 trp_translate 路径都要走，不能漏其中一条。
 - TranslatePress 钩子前置：
   - `functions.php` 中的 `add_filter('trp_apply_gettext_early', '__return_true');` 是必须的——否则 `wp_localize_script` 阶段调用的 `__('xxx', 'ippgi')` 全部返回原文（TP gettext 默认在 `wp_head` 优先级 100 才挂载，晚于 `wp_enqueue_scripts`）。删除这一行会导致全站 JS 字典回退到机翻，质量大幅下降。

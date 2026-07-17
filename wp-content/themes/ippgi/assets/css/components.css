@@ -1077,6 +1077,210 @@
 }
 
 /* ==========================================================================
+   Mobile Number Collection Modal
+   ========================================================================== */
+
+.phone-collection-modal {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-modal) + 20);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.phone-collection-modal[hidden] {
+    display: none;
+}
+
+.phone-collection-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 28, 38, 0.48);
+}
+
+.phone-collection-modal__content {
+    position: relative;
+    width: min(100%, 440px);
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 32px;
+    background: #fff;
+    border: 1px solid #d8dde3;
+    border-radius: 8px;
+    box-shadow: 0 18px 50px rgba(20, 28, 38, 0.2);
+}
+
+.phone-collection-modal__close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #68727d;
+    cursor: pointer;
+}
+
+.phone-collection-modal__close:hover {
+    color: #111827;
+}
+
+.phone-collection-modal__title {
+    margin: 0 36px 10px 0;
+    font-size: 24px;
+    line-height: 1.25;
+    font-weight: var(--font-weight-semibold);
+    color: #17212b;
+}
+
+.phone-collection-modal__description {
+    margin: 0 0 24px;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #52606d;
+}
+
+.phone-collection-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.phone-collection-form__phone-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 10px;
+}
+
+.phone-collection-form__field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.phone-collection-form__label {
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: var(--font-weight-semibold);
+    color: #24313d;
+}
+
+.phone-collection-form__input,
+.phone-collection-form__select {
+    width: 100%;
+    min-height: 48px;
+    padding: 11px 12px;
+    border: 1px solid #aab4bf;
+    border-radius: 6px;
+    background: #fff;
+    color: #17212b;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.phone-collection-form__select {
+    margin-top: auto;
+    padding-right: 32px;
+    cursor: pointer;
+}
+
+.phone-collection-form__input {
+    margin-top: auto;
+}
+
+.phone-collection-form__input:focus,
+.phone-collection-form__select:focus {
+    border-color: #1683c4;
+    outline: 3px solid rgba(22, 131, 196, 0.16);
+}
+
+.phone-collection-form__help {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #68727d;
+}
+
+.phone-collection-form__help a {
+    color: #146a99;
+}
+
+.phone-collection-form__error {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #b42318;
+}
+
+.phone-collection-form__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.phone-collection-form__button {
+    min-height: 44px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+}
+
+.phone-collection-form__button--cancel {
+    border: 1px solid #aab4bf;
+    background: #fff;
+    color: #344250;
+}
+
+.phone-collection-form__button--submit {
+    border: 1px solid #1d7f45;
+    background: #1d7f45;
+    color: #fff;
+}
+
+.phone-collection-form__button--cancel:hover {
+    border-color: #68727d;
+    background: #f5f7f9;
+}
+
+.phone-collection-form__button--submit:hover {
+    border-color: #176a3a;
+    background: #176a3a;
+}
+
+.phone-collection-form__button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+@media (max-width: 480px) {
+    .phone-collection-modal {
+        padding: 14px;
+    }
+
+    .phone-collection-modal__content {
+        padding: 26px 20px 22px;
+    }
+
+    .phone-collection-modal__title {
+        font-size: 21px;
+    }
+
+    .phone-collection-form__phone-row {
+        grid-template-columns: 108px minmax(0, 1fr);
+        gap: 8px;
+    }
+}
+
+/* ==========================================================================
    Announcement Banner
    ========================================================================== */
 
@@ -3586,6 +3790,36 @@ html:has(.edit-profile-page-body) {
     color: #e53935;
 }
 
+.edit-profile-phone-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 12px;
+    align-items: stretch;
+}
+
+.edit-profile-phone-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.edit-profile-phone-field .edit-profile-field__input,
+.edit-profile-phone-field .edit-profile-field__select-wrapper {
+    margin-top: auto;
+}
+
+.edit-profile-field__error {
+    display: block;
+    margin-top: 6px;
+    color: #e53935;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.edit-profile-field__error[hidden] {
+    display: none;
+}
+
 /* Select Field */
 .edit-profile-field__select-wrapper {
     position: relative;
@@ -3606,6 +3840,11 @@ html:has(.edit-profile-page-body) {
 
 .edit-profile-field__select:focus {
     outline: none;
+}
+
+.edit-profile-field__select.is-invalid {
+    border-bottom: 1px solid #e53935;
+    color: #e53935;
 }
 
 .edit-profile-field__select-arrow {
@@ -4026,6 +4265,11 @@ html:has(.edit-profile-page-body) {
 
     .edit-profile-page__title {
         font-size: 28px;
+    }
+
+    .edit-profile-phone-row {
+        grid-template-columns: 108px minmax(0, 1fr);
+        gap: 10px;
     }
 
     .edit-profile-submit-btn {

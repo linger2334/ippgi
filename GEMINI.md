@@ -21,9 +21,16 @@ This project is a custom WordPress-based platform for displaying and managing ra
 - **Primary login route:** `/login/` is the canonical login page. `/membership-login/` remains for backward compatibility only.
 - **Logged-in redirect rule:** Logged-in users visiting `/login/` or `/membership-login/` should be redirected to the home page through centralized theme logic.
 - **Membership levels in active use:** The project only uses SWPM `Basic (2)` and `Plus (4)` for live membership state. Trial `Level 3` has been retired from business logic, and all temporary gifted access is handled through the bonus meta mechanism.
+- **Price-page access:** `/prices` and `/price-detail` require login only; neither page requires Plus/bonus access or a saved phone number.
+- **Phone collection and profile editing:**
+  - A logged-in user whose `phone` user meta is empty sees a dismissible phone modal when continuing from homepage and other price-entry links. Direct navigation to `/prices` remains available and is not hard-blocked by the phone field.
+  - The phone modal and `/edit-profile` share the country/region calling-code table, phone splitting, validation, and server-side normalization rules.
+  - Existing international numbers take their selector default from the stored prefix. For legacy local numbers without a prefix, the profile `country` is used as a fallback. If neither source is usable, the selector stays unselected; do not infer it from IP address or interface language.
+  - Phone values are stored in the existing `phone` user meta as `+calling-code local-digits`, for example `+86 13812345678`. Selecting a phone calling code must not update the profile Country/Region field. SMS verification is not implemented yet.
 - **Rendui header rules:**
   - `prices/daily` should not send custom headers.
-  - `daily/getByProductSpecAndDate` and `prices/statistics` require `phone: 13792171909`.
+  - `daily/getByProductSpecAndDate` is disabled and should not be requested.
+  - `prices/statistics` requires `phone: 13792171909`.
 - **Membership mail responsibilities:**
   - SWPM auto-sends `Registration Complete`, `Account Upgrade Notification`, and `Subscription Payment Canceled or Expired` emails.
   - Custom theme code handles the payment-success modal and cancellation-state cleanup only; it no longer sends delayed cancellation/expiration emails from the nightly downgrade cron path.
@@ -40,7 +47,7 @@ This project is a custom WordPress-based platform for displaying and managing ra
 - **JS string i18n contract:**
   - All user-visible English strings emitted from JavaScript must be looked up via `ippgiData.strings.<key>`. Do not hard-code English literals inside JS or inline PHP that runs in JS context.
   - The dictionary is built in `inc/template-functions.php::ippgi_get_js_i18n_strings()`. When adding a key, call `$tr('English source')` directly. **Never wrap with `$tr(__('...', 'ippgi'))`** — `$tr` already does gettext lookup internally and falling through `__()` first triggers a double-translation bug (e.g. `Mai → Peut`, `May → номер`).
-  - Whenever the dictionary's logic changes or keys are added/removed, bump the `v5` segment of `$cache_key` to invalidate stale transients.
+  - Whenever the dictionary's logic changes or keys are added/removed, bump the current version segment of `$cache_key` (currently `v7`) to invalidate stale transients.
   - All translated values must pass through the `$sanitize` closure (strips `<translate-press>` editor wrap tags and runs `html_entity_decode`). Both gettext and `trp_translate` paths must call it; missing it on either branch corrupts the JSON output.
 - **TranslatePress hook ordering:**
   - The line `add_filter('trp_apply_gettext_early', '__return_true');` in `functions.php` is required. Without it, TP registers its gettext filter at `wp_head` priority 100, which is later than `wp_enqueue_scripts`, so any `__('...', 'ippgi')` called from `wp_localize_script` returns the original English. Removing this line silently regresses every JS dictionary entry to machine-translated values.
@@ -72,7 +79,7 @@ Toggle `IPPGI_DEV_MODE` in `wp-content/themes/ippgi/functions.php` to simulate p
 
 ## Development Conventions
 
-- **Source of Truth:** The running code is the primary source of truth. Documentation (`CLAUDE.md`, `AGENTS.md`) should be kept in sync.
+- **Source of Truth:** The running code is the primary source of truth. Documentation (`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md`) should be kept in sync.
 - **Modifications:** 
   - Never modify WordPress Core (`wp-admin`, `wp-includes`, root `wp-*.php`).
   - All custom business logic should reside in the `ippgi` theme or `ippgi-prices` plugin.

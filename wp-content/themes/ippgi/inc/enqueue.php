@@ -68,6 +68,9 @@ add_action('wp_enqueue_scripts', 'ippgi_enqueue_styles');
  * Enqueue theme scripts
  */
 function ippgi_enqueue_scripts() {
+    $current_user_id = get_current_user_id();
+    $current_phone   = $current_user_id ? trim((string) get_user_meta($current_user_id, 'phone', true)) : '';
+
     // Navigation script
     wp_enqueue_script(
         'ippgi-navigation',
@@ -98,6 +101,7 @@ function ippgi_enqueue_scripts() {
         'subscribeUrl'  => home_url('/subscribe'),
         'pricesUrl'     => home_url('/prices'),
         'isLoggedIn'    => is_user_logged_in(),
+        'hasPhone'      => '' !== $current_phone,
         'hasPremium'    => ippgi_user_can_view_history(),
         'isFrontPage'   => is_front_page(),
         'productNames'  => [

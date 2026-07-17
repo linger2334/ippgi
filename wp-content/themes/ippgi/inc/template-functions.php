@@ -698,7 +698,7 @@ function ippgi_get_js_i18n_strings() {
     $needs_translation = $tp_active && ($current_lang !== $default_lng) && ($current_lang !== 'default');
 
     // Bump the version segment to invalidate stale caches when this code changes.
-    $cache_key = 'ippgi_js_i18n_v5_' . md5($current_lang);
+    $cache_key = 'ippgi_js_i18n_v7_' . md5($current_lang);
     if ($needs_translation) {
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
@@ -738,6 +738,11 @@ function ippgi_get_js_i18n_strings() {
         'favoriteAddedFull'   => $tr('The dataset has been added to your favorites.'),
         'favoriteRemovedFull' => $tr('The dataset has been removed from your favorites.'),
         'submitting'          => $tr('Submitting...'),
+        'savingPhone'         => $tr('Saving...'),
+        'countryCodeRequired' => $tr('Please select a country/region code.'),
+        'phoneRequired'       => $tr('Please enter your mobile number.'),
+        'invalidPhone'        => $tr('Please enter a valid mobile number.'),
+        'phoneSaveFailed'     => $tr('Unable to save your mobile number. Please try again.'),
         'noPriceData'         => $tr('No price data available'),
         'noPriceDataWidth'    => $tr('No price data available for this width.'),
         'failedLoadPrices'    => $tr('Failed to load prices'),

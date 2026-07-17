@@ -42,9 +42,11 @@
 </footer>
 
 <?php
-// Include login modal for non-logged-in users
+// Include the relevant account prompt for the current visitor.
 if (!is_user_logged_in()) {
     get_template_part('template-parts/login-modal');
+} elseif ('' === trim((string) get_user_meta(get_current_user_id(), 'phone', true))) {
+    get_template_part('template-parts/phone-collection-modal');
 }
 ?>
 

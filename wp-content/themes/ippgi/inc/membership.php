@@ -1735,6 +1735,60 @@ function ippgi_ajax_toggle_favorite() {
 add_action('wp_ajax_ippgi_toggle_favorite', 'ippgi_ajax_toggle_favorite');
 
 /**
+ * Save the current user's mobile number before continuing to detailed prices.
+ */
+function ippgi_ajax_save_phone() {
+    check_ajax_referer('ippgi_nonce', 'nonce');
+
+    if (!is_user_logged_in()) {
+        wp_send_json_error([
+            'message' => __('Please log in before saving your mobile number.', 'ippgi'),
+        ], 401);
+    }
+
+    $country_iso = isset($_POST['country_iso'])
+        ? strtoupper(sanitize_text_field(wp_unslash($_POST['country_iso'])))
+        : '';
+    $phone_number = isset($_POST['phone_number'])
+        ? sanitize_text_field(wp_unslash($_POST['phone_number']))
+        : '';
+
+    if ('' !== $country_iso || '' !== $phone_number) {
+        $phone = ippgi_normalize_phone_number($country_iso, $phone_number);
+        if (is_wp_error($phone)) {
+            wp_send_json_error([
+                'message' => $phone->get_error_message(),
+            ], 400);
+        }
+    } else {
+        // Keep old cached frontend assets working during deployment.
+        $phone = isset($_POST['phone']) ? sanitize_text_field(wp_unslash($_POST['phone'])) : '';
+        $phone = preg_replace('/\s+/', ' ', trim($phone));
+
+        if ('' === $phone) {
+            wp_send_json_error([
+                'message' => __('Please enter your mobile number.', 'ippgi'),
+            ], 400);
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+        $valid_format = (bool) preg_match('/^\+?[0-9\s\-()]{6,20}$/', $phone);
+        if (!$valid_format || strlen($digits) < 6 || strlen($digits) > 15) {
+            wp_send_json_error([
+                'message' => __('Please enter a valid mobile number.', 'ippgi'),
+            ], 400);
+        }
+    }
+
+    update_user_meta(get_current_user_id(), 'phone', $phone);
+
+    wp_send_json_success([
+        'hasPhone' => true,
+    ]);
+}
+add_action('wp_ajax_ippgi_save_phone', 'ippgi_ajax_save_phone');
+
+/**
  * AJAX handler for cancelling subscription
  */
 function ippgi_ajax_cancel_subscription() {

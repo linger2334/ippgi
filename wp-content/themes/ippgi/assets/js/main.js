@@ -34,6 +34,7 @@
         initSmoothScroll();
         initFavoriteButtons();
         initLoginModal();
+        initPhoneCollectionModal();
         initQuoteRequestForms();
         initQuoteRequestModal();
         initRequireLoginLinks();
@@ -342,6 +343,165 @@
                 }
             }
         };
+    }
+
+    /**
+     * Collect a logged-in user's mobile number before navigating to prices.
+     */
+    function initPhoneCollectionModal() {
+        const modal = document.getElementById('phone-collection-modal');
+        const form = document.getElementById('phone-collection-form');
+
+        if (!modal || !form) return;
+
+        const countrySelect = document.getElementById('phone-collection-country');
+        const phoneInput = document.getElementById('phone-collection-input');
+        const errorMessage = document.getElementById('phone-collection-error');
+        const submitButton = form.querySelector('.phone-collection-form__button--submit');
+        const closeButtons = modal.querySelectorAll('[data-phone-modal-close]');
+        const defaultSubmitText = submitButton ? submitButton.textContent : '';
+        let pendingUrl = '';
+        let lastFocusedElement = null;
+
+        function showError(message) {
+            if (!errorMessage) return;
+            errorMessage.textContent = message;
+            errorMessage.hidden = false;
+        }
+
+        function clearError() {
+            if (!errorMessage) return;
+            errorMessage.textContent = '';
+            errorMessage.hidden = true;
+        }
+
+        function getSelectedDialCode() {
+            if (!countrySelect || countrySelect.selectedIndex < 0) return '';
+            return countrySelect.options[countrySelect.selectedIndex].dataset.dialCode || '';
+        }
+
+        function isValidPhone(dialCode, phoneNumber) {
+            const normalized = phoneNumber.trim();
+            const digits = (dialCode + normalized).replace(/\D/g, '');
+            return /^[\d\s\-()]{4,20}$/.test(normalized)
+                && digits.length >= 6
+                && digits.length <= 15;
+        }
+
+        function openModal(url) {
+            pendingUrl = url || ippgiData.pricesUrl;
+            lastFocusedElement = document.activeElement;
+            clearError();
+            modal.hidden = false;
+            document.body.style.overflow = 'hidden';
+            window.setTimeout(function() {
+                if (countrySelect && !countrySelect.value) {
+                    countrySelect.focus();
+                } else {
+                    phoneInput?.focus();
+                }
+            }, 0);
+        }
+
+        function closeModal() {
+            modal.hidden = true;
+            document.body.style.overflow = '';
+            clearError();
+
+            if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                lastFocusedElement.focus();
+            }
+        }
+
+        closeButtons.forEach(function(button) {
+            button.addEventListener('click', closeModal);
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.hidden) {
+                closeModal();
+            }
+        });
+
+        countrySelect?.addEventListener('change', clearError);
+        phoneInput?.addEventListener('input', clearError);
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            clearError();
+
+            const countryIso = countrySelect ? countrySelect.value : '';
+            const dialCode = getSelectedDialCode();
+            const phoneNumber = phoneInput ? phoneInput.value.trim() : '';
+
+            if (!countryIso || !dialCode) {
+                showError(t('countryCodeRequired'));
+                countrySelect?.focus();
+                return;
+            }
+
+            if (!phoneNumber) {
+                showError(t('phoneRequired'));
+                phoneInput?.focus();
+                return;
+            }
+
+            if (!isValidPhone(dialCode, phoneNumber)) {
+                showError(t('invalidPhone'));
+                phoneInput?.focus();
+                return;
+            }
+
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = t('savingPhone');
+            }
+
+            const requestBody = new URLSearchParams({
+                action: 'ippgi_save_phone',
+                nonce: ippgiData.nonce,
+                country_iso: countryIso,
+                phone_number: phoneNumber
+            });
+
+            fetch(ippgiData.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                },
+                body: requestBody.toString()
+            })
+                .then(function(response) {
+                    return response.json();
+                })
+                .then(function(result) {
+                    if (!result.success) {
+                        const message = result.data && result.data.message
+                            ? result.data.message
+                            : t('phoneSaveFailed');
+                        const requestError = new Error(message);
+                        requestError.isUserMessage = true;
+                        throw requestError;
+                    }
+
+                    ippgiData.hasPhone = true;
+                    window.location.href = pendingUrl || ippgiData.pricesUrl;
+                })
+                .catch(function(error) {
+                    showError(error && error.isUserMessage
+                        ? error.message
+                        : t('phoneSaveFailed'));
+                })
+                .finally(function() {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = defaultSubmitText;
+                    }
+                });
+        });
+
+        window.ippgiRequestPhone = openModal;
     }
 
     /**
@@ -1631,8 +1791,16 @@
                 return;
             }
 
+            const pricesUrl = ippgiData.pricesUrl + '?category=' + encodeURIComponent(category);
+
+            // Prompt logged-in users once when their profile has no mobile number.
+            if (!ippgiData.hasPhone && typeof window.ippgiRequestPhone === 'function') {
+                window.ippgiRequestPhone(pricesUrl);
+                return;
+            }
+
             // Logged-in users can access the prices page.
-            window.location.href = ippgiData.pricesUrl + '?category=' + encodeURIComponent(category);
+            window.location.href = pricesUrl;
         }
 
         // Price table click handler

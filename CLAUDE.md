@@ -583,11 +583,16 @@ Body: cancel_at_period_end=true
    - 通过 JavaScript 检测表单变化
 
 **手机号验证**：
-- 支持国际格式（+86、+1 等）
-- 允许数字、空格、连字符、括号
-- 最少 6 位数字，最多 15 位
-- 输入时自动过滤非法字符
-- 失焦时验证，无效显示红色错误提示
+- Country code 与 Mobile Number 分列显示，和手机号补全弹窗共用同一份国家码表及服务端规范化规则
+- 已有国际号码优先根据前缀拆分；共享国家码优先结合资料中的 Country/Region 判断；旧号码没有前缀时再按 Country/Region 预选
+- 本地号码允许数字、空格、连字符、括号；国家码和本地号码合计最少 6 位、最多 15 位数字
+- 保存格式统一为 `+国家码 本地号码纯数字`；手机号国家码不会自动修改资料中的 Country/Region
+- 输入时自动过滤非法字符，失焦时验证，无效显示红色错误提示
+
+**价格入口手机号补全**：
+- 已登录且用户 meta `phone` 为空时，从首页等价格入口继续会显示可关闭的手机号弹窗；直接访问 `/prices` 仍按“登录即可访问”处理，不增加手机号硬拦截
+- 弹窗将国家/地区代码与本地号码分开填写；优先按用户资料中的 `country` 预选，资料为空或无法识别时保持“请选择”，不按 IP 或界面语言推断
+- 服务端按受支持的国家码表校验并统一保存为 `+国家码 本地号码纯数字`，继续复用 user meta `phone`，当前不做短信验证
 
 **国家选择器**：
 - 点击 Country/Region 字段弹出模态框
@@ -1089,11 +1094,11 @@ if (is_user_logged_in() && !ippgi_is_user_subscribed() && !is_page('subscribe'))
 - `html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8')` —— 把 `S&#039;orienter` 还原成 `S'orienter`，否则 JS `escapeHtml()` 会二次编码成 `S&amp;#039;orienter`
 
 **缓存机制**：
-- 缓存键：`ippgi_js_i18n_v5_<md5(language_code)>`
+- 缓存键：`ippgi_js_i18n_v7_<md5(language_code)>`
 - TTL：12 小时
 - 默认语言（en_US）跳过缓存（直接返回原文）
 - 请求内 static memo 防止同一次请求多次读 transient
-- 修改函数逻辑时，把版本段 `v5` 升一位即可让旧缓存失效
+- 修改函数逻辑时，把当前版本段（现为 `v7`）升一位即可让旧缓存失效
 
 **自动失效 hook**：
 - `trp_save_editor_translations_regular_strings`
@@ -1107,8 +1112,8 @@ cd /home/html/www/ippgi
 wp transient delete --all --allow-root
 ```
 
-**字典字段清单**（截至 v5）：
-`loading / loadingPrices / error / copied / added / removed / favoriteAddedFull / favoriteRemovedFull / submitting / noPriceData / noPriceDataWidth / failedLoadPrices / updatedLabel / timezoneSuffix / trend / startDateEndDate / thProducts / thDimensions / thLatest / months[12]`
+**字典字段清单**（截至 v7）：
+`loading / loadingPrices / error / copied / added / removed / favoriteAddedFull / favoriteRemovedFull / submitting / savingPhone / countryCodeRequired / phoneRequired / invalidPhone / phoneSaveFailed / noPriceData / noPriceDataWidth / failedLoadPrices / updatedLabel / timezoneSuffix / trend / startDateEndDate / thProducts / thDimensions / thLatest / months[12]`
 
 新增字段时：
 1. 在 `ippgi_get_js_i18n_strings()` 加一行 `'<key>' => $tr('<English source>')`
