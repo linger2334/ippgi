@@ -24,7 +24,7 @@
 | Plus | 4 | 付费高级会员，查看完整历史数据、图表、数据导出 |
 
 **注意**：
-- 新用户注册时默认为 Basic，系统自动通过 bonus 机制给予 7 天 Plus 访问权限
+- 新用户注册时默认为 Basic，系统自动通过 bonus 机制给予完整 7 天 Plus 访问权限；注册后仍返回首页，但当前不显示注册成功欢迎弹窗
 - bonus 激活/续期只写入 bonus 相关 meta，不会把 SWPM membership_level 改成 4；权限判断统一走 `ippgi_bonus_access_end > 当前时间`
 - 主题代码禁止手动升级会员等级到 Plus(4)；升级仅由 SWPM 支付流程自动处理，主题侧只允许降级到 Basic(2)
 - Plus 等级在 SWPM 后台设置为 "No Expiry"，所以 SWPM 不会自动降级用户，需要我们的代码在订阅到期时手动处理降级
@@ -215,13 +215,7 @@ Body: cancel_at_period_end=true
 **注意**：
 - 我们使用 `swpm_payment_ipn_processed` hook 而非 `swpm_membership_level_changed`（后者不可靠）
 - Toast 组件 `ippgiToast` 仍保留用于其他功能（收藏、复制链接等）
-- 新用户注册欢迎弹窗复用了同一套视觉组件（`payment-success-*` 样式），文案为：
-  - 标题：`Congratulations!`
-  - 第一段：`Enjoy 7 days of Plus.`（加粗）
-  - 第二段：`Full price data unlocked. Upgrade or stay Basic after.`
-  - 按钮：`Continue to iPPGI`（所有 success 弹窗统一使用较短按钮宽度，不占满整行）
-  - 段落间距：第一段到第二段间距收紧，按钮上方保留更清晰间距
-  - 响应式：按钮使用 `width: min(100%, 210px)` + `box-sizing: border-box`，在窄屏下等比收缩且不出现突变放大
+- 新用户注册成功后仍自动获得 7 天 bonus 并按既有登录流程返回首页，但当前不写入欢迎弹窗标记，也不显示注册成功弹窗；付费成功弹窗保持不变。
 
 **Webhook 配置**：
 - PayPal：SWPM 自动创建 webhook，无需手动配置
@@ -1725,7 +1719,7 @@ TP 只翻前端 HTML，**不翻邮件**。SWPM 注册欢迎、订阅升级 / 取
 - **兼容说明**：
   - SWPM `login-page-url` 应指向 `/login/`
   - Google OAuth 回调需与 `/login/?swpm-google-login=1` 保持一致
-  - 首次注册成功后的 bonus、推荐关系处理、成功弹窗逻辑仍由既有 SWPM hook + user meta 驱动，不依赖旧的 `/membership-login/` slug
+  - 首次注册成功后的 bonus、推荐关系处理仍由既有 SWPM hook + user meta 驱动，不依赖旧的 `/membership-login/` slug；注册成功欢迎弹窗当前停用
 
 #### 58. Rendui API `phone` 请求头统一调整 ✅
 - **背景**：人堆价格接口中，价格列表接口不需要自定义请求头；当前仅统计接口需要 `phone`。

@@ -18,6 +18,7 @@
 
 ## 4) 关键业务约束
 - 会员体系（SWPM）：Basic=2，Plus=4；赠送天数走 bonus 机制（用户 meta）。
+- 新用户注册后仍按现有流程返回首页并自动获得完整 7 天 bonus 权限，但当前不显示注册成功欢迎弹窗；bonus 时间计算必须使用真实 Unix 时间戳与 WordPress 站点时区，禁止拿 `current_time('timestamp')` 与真实时间戳直接比较。
 - Trial（Level 3）已停用且不再参与任何业务流程；当前项目仅保留 Basic=2、Plus=4 两个实际使用的 SWPM 等级。
 - 登录入口：`/login/` 是主登录页；`/membership-login/` 保留兼容。已登录用户访问这两个页面时应立即跳回首页，避免重复维护两套跳转逻辑。
 - 页面访问权限：

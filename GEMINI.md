@@ -21,6 +21,7 @@ This project is a custom WordPress-based platform for displaying and managing ra
 - **Primary login route:** `/login/` is the canonical login page. `/membership-login/` remains for backward compatibility only.
 - **Logged-in redirect rule:** Logged-in users visiting `/login/` or `/membership-login/` should be redirected to the home page through centralized theme logic.
 - **Membership levels in active use:** The project only uses SWPM `Basic (2)` and `Plus (4)` for live membership state. Trial `Level 3` has been retired from business logic, and all temporary gifted access is handled through the bonus meta mechanism.
+- **New-user bonus:** New registrations still return to the home page and receive a full 7 days of bonus access. The registration-success welcome modal is currently disabled. Bonus expiry calculations must compare real Unix timestamps and format stored dates in the WordPress site timezone.
 - **Price-page access:** `/prices` and `/price-detail` require login only; neither page requires Plus/bonus access or a saved phone number.
 - **Phone collection and profile editing:**
   - A logged-in user whose `phone` user meta is empty sees a dismissible phone modal when continuing from homepage and other price-entry links. Direct navigation to `/prices` remains available and is not hard-blocked by the phone field.

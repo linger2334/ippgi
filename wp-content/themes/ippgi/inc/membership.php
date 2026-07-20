@@ -81,7 +81,7 @@ function ippgi_is_bonus_access_active($user_id = null) {
         return false;
     }
 
-    return $end_time > current_time('timestamp');
+    return $end_time > time();
 }
 
 /**
@@ -337,7 +337,7 @@ function ippgi_on_payment_success($ipn_data) {
         $bonus_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
         if ($bonus_end) {
             $end_time = strtotime($bonus_end . ' ' . wp_timezone_string());
-            $now = current_time('timestamp');
+            $now = time();
             if ($end_time > $now) {
                 // Calculate remaining days and save for later use
                 $remaining_days = ceil(($end_time - $now) / DAY_IN_SECONDS);
@@ -758,9 +758,6 @@ function ippgi_on_swpm_registration($member_data) {
         ippgi_activate_bonus_access($wp_user->ID, 7);
         update_user_meta($wp_user->ID, 'ippgi_registration_bonus_granted', current_time('mysql'));
         error_log(sprintf('IPPGI: Granted 7 days bonus access to new user %d', $wp_user->ID));
-
-        // Set registration success flag for showing welcome modal
-        update_user_meta($wp_user->ID, 'ippgi_registration_just_completed', true);
     } else {
         error_log(sprintf('IPPGI: Registration bonus already granted for user %d, skipping duplicate grant', $wp_user->ID));
     }
@@ -915,12 +912,13 @@ function ippgi_award_referral_bonus($user_id, $bonus_days = 7) {
     } elseif ($bonus_active) {
         // User already has bonus access - extend the current bonus period
         $current_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
-        $new_end = date('Y-m-d H:i:s', strtotime($current_end . " +{$bonus_days} days"));
+        $current_end_time = strtotime($current_end . ' ' . wp_timezone_string());
+        $new_end = wp_date('Y-m-d H:i:s', $current_end_time + ($bonus_days * DAY_IN_SECONDS), wp_timezone());
         update_user_meta($user_id, 'ippgi_bonus_access_end', $new_end);
 
         // Reschedule expiration check
         wp_clear_scheduled_hook('ippgi_check_bonus_access_expired', [$user_id]);
-        wp_schedule_single_event(strtotime($new_end), 'ippgi_check_bonus_access_expired', [$user_id]);
+        wp_schedule_single_event(strtotime($new_end . ' ' . wp_timezone_string()), 'ippgi_check_bonus_access_expired', [$user_id]);
 
         error_log(sprintf('IPPGI: Extended bonus access for user %d by %d days. New end: %s', $user_id, $bonus_days, $new_end));
     } else {
@@ -1002,10 +1000,10 @@ function ippgi_activate_bonus_access($user_id, $days = null) {
         $current_end = get_user_meta($user_id, 'ippgi_bonus_access_end', true);
         if ($current_end) {
             $current_end_time = strtotime($current_end . ' ' . wp_timezone_string());
-            $now = current_time('timestamp');
+            $now = time();
             // If current end is in the future, extend from there; otherwise from now
             $base_time = max($current_end_time, $now);
-            $end_date = date('Y-m-d H:i:s', $base_time + ($bonus_days * DAY_IN_SECONDS));
+            $end_date = wp_date('Y-m-d H:i:s', $base_time + ($bonus_days * DAY_IN_SECONDS), wp_timezone());
             update_user_meta($user_id, 'ippgi_bonus_access_end', $end_date);
 
             if ($clear_unused) {
@@ -1023,7 +1021,7 @@ function ippgi_activate_bonus_access($user_id, $days = null) {
 
     // Set bonus access start and end dates (using local timezone consistently)
     $start_date = current_time('mysql');
-    $end_date = date('Y-m-d H:i:s', current_time('timestamp') + ($bonus_days * DAY_IN_SECONDS));
+    $end_date = wp_date('Y-m-d H:i:s', time() + ($bonus_days * DAY_IN_SECONDS), wp_timezone());
 
     update_user_meta($user_id, 'ippgi_bonus_access_start', $start_date);
     update_user_meta($user_id, 'ippgi_bonus_access_end', $end_date);
@@ -1055,7 +1053,7 @@ function ippgi_check_bonus_access_expired($user_id) {
     }
 
     $end_time = strtotime($end_date . ' ' . wp_timezone_string());
-    if (!$end_time || $end_time > current_time('timestamp')) {
+    if (!$end_time || $end_time > time()) {
         return; // Not expired yet
     }
 
@@ -1072,13 +1070,13 @@ function ippgi_check_bonus_access_expired($user_id) {
     $new_bonus_days = (int) get_user_meta($user_id, 'ippgi_unused_bonus_days', true);
     if ($new_bonus_days > 0) {
         // Extend bonus access with new days
-        $new_end = date('Y-m-d H:i:s', strtotime("+{$new_bonus_days} days"));
+        $new_end = wp_date('Y-m-d H:i:s', time() + ($new_bonus_days * DAY_IN_SECONDS), wp_timezone());
         update_user_meta($user_id, 'ippgi_bonus_access_start', current_time('mysql'));
         update_user_meta($user_id, 'ippgi_bonus_access_end', $new_end);
         update_user_meta($user_id, 'ippgi_unused_bonus_days', 0);
 
         // Schedule next expiration check
-        wp_schedule_single_event(strtotime($new_end), 'ippgi_check_bonus_access_expired', [$user_id]);
+        wp_schedule_single_event(strtotime($new_end . ' ' . wp_timezone_string()), 'ippgi_check_bonus_access_expired', [$user_id]);
 
         error_log(sprintf('IPPGI: User %d bonus extended with %d accumulated days until %s', $user_id, $new_bonus_days, $new_end));
         return;
@@ -2027,7 +2025,7 @@ function ippgi_admin_user_bonus_section($user) {
     $remaining_days = 0;
     if ($bonus_active && $bonus_end) {
         $end_time = strtotime($bonus_end . ' ' . wp_timezone_string());
-        $now = current_time('timestamp');
+        $now = time();
         if ($end_time > $now) {
             $remaining_days = ceil(($end_time - $now) / DAY_IN_SECONDS);
         }

@@ -82,7 +82,7 @@ $subscription_status = ippgi_get_subscription_status($current_user->ID);
                         if ($bonus_end) {
                             // Use WordPress timezone-aware functions
                             $end_time = strtotime($bonus_end . ' ' . wp_timezone_string());
-                            $now = current_time('timestamp');
+                            $now = time();
                             if ($end_time > $now) {
                                 $remaining_bonus_days = ceil(($end_time - $now) / DAY_IN_SECONDS);
                             }
