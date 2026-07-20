@@ -27,6 +27,11 @@ This project is a custom WordPress-based platform for displaying and managing ra
   - The phone modal and `/edit-profile` share the country/region calling-code table, phone splitting, validation, and server-side normalization rules.
   - Existing international numbers take their selector default from the stored prefix. For legacy local numbers without a prefix, the profile `country` is used as a fallback. If neither source is usable, the selector stays unselected; do not infer it from IP address or interface language.
   - Phone values are stored in the existing `phone` user meta as `+calling-code local-digits`, for example `+86 13812345678`. Selecting a phone calling code must not update the profile Country/Region field. SMS verification is not implemented yet.
+- **SEO metadata:**
+  - `wp-content/themes/ippgi/inc/seo.php` centrally outputs Meta Description and Meta Keywords for frontend requests. Every future post/page receives automatic values without template edits.
+  - The post/page `SEO Metadata` editor panel stores optional overrides in `_ippgi_seo_description` and `_ippgi_seo_keywords`. Manual values win; blank fields fall back to page defaults, excerpts/content, title, taxonomy, and site business keywords.
+  - Login, profile, favorites, invite, payment/result, protected price, search, and 404 pages remain `noindex, noarchive`.
+  - TranslatePress SEO Pack translates Description and hreflang values; the theme registers Keywords as an additional translatable meta attribute. Theme metadata output disables itself if Yoast, Rank Math, SEOPress, or AIOSEO is introduced later, preventing duplicate tags.
 - **Rendui header rules:**
   - `prices/daily` should not send custom headers.
   - `daily/getByProductSpecAndDate` is disabled and should not be requested.

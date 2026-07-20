@@ -594,6 +594,16 @@ Body: cancel_at_period_end=true
 - 弹窗将国家/地区代码与本地号码分开填写；优先按用户资料中的 `country` 预选，资料为空或无法识别时保持“请选择”，不按 IP 或界面语言推断
 - 服务端按受支持的国家码表校验并统一保存为 `+国家码 本地号码纯数字`，继续复用 user meta `phone`，当前不做短信验证
 
+### SEO Meta 自动生成与人工覆盖
+**实现文件**：`/inc/seo.php`（由 `functions.php` 统一加载）
+
+- 所有前台文章、页面、归档、搜索和 404 请求统一输出 `<meta name="description">` 与 `<meta name="keywords">`；以后新增的文章/页面无需修改模板即可自动获得 Meta。
+- 文章/页面编辑器增加 `SEO Metadata` 面板，人工值保存到 `_ippgi_seo_description`、`_ippgi_seo_keywords`。人工值优先；留空时 Description 依次使用页面专用默认值、摘要、正文、标题兜底，Keywords 使用标题、文章分类/标签及站点业务词并自动去重。
+- Description 最长 160 字符；Keywords 最多保留 12 项。`meta keywords` 仅为兼容需求保留，不应把它当作主要搜索排名信号。
+- `/login`、`/membership-login`、`/profile`、`/edit-profile`、`/favorites`、`/invite`、`/payment`、支付结果页、`/prices`、`/price-detail`、搜索页和 404 输出 `noindex, noarchive`。
+- TranslatePress SEO Pack 负责 Description 与 hreflang 的多语言处理，主题通过 `trp_node_accessors` 额外注册 Keywords 的 `content` 属性翻译。
+- 若未来启用 Yoast、Rank Math、SEOPress 或 AIOSEO，主题会停止自身 Meta 输出，避免重复 Description/Keywords。
+
 **国家选择器**：
 - 点击 Country/Region 字段弹出模态框
 - 支持搜索过滤

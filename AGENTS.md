@@ -24,6 +24,11 @@
   - `/prices` 价格列表页当前为“登录即可访问”。
   - `/price-detail` 价格详情页当前为“登录即可访问”。
 - 手机号补全：已登录但 `phone` 为空的用户从首页等价格入口继续时显示可关闭的手机号弹窗，直达 `/prices` 不增加手机号硬拦截。弹窗和 `/edit-profile` 共用国家码表、拆分及校验规则；已有国际号码优先按号码前缀选择国家码，旧号码无前缀时再按用户资料中的 `country` 预选，资料为空或无法识别时保持未选择，不按 IP 或界面语言推断。保存格式统一为 `+国家码 本地号码纯数字`，手机号国家码不自动修改资料中的 Country/Region，当前不做短信验证。
+- SEO 元数据：
+  - 主题通过 `inc/seo.php` 为前台请求统一输出 Meta Description 和 Meta Keywords；新建文章/页面无需额外配置即可自动生成。
+  - 文章和页面编辑器中的 `SEO Metadata` 面板可用 `_ippgi_seo_description`、`_ippgi_seo_keywords` 手动覆盖；人工值优先，留空时 Description 按页面专用默认值/摘要/正文/标题回退，Keywords 按标题/分类/标签/站点业务词生成。
+  - 登录、个人资料、收藏、邀请、支付结果、价格列表/详情、搜索和 404 等功能页必须保持 `noindex, noarchive`。
+  - TranslatePress SEO Pack 负责 Description 与 hreflang 翻译，主题额外注册 Keywords 的属性翻译；若以后启用 Yoast、Rank Math、SEOPress 或 AIOSEO，主题应停止自身 Meta 输出以避免重复标签。
 - 首页公告系统：
   - 公告条当前只在首页显示，且已改为参与正常文档流，不再使用 fixed 悬浮覆盖首页内容。
   - 公告条当前插在 `front-page.php` 的 `site-main` 顶部，并通过轻微负 margin 贴紧 header 下边界。

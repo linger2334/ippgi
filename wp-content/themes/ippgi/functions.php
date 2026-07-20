@@ -101,6 +101,7 @@ require_once IPPGI_THEME_DIR . '/inc/country-calling-codes.php';
 require_once IPPGI_THEME_DIR . '/inc/enqueue.php';
 require_once IPPGI_THEME_DIR . '/inc/customizer.php';
 require_once IPPGI_THEME_DIR . '/inc/template-functions.php';
+require_once IPPGI_THEME_DIR . '/inc/seo.php';
 require_once IPPGI_THEME_DIR . '/inc/membership.php';
 require_once IPPGI_THEME_DIR . '/inc/quote-requests.php';
 require_once IPPGI_THEME_DIR . '/inc/announcement.php';
