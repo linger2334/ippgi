@@ -20,7 +20,19 @@ set_time_limit(600);
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-require_once(__DIR__ . '/wp-load.php');
+// 生产环境可通过 IPPGI_WP_ROOT 指向实际站点目录。
+if (!defined('ABSPATH')) {
+    $wp_root = getenv('IPPGI_WP_ROOT');
+    $wp_load = $wp_root
+        ? rtrim($wp_root, '/\\') . '/wp-load.php'
+        : __DIR__ . '/wp-load.php';
+
+    if (!is_readable($wp_load)) {
+        die("错误: 找不到可读取的 wp-load.php，请设置 IPPGI_WP_ROOT\n");
+    }
+
+    require_once $wp_load;
+}
 
 echo "=== IPPGI 历史美元区间回填工具 ===\n\n";
 

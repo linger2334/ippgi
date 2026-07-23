@@ -193,22 +193,101 @@ class IPPGI_Prices_Historical_Importer {
     private function extract_product_specs($material_type, $price_list) {
         $product_specs = array();
 
-        if (!isset($price_list['categories'][$material_type]['result'])) {
-            return $product_specs;
-        }
+        if (isset($price_list['categories'][$material_type]['result'])
+            && is_array($price_list['categories'][$material_type]['result'])) {
+            $result = $price_list['categories'][$material_type]['result'];
 
-        $result = $price_list['categories'][$material_type]['result'];
+            // Iterate through widths and items.
+            foreach ($result as $width => $items) {
+                if (!is_array($items)) {
+                    continue;
+                }
 
-        // Iterate through widths and items
-        foreach ($result as $width => $items) {
-            foreach ($items as $item) {
-                if (isset($item['productSpec'])) {
-                    $product_specs[] = $item['productSpec'];
+                foreach ($items as $item) {
+                    if (!empty($item['productSpec'])) {
+                        $product_specs[] = (string) $item['productSpec'];
+                    }
                 }
             }
         }
 
-        return array_unique($product_specs);
+        $product_specs = array_values(array_unique($product_specs));
+        if (!empty($product_specs)) {
+            return $product_specs;
+        }
+
+        // A single upstream category can fail while other category caches remain usable.
+        // Use the latest stored snapshot so the missing category can still be repaired.
+        $fallback = $this->get_latest_stored_product_specs($material_type);
+        if (!empty($fallback['product_specs'])) {
+            error_log(sprintf(
+                'IPPGI Prices: No cached product specs for %s; using %d specs from stored snapshot %s',
+                $material_type,
+                count($fallback['product_specs']),
+                $fallback['date']
+            ));
+            $this->output_progress(sprintf(
+                '[补数进度] %s 当前缓存无规格，改用历史表 %s 的 %d 个规格',
+                strtoupper($material_type),
+                $fallback['date'],
+                count($fallback['product_specs'])
+            ));
+        }
+
+        return $fallback['product_specs'];
+    }
+
+    /**
+     * Get product specs from the most recent stored snapshot.
+     *
+     * @param string $material_type Material type.
+     * @return array
+     */
+    private function get_latest_stored_product_specs($material_type) {
+        global $wpdb;
+
+        $result = array(
+            'date' => '',
+            'product_specs' => array(),
+        );
+
+        $table_name = IPPGI_Prices_Database::get_table_name($material_type);
+        if (!$table_name) {
+            return $result;
+        }
+
+        $latest_date = $wpdb->get_var("SELECT DATE(MAX(statistics_time)) FROM {$table_name}");
+        if (empty($latest_date)) {
+            return $result;
+        }
+
+        try {
+            $day_start = new DateTimeImmutable($latest_date . ' 00:00:00', wp_timezone());
+        } catch (Exception $e) {
+            return $result;
+        }
+
+        $day_end = $day_start->modify('+1 day');
+        $product_specs = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT DISTINCT product_spec
+                 FROM {$table_name}
+                 WHERE statistics_time >= %s
+                   AND statistics_time < %s
+                   AND product_spec <> ''
+                 ORDER BY product_spec ASC",
+                $day_start->format('Y-m-d H:i:s'),
+                $day_end->format('Y-m-d H:i:s')
+            )
+        );
+
+        $result['date'] = $day_start->format('Y-m-d');
+        $result['product_specs'] = array_values(array_unique(array_filter(array_map(
+            'strval',
+            is_array($product_specs) ? $product_specs : array()
+        ))));
+
+        return $result;
     }
 
     /**

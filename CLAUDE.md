@@ -1936,6 +1936,14 @@ php import-missing-days.php
 - 从外部 API 获取历史价格数据
 - 自动获取对应日期的历史汇率
 - 将数据保存到数据库（仅单点美元价，不直接补区间字段）
+- 若某一分类因上游错误未进入当前价格缓存，自动从该分类最近一次历史快照读取产品规格，再逐规格调用统计接口补数
+
+生产环境的 Git 仓库与 WordPress 网站目录分离时，不要把运维脚本复制到 Web 根目录。通过环境变量加载实际站点：
+
+```bash
+IPPGI_WP_ROOT=/home/html/www/ippgi \
+php /home/wlg2008g/deploy/ippgi-src/import-missing-days.php 2026-07-22
+```
 
 ### 历史美元区间回填工具
 **文件**：`/backfill-historical-usd-ranges.php`
