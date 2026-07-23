@@ -37,20 +37,30 @@ echo "=== IPPGI 历史价格数据导入工具 ===\n\n";
 
 // 显示帮助信息
 if (isset($argv[1]) && in_array($argv[1], ['-h', '--help', 'help'])) {
-    echo "用法: php import-missing-days.php [开始日期] [结束日期]\n\n";
+    echo "用法: php import-missing-days.php [开始日期] [结束日期] [--only-missing]\n\n";
     echo "参数:\n";
     echo "  开始日期  格式 YYYY-MM-DD，默认为昨天\n";
     echo "  结束日期  格式 YYYY-MM-DD，默认为开始日期\n\n";
+    echo "  --only-missing  只请求日期范围内尚无记录的产品规格\n\n";
     echo "示例:\n";
     echo "  php import-missing-days.php 2026-01-24 2026-01-27  # 导入指定日期范围\n";
     echo "  php import-missing-days.php 2026-01-24             # 导入单天数据\n";
+    echo "  php import-missing-days.php 2026-01-24 2026-01-24 --only-missing\n";
     echo "  php import-missing-days.php                        # 导入昨天数据\n";
     exit(0);
 }
 
 // 获取日期参数
-$from_date = isset($argv[1]) ? $argv[1] : date('Y-m-d', strtotime('-1 day'));
-$to_date = isset($argv[2]) ? $argv[2] : $from_date;
+$arguments = array_slice($argv, 1);
+$only_missing = in_array('--only-missing', $arguments, true);
+$date_arguments = array_values(array_filter(
+    $arguments,
+    static function ($argument) {
+        return '--only-missing' !== $argument;
+    }
+));
+$from_date = isset($date_arguments[0]) ? $date_arguments[0] : date('Y-m-d', strtotime('-1 day'));
+$to_date = isset($date_arguments[1]) ? $date_arguments[1] : $from_date;
 
 // 验证日期格式
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
@@ -66,6 +76,7 @@ $from = $from_date . ' 00:00:00';
 $to = $to_date . ' 23:59:59';
 
 echo "导入日期范围: {$from_date} 至 {$to_date}\n\n";
+echo "导入模式: " . ($only_missing ? "仅补缺失规格\n\n" : "全部规格\n\n");
 
 // 获取插件实例
 if (!class_exists('IPPGI_Prices')) {
@@ -86,7 +97,7 @@ $start_time = microtime(true);
 echo "开始导入，请耐心等待...\n";
 echo str_repeat('-', 50) . "\n";
 
-$results = $importer->import_all_materials($from, $to);
+$results = $importer->import_all_materials($from, $to, $only_missing);
 
 $duration = microtime(true) - $start_time;
 

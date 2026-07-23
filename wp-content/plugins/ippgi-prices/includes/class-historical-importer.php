@@ -37,9 +37,10 @@ class IPPGI_Prices_Historical_Importer {
      *
      * @param string $from Start date (YYYY-MM-DD HH:MM:SS)
      * @param string $to End date (YYYY-MM-DD HH:MM:SS)
+     * @param bool $only_missing Import only product specs without a row in the requested range.
      * @return array Import results
      */
-    public function import_all_materials($from = '2022-01-23 00:00:00', $to = '2026-01-23 00:00:00') {
+    public function import_all_materials($from = '2022-01-23 00:00:00', $to = '2026-01-23 00:00:00', $only_missing = false) {
         $results = array(
             'total_records' => 0,
             'successful' => 0,
@@ -95,7 +96,8 @@ class IPPGI_Prices_Historical_Importer {
                 $category_id,
                 $price_list,
                 $from,
-                $to
+                $to,
+                $only_missing
             );
 
             $results['materials'][$material_type] = $material_results;
@@ -125,9 +127,10 @@ class IPPGI_Prices_Historical_Importer {
      * @param array $price_list Price list data
      * @param string $from Start date
      * @param string $to End date
+     * @param bool $only_missing Import only product specs missing in the requested range.
      * @return array Import results for this material
      */
-    private function import_material_data($material_type, $category_id, $price_list, $from, $to) {
+    private function import_material_data($material_type, $category_id, $price_list, $from, $to, $only_missing = false) {
         $results = array(
             'total_records' => 0,
             'successful' => 0,
@@ -140,8 +143,24 @@ class IPPGI_Prices_Historical_Importer {
         // Get product specs for this material from price list
         $product_specs = $this->extract_product_specs($material_type, $price_list);
 
+        if ($only_missing && !empty($product_specs)) {
+            $original_count = count($product_specs);
+            $product_specs = $this->filter_missing_product_specs(
+                $material_type,
+                $product_specs,
+                $from,
+                $to
+            );
+            $this->output_progress(sprintf(
+                '[补数进度] %s 仅补缺失规格: %d/%d',
+                strtoupper($material_type),
+                count($product_specs),
+                $original_count
+            ));
+        }
+
         if (empty($product_specs)) {
-            error_log("IPPGI Prices: No product specs found for {$material_type}");
+            error_log("IPPGI Prices: No product specs require import for {$material_type}");
             return $results;
         }
 
@@ -291,6 +310,48 @@ class IPPGI_Prices_Historical_Importer {
     }
 
     /**
+     * Keep only product specs that have no row inside the requested range.
+     *
+     * @param string $material_type Material type.
+     * @param array  $product_specs Candidate product specs.
+     * @param string $from Start datetime.
+     * @param string $to End datetime.
+     * @return array
+     */
+    private function filter_missing_product_specs($material_type, $product_specs, $from, $to) {
+        global $wpdb;
+
+        $table_name = IPPGI_Prices_Database::get_table_name($material_type);
+        if (!$table_name) {
+            return $product_specs;
+        }
+
+        $existing_specs = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT DISTINCT product_spec
+                 FROM {$table_name}
+                 WHERE statistics_time >= %s
+                   AND statistics_time <= %s",
+                $from,
+                $to
+            )
+        );
+
+        if (empty($existing_specs)) {
+            return array_values($product_specs);
+        }
+
+        $existing_lookup = array_fill_keys(array_map('strval', $existing_specs), true);
+
+        return array_values(array_filter(
+            $product_specs,
+            static function ($product_spec) use ($existing_lookup) {
+                return !isset($existing_lookup[(string) $product_spec]);
+            }
+        ));
+    }
+
+    /**
      * Fetch and store historical data for a product spec
      *
      * @param string $material_type Material type
@@ -347,6 +408,7 @@ class IPPGI_Prices_Historical_Importer {
             return $results;
         }
 
+        $list = $this->filter_historical_records_to_range($list, $from, $to);
         $results['total_records'] = count($list);
         $this->store_historical_records($material_type, $product_spec, $list, $results);
 
@@ -416,6 +478,7 @@ class IPPGI_Prices_Historical_Importer {
                 continue;
             }
 
+            $list = $this->filter_historical_records_to_range($list, $day_start, $day_end);
             $results['total_records'] += count($list);
             $this->store_historical_records($material_type, $product_spec, $list, $results);
             usleep(100000);
@@ -493,6 +556,35 @@ class IPPGI_Prices_Historical_Importer {
         }
 
         return $data['result']['list'];
+    }
+
+    /**
+     * Ignore records outside the requested range even if the upstream API returns them.
+     *
+     * Records without a usable time stay in the list so the normal storage path
+     * can report them as normalization failures.
+     *
+     * @param array  $list Historical records.
+     * @param string $from Start datetime.
+     * @param string $to End datetime.
+     * @return array
+     */
+    private function filter_historical_records_to_range($list, $from, $to) {
+        if (!is_array($list)) {
+            return array();
+        }
+
+        return array_values(array_filter(
+            $list,
+            function ($record) use ($from, $to) {
+                $statistics_time = $this->resolve_statistics_time($record);
+                if ('' === $statistics_time) {
+                    return true;
+                }
+
+                return $statistics_time >= $from && $statistics_time <= $to;
+            }
+        ));
     }
 
     /**
@@ -665,7 +757,13 @@ class IPPGI_Prices_Historical_Importer {
      */
     private function resolve_statistics_time($record) {
         if (!empty($record['satisticsTime'])) {
-            return (string) $record['satisticsTime'];
+            try {
+                return (new DateTimeImmutable((string) $record['satisticsTime'], wp_timezone()))
+                    ->setTimezone(wp_timezone())
+                    ->format('Y-m-d H:i:s');
+            } catch (Exception $e) {
+                return '';
+            }
         }
 
         if (empty($record['timestamp']) || !is_numeric($record['timestamp'])) {
