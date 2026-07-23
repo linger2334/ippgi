@@ -650,7 +650,10 @@ class IPPGI_Prices_Historical_Importer {
         $message = strtolower((string) $error_message);
 
         return false !== strpos($message, 'curl error 35')
+            || false !== strpos($message, 'curl error 28')
             || false !== strpos($message, 'tls connect error')
+            || false !== strpos($message, 'connection timeout')
+            || false !== strpos($message, 'timed out')
             || false !== strpos($message, 'unexpected eof while reading');
     }
 

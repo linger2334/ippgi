@@ -14,8 +14,8 @@
  * @since 1.0.0
  */
 
-// 设置执行时间限制（10分钟）
-set_time_limit(600);
+// 大批量逐规格请求可能耗时较长。
+set_time_limit(3600);
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
@@ -57,9 +57,13 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{
     die("错误: 日期格式不正确，请使用 YYYY-MM-DD 格式\n");
 }
 
+if (strcmp($from_date, $to_date) > 0) {
+    die("错误: 开始日期不能晚于结束日期\n");
+}
+
 // 转换为 API 需要的格式
 $from = $from_date . ' 00:00:00';
-$to = $to_date . ' 00:00:00';
+$to = $to_date . ' 23:59:59';
 
 echo "导入日期范围: {$from_date} 至 {$to_date}\n\n";
 
@@ -131,3 +135,6 @@ if (!empty($results['failures'])) {
 }
 
 echo "\n完成!\n";
+
+// 让 shell、cron 和部署工具能够识别部分或全部导入失败。
+exit($results['failed'] > 0 ? 1 : 0);
