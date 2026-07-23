@@ -141,7 +141,7 @@ class IPPGI_Prices_Historical_Importer {
         );
 
         // Get product specs for this material from price list
-        $product_specs = $this->extract_product_specs($material_type, $price_list);
+        $product_specs = $this->extract_product_specs($material_type, $price_list, $from, $to);
 
         if ($only_missing && !empty($product_specs)) {
             $original_count = count($product_specs);
@@ -207,9 +207,11 @@ class IPPGI_Prices_Historical_Importer {
      *
      * @param string $material_type Material type
      * @param array $price_list Price list data
+     * @param string $from Requested range start.
+     * @param string $to Requested range end.
      * @return array Array of product specs
      */
-    private function extract_product_specs($material_type, $price_list) {
+    private function extract_product_specs($material_type, $price_list, $from = '', $to = '') {
         $product_specs = array();
 
         if (isset($price_list['categories'][$material_type]['result'])
@@ -237,7 +239,7 @@ class IPPGI_Prices_Historical_Importer {
 
         // A single upstream category can fail while other category caches remain usable.
         // Use the latest stored snapshot so the missing category can still be repaired.
-        $fallback = $this->get_latest_stored_product_specs($material_type);
+        $fallback = $this->get_latest_stored_product_specs($material_type, $from, $to);
         if (!empty($fallback['product_specs'])) {
             error_log(sprintf(
                 'IPPGI Prices: No cached product specs for %s; using %d specs from stored snapshot %s',
@@ -257,12 +259,14 @@ class IPPGI_Prices_Historical_Importer {
     }
 
     /**
-     * Get product specs from the most recent stored snapshot.
+     * Get product specs from the closest stored snapshot outside the requested range.
      *
      * @param string $material_type Material type.
+     * @param string $from Requested range start.
+     * @param string $to Requested range end.
      * @return array
      */
-    private function get_latest_stored_product_specs($material_type) {
+    private function get_latest_stored_product_specs($material_type, $from = '', $to = '') {
         global $wpdb;
 
         $result = array(
@@ -275,7 +279,33 @@ class IPPGI_Prices_Historical_Importer {
             return $result;
         }
 
-        $latest_date = $wpdb->get_var("SELECT DATE(MAX(statistics_time)) FROM {$table_name}");
+        $latest_date = '';
+        if ('' !== $from) {
+            $latest_date = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT DATE(MAX(statistics_time))
+                     FROM {$table_name}
+                     WHERE statistics_time < %s",
+                    $from
+                )
+            );
+        }
+
+        if (empty($latest_date) && '' !== $to) {
+            $latest_date = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT DATE(MIN(statistics_time))
+                     FROM {$table_name}
+                     WHERE statistics_time > %s",
+                    $to
+                )
+            );
+        }
+
+        if (empty($latest_date)) {
+            $latest_date = $wpdb->get_var("SELECT DATE(MAX(statistics_time)) FROM {$table_name}");
+        }
+
         if (empty($latest_date)) {
             return $result;
         }
