@@ -1950,7 +1950,7 @@ php /home/wlg2008g/deploy/ippgi-src/import-missing-days.php 2026-07-22
 ### 历史美元区间回填工具
 **文件**：`/backfill-historical-usd-ranges.php`
 
-用于按日期范围回填历史价格表中的 `price_usd_min` / `price_usd_max` / `price_tax_usd_min` / `price_tax_usd_max`。脚本会按“每天单独生成一组随机因子、当天全表共用”的规则计算；若现有值为空或不在限定区间内，则重算并写回。
+用于按日期范围回填历史价格表中的 `price_usd_min` / `price_usd_max` / `price_tax_usd_min` / `price_tax_usd_max`。脚本优先从当天已有区间恢复最常见的公共因子；当天完全没有可恢复区间时才随机生成，并按“每天一组、当天全表共用”的规则补齐或规范化区间。
 
 ---
 

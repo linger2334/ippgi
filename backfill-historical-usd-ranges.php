@@ -9,8 +9,9 @@
  * php backfill-historical-usd-ranges.php 2026-03-20 2026-04-21
  *
  * 规则：
- * - 每天单独生成一组随机因子，并应用到当天全部产品
- * - 若区间值为空，或不在限定范围内，则重新计算并写入
+ * - 优先从当天已有区间恢复一组公共因子；当天没有区间时才随机生成
+ * - 同一天的全部产品统一使用同一组因子
+ * - 若区间值为空或与当天公共因子不一致，则重新计算并写入
  *
  * @package IPPGI
  * @since 1.0.0
@@ -110,16 +111,34 @@ while ($current <= $end) {
     $day_start = $date . ' 00:00:00';
     $day_end = $current->modify('+1 day')->format('Y-m-d') . ' 00:00:00';
 
-    $day_lower_bps = random_int($lower_bps_min, $lower_bps_max);
-    $day_upper_bps = random_int($upper_bps_min, $upper_bps_max);
+    $existing_day_bps = ippgi_backfill_detect_day_bps(
+        $wpdb,
+        $day_start,
+        $day_end,
+        $lower_bps_min,
+        $lower_bps_max,
+        $upper_bps_min,
+        $upper_bps_max
+    );
+
+    $day_lower_bps = null !== $existing_day_bps['lower']
+        ? $existing_day_bps['lower']
+        : random_int($lower_bps_min, $lower_bps_max);
+    $day_upper_bps = null !== $existing_day_bps['upper']
+        ? $existing_day_bps['upper']
+        : random_int($upper_bps_min, $upper_bps_max);
     $day_lower_multiplier = 1 - ($day_lower_bps / 10000);
     $day_upper_multiplier = 1 + ($day_upper_bps / 10000);
+    $factor_source = null !== $existing_day_bps['lower'] || null !== $existing_day_bps['upper']
+        ? '恢复当天已有因子'
+        : '生成新因子';
 
     echo sprintf(
-        "%s: 下限因子 %.2f%%, 上限因子 %.2f%%\n",
+        "%s: 下限因子 %.2f%%, 上限因子 %.2f%%（%s）\n",
         $date,
         $day_lower_bps / 100,
-        $day_upper_bps / 100
+        $day_upper_bps / 100,
+        $factor_source
     );
 
     foreach (IPPGI_Prices_Database::TABLES as $material_type => $table_suffix) {
@@ -154,17 +173,12 @@ while ($current <= $end) {
                 $expected_min = ippgi_backfill_round_price($price_usd * $day_lower_multiplier);
                 $expected_max = ippgi_backfill_round_price($price_usd * $day_upper_multiplier);
 
-                $allowed_min_low = ippgi_backfill_round_price($price_usd * (1 - ($lower_bps_max / 10000)));
-                $allowed_min_high = ippgi_backfill_round_price($price_usd * (1 - ($lower_bps_min / 10000)));
-                $allowed_max_low = ippgi_backfill_round_price($price_usd * (1 + ($upper_bps_min / 10000)));
-                $allowed_max_high = ippgi_backfill_round_price($price_usd * (1 + ($upper_bps_max / 10000)));
-
-                if (!ippgi_backfill_value_in_range($row['price_usd_min'], $allowed_min_low, $allowed_min_high)) {
+                if (!ippgi_backfill_value_matches($row['price_usd_min'], $expected_min)) {
                     $update_data['price_usd_min'] = $expected_min;
                     $update_formats[] = '%f';
                 }
 
-                if (!ippgi_backfill_value_in_range($row['price_usd_max'], $allowed_max_low, $allowed_max_high)) {
+                if (!ippgi_backfill_value_matches($row['price_usd_max'], $expected_max)) {
                     $update_data['price_usd_max'] = $expected_max;
                     $update_formats[] = '%f';
                 }
@@ -174,17 +188,12 @@ while ($current <= $end) {
                 $expected_tax_min = ippgi_backfill_round_price($price_tax_usd * $day_lower_multiplier);
                 $expected_tax_max = ippgi_backfill_round_price($price_tax_usd * $day_upper_multiplier);
 
-                $allowed_tax_min_low = ippgi_backfill_round_price($price_tax_usd * (1 - ($lower_bps_max / 10000)));
-                $allowed_tax_min_high = ippgi_backfill_round_price($price_tax_usd * (1 - ($lower_bps_min / 10000)));
-                $allowed_tax_max_low = ippgi_backfill_round_price($price_tax_usd * (1 + ($upper_bps_min / 10000)));
-                $allowed_tax_max_high = ippgi_backfill_round_price($price_tax_usd * (1 + ($upper_bps_max / 10000)));
-
-                if (!ippgi_backfill_value_in_range($row['price_tax_usd_min'], $allowed_tax_min_low, $allowed_tax_min_high)) {
+                if (!ippgi_backfill_value_matches($row['price_tax_usd_min'], $expected_tax_min)) {
                     $update_data['price_tax_usd_min'] = $expected_tax_min;
                     $update_formats[] = '%f';
                 }
 
-                if (!ippgi_backfill_value_in_range($row['price_tax_usd_max'], $allowed_tax_max_low, $allowed_tax_max_high)) {
+                if (!ippgi_backfill_value_matches($row['price_tax_usd_max'], $expected_tax_max)) {
                     $update_data['price_tax_usd_max'] = $expected_tax_max;
                     $update_formats[] = '%f';
                 }
@@ -297,19 +306,151 @@ function ippgi_backfill_round_price($value) {
 }
 
 /**
- * Check whether an existing decimal value falls within the allowed range.
+ * Detect the most common range factors already stored for a business day.
+ *
+ * @param wpdb   $wpdb WordPress database instance.
+ * @param string $day_start Inclusive day start.
+ * @param string $day_end Exclusive day end.
+ * @param int    $lower_bps_min Minimum lower factor.
+ * @param int    $lower_bps_max Maximum lower factor.
+ * @param int    $upper_bps_min Minimum upper factor.
+ * @param int    $upper_bps_max Maximum upper factor.
+ * @return array{lower:int|null,upper:int|null}
+ */
+function ippgi_backfill_detect_day_bps(
+    $wpdb,
+    $day_start,
+    $day_end,
+    $lower_bps_min,
+    $lower_bps_max,
+    $upper_bps_min,
+    $upper_bps_max
+) {
+    $lower_votes = array();
+    $upper_votes = array();
+
+    foreach (IPPGI_Prices_Database::TABLES as $table_suffix) {
+        $table_name = $wpdb->prefix . $table_suffix;
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT price_usd, price_usd_min, price_usd_max,
+                        price_tax_usd, price_tax_usd_min, price_tax_usd_max
+                 FROM {$table_name}
+                 WHERE statistics_time >= %s
+                   AND statistics_time < %s
+                   AND (
+                       (price_usd > 0 AND price_usd_min > 0 AND price_usd_max > 0)
+                       OR
+                       (price_tax_usd > 0 AND price_tax_usd_min > 0 AND price_tax_usd_max > 0)
+                   )
+                 ORDER BY id ASC
+                 LIMIT 200",
+                $day_start,
+                $day_end
+            ),
+            ARRAY_A
+        );
+
+        foreach ($rows as $row) {
+            ippgi_backfill_record_factor_votes(
+                $lower_votes,
+                $upper_votes,
+                $row['price_usd'],
+                $row['price_usd_min'],
+                $row['price_usd_max'],
+                $lower_bps_min,
+                $lower_bps_max,
+                $upper_bps_min,
+                $upper_bps_max
+            );
+            ippgi_backfill_record_factor_votes(
+                $lower_votes,
+                $upper_votes,
+                $row['price_tax_usd'],
+                $row['price_tax_usd_min'],
+                $row['price_tax_usd_max'],
+                $lower_bps_min,
+                $lower_bps_max,
+                $upper_bps_min,
+                $upper_bps_max
+            );
+        }
+    }
+
+    arsort($lower_votes);
+    arsort($upper_votes);
+
+    return array(
+        'lower' => !empty($lower_votes) ? intval(array_key_first($lower_votes)) : null,
+        'upper' => !empty($upper_votes) ? intval(array_key_first($upper_votes)) : null,
+    );
+}
+
+/**
+ * Add inferred factors from one stored price range to the vote counts.
+ *
+ * @param array $lower_votes Lower-factor vote counts.
+ * @param array $upper_votes Upper-factor vote counts.
+ * @param mixed $price Point price.
+ * @param mixed $price_min Stored minimum.
+ * @param mixed $price_max Stored maximum.
+ * @param int   $lower_bps_min Minimum lower factor.
+ * @param int   $lower_bps_max Maximum lower factor.
+ * @param int   $upper_bps_min Minimum upper factor.
+ * @param int   $upper_bps_max Maximum upper factor.
+ * @return void
+ */
+function ippgi_backfill_record_factor_votes(
+    &$lower_votes,
+    &$upper_votes,
+    $price,
+    $price_min,
+    $price_max,
+    $lower_bps_min,
+    $lower_bps_max,
+    $upper_bps_min,
+    $upper_bps_max
+) {
+    $price = ippgi_backfill_normalize_decimal($price);
+    $price_min = ippgi_backfill_normalize_decimal($price_min);
+    $price_max = ippgi_backfill_normalize_decimal($price_max);
+
+    if (null === $price || $price <= 0) {
+        return;
+    }
+
+    if (null !== $price_min && $price_min < $price) {
+        $lower_bps = (int) round((1 - ($price_min / $price)) * 10000);
+        if ($lower_bps >= $lower_bps_min && $lower_bps <= $lower_bps_max) {
+            $lower_votes[$lower_bps] = isset($lower_votes[$lower_bps])
+                ? $lower_votes[$lower_bps] + 1
+                : 1;
+        }
+    }
+
+    if (null !== $price_max && $price_max > $price) {
+        $upper_bps = (int) round((($price_max / $price) - 1) * 10000);
+        if ($upper_bps >= $upper_bps_min && $upper_bps <= $upper_bps_max) {
+            $upper_votes[$upper_bps] = isset($upper_votes[$upper_bps])
+                ? $upper_votes[$upper_bps] + 1
+                : 1;
+        }
+    }
+}
+
+/**
+ * Check whether an existing decimal matches the expected stored value.
  *
  * @param mixed $value Raw DB value.
- * @param float $min Minimum allowed value.
- * @param float $max Maximum allowed value.
+ * @param float $expected Expected value.
  * @return bool
  */
-function ippgi_backfill_value_in_range($value, $min, $max) {
+function ippgi_backfill_value_matches($value, $expected) {
     $normalized = ippgi_backfill_normalize_decimal($value);
 
     if (null === $normalized) {
         return false;
     }
 
-    return $normalized >= ($min - 0.00001) && $normalized <= ($max + 0.00001);
+    return abs($normalized - $expected) < 0.00001;
 }
