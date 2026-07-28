@@ -51,9 +51,25 @@ class swpm_paypal_ipn_handler { // phpcs:ignore
 			return true;
 		}
 
-		$custom                   = urldecode( $this->ipn_data['custom'] );
+		//Retrieve the membership level ID from the button's post meta data.
+		$button_id = isset( $this->ipn_data['item_number'] ) ? sanitize_text_field($this->ipn_data['item_number']) : '';
+		$configured_level_id = get_post_meta( $button_id, 'membership_level_id', true );
+		if ( !SwpmUtils::membership_level_id_exists( $configured_level_id ) ) {
+			$this->debug_log( 'Error! Could not find a valid membership level for the given item_number/button_id ('.$button_id.'). Cannot handle this IPN.', false);
+			return false;
+		}
+
+		// Parse the custom variable.
+		$custom = urldecode( $this->ipn_data['custom'] );
 		$this->ipn_data['custom'] = $custom;
-		$customvariables          = SwpmTransactions::parse_custom_var( $custom );
+		$customvariables = SwpmTransactions::parse_custom_var( $custom );
+
+		// Validate/verify the subsc_ref value in the custom variable.
+		$received_membership_level_id = isset( $customvariables['subsc_ref'] ) ? sanitize_text_field($customvariables['subsc_ref']) : '';
+		if ( $received_membership_level_id != $configured_level_id ) {
+			$this->debug_log( 'Error: Invalid subsc_ref parameter received! Cannot handle this IPN data.', false );
+			return false;
+		}
 
 		// Handle refunds
 		if ( $gross_total < 0 ) {
@@ -75,7 +91,7 @@ class swpm_paypal_ipn_handler { // phpcs:ignore
 
 			if ( ! empty( $subsc_ref ) ) {
 				$this->debug_log( 'Found a membership level ID. Creating member account...', true );
-				$swpm_id = $customvariables['swpm_id'];
+				$swpm_id = isset($customvariables['swpm_id']) ? sanitize_text_field($customvariables['swpm_id']) : '';
 				swpm_handle_subsc_signup_stand_alone( $this->ipn_data, $subsc_ref, $this->ipn_data['subscr_id'], $swpm_id );
 				
 				// Save in the Transactions CPT so there is a 'subscription created' entry for paypal standard subscriptions.
@@ -138,11 +154,6 @@ class swpm_paypal_ipn_handler { // phpcs:ignore
 			// Get the button id
 			$pp_hosted_button    = false;
 			$button_id           = $cart_item_data_num;// Button id is the item number.
-			$membership_level_id = get_post_meta( $button_id, 'membership_level_id', true );
-			if ( ! SwpmUtils::membership_level_id_exists( $membership_level_id ) ) {
-				$this->debug_log( 'This payment button was not created in the plugin. This is a paypal hosted button.', true );
-				$pp_hosted_button = true;
-			}
 
 			// Price check
 			$check_price = true;
@@ -341,6 +352,21 @@ class swpm_paypal_ipn_handler { // phpcs:ignore
 		// Get received values from post data
 		$validate_ipn  = array( 'cmd' => '_notify-validate' );
 		$validate_ipn += wp_unslash( $_POST );
+
+		$receiver_email = isset( $_POST['receiver_email'] ) ? sanitize_email($_POST['receiver_email']) : '';
+		$button_id = isset( $_POST['item_number'] ) ? sanitize_text_field($_POST['item_number']) : '';
+		if (empty($button_id) ){
+			$this->debug_log( 'Error: Empty item number received! Cannot handle this IPN data.', false );
+			return false;
+		}
+
+		$configured_paypal_email = get_post_meta($button_id, 'paypal_email', true);;
+
+		// Check if paypal receiver email mismatch.
+		if ($receiver_email !== $configured_paypal_email) {
+			$this->debug_log( 'Error: PayPal receiver email mismatch! Cannot handle this IPN data.', false );
+			return false;
+		}
 
 		// Send back post vars to paypal
 		$params = array(

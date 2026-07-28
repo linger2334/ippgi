@@ -110,7 +110,17 @@
 - 在 Git 仓库与正式网站目录分离的服务器上，根目录补数脚本通过 `IPPGI_WP_ROOT=/home/html/www/ippgi` 加载正式站点，脚本本身不要复制到可公开访问的网站根目录。
 - 与汇率相关的导入脚本可能耗时较长，执行前明确预期与回滚方案。
 
-## 8) 提交说明建议
+## 8) 正式服插件部署规则
+- 正式服的 Git 仓库位于 `/home/wlg2008g/deploy/ippgi-src`，网站目录位于 `/home/html/www/ippgi`；`git pull` 只更新前者，不会自动修改网站目录。
+- 正式服可能存在未被本地 Git 跟踪的插件（如 Wordfence）。发布时必须按具体主题/插件目录分别执行 `rsync`，不要对整个 `wp-content/plugins/` 使用 `rsync --delete`，否则会删除仅存在于正式服的插件。
+- `rsync --delete` 只允许把源和目标都限定到同一个具体插件目录，例如 `plugins/simple-membership/ -> plugins/simple-membership/`；这种用法不会影响相邻的 Wordfence、Rank Math 或 WP Data Access。
+- 插件代码继续遵循 PHP-FPM 只读规则：代码由 `root:www-data` 持有，目录 `0755`、文件 `0644`；只有明确的运行数据目录（如 `uploads`、`wflogs`）允许 `www-data` 写入。
+- Simple Membership 属于带本地补丁的第三方插件。升级官方版本时必须先在 Git 仓库更新、恢复 `class.swpm-utils-misc.php::get_countries_dropdown()` 对非字符串 `$country` 的兜底，再提交和部署；禁止只在 WordPress 后台或正式服原地强制升级。
+- SWPM 国家兼容补丁的必要代码为：`$country = is_string( $country ) ? $country : '';`。官方 `4.7.9` 仍未包含该处理；缺失时，数据库 `country IS NULL` 的会员会在 PHP 8.1+ 触发大量 `strtolower(null)` Deprecated 日志。
+- 因上述已知补丁，`wp plugin verify-checksums simple-membership` 允许且只允许报告 `classes/class.swpm-utils-misc.php` 这一处预期差异；其他文件差异仍需排查。
+- 部署时排除 `.DS_Store` 和 `log-*.txt`，避免把本地系统文件或调试日志复制到正式服/提交到 Git。
+
+## 9) 提交说明建议
 - 提交信息应包含：
   - 改了什么（文件/模块）
   - 为什么改（问题或需求）

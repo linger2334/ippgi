@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Simple Membership
-Version: 4.7.2
+Version: 4.7.9
 Plugin URI: https://simple-membership-plugin.com/
 Author: smp7, wp.insider
 Author URI: https://simple-membership-plugin.com/
@@ -17,8 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 //Define plugin constants
-define( 'SIMPLE_WP_MEMBERSHIP_VER', '4.7.2' );
-define( 'SIMPLE_WP_MEMBERSHIP_DB_VER', '1.5' );
+define( 'SIMPLE_WP_MEMBERSHIP_VER', '4.7.9' );
+define( 'SIMPLE_WP_MEMBERSHIP_DB_VER', '1.6' );
 define( 'SIMPLE_WP_MEMBERSHIP_SITE_HOME_URL', home_url() );
 define( 'SIMPLE_WP_MEMBERSHIP_PATH', dirname( __FILE__ ) . '/' );
 define( 'SIMPLE_WP_MEMBERSHIP_URL', plugins_url( '', __FILE__ ) );
@@ -30,6 +30,7 @@ if ( ! defined( 'COOKIEHASH' ) ) {
 define( 'SIMPLE_WP_MEMBERSHIP_AUTH', 'simple_wp_membership_' . COOKIEHASH );
 define( 'SIMPLE_WP_MEMBERSHIP_SEC_AUTH', 'simple_wp_membership_sec_' . COOKIEHASH );
 define( 'SIMPLE_WP_MEMBERSHIP_STRIPE_ZERO_CENTS', serialize( array( 'JPY', 'MGA', 'VND', 'KRW' ) ) );
+define( 'SIMPLE_WP_MEMBERSHIP_STRIPE_MIN_API_VER', '2024-06-20' );
 
 //Include the main class file.
 include_once( SIMPLE_WP_MEMBERSHIP_PATH . 'classes/class.simple-wp-membership.php' );

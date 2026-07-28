@@ -821,8 +821,6 @@ class SwpmMiscUtils {
 	}
 
 	public static function get_countries_dropdown( $country = '' ) {
-		$country = is_string( $country ) ? $country : '';
-
 		//Note: the country names are output using the __() function below so that they can be translated. The POT file just needs to have the country names in it.
 		$countries = array(
 			'Afghanistan',
@@ -1032,7 +1030,6 @@ class SwpmMiscUtils {
 		$curr_lev      = -1;
 		$guess_country = '';
 		foreach ( $countries as $country_name ) {
-			$country_name = is_string( $country_name ) ? $country_name : '';
 			similar_text( strtolower( $country ), strtolower( $country_name ), $lev );
 			if ( $lev >= $curr_lev ) {
 				//this is closest match so far
@@ -1059,7 +1056,6 @@ class SwpmMiscUtils {
 			$country = $guess_country;
 		}
 		foreach ( $countries as $country_name ) {
-			$country_name = is_string( $country_name ) ? $country_name : '';
 			//The country name strings are already in the POT file from the swpm_dummy_country_names_for_translation() function, so we can use __() function to output the country names.
 			$countries_dropdown .= "\r\n" . '<option value="' . $country_name . '"' . ( strtolower( $country_name ) == strtolower( $country ) ? ' selected' : '' ) . '>' . __($country_name, 'simple-membership') . '</option>';
 		}
@@ -1288,7 +1284,6 @@ class SwpmMiscUtils {
 			'pp_subscription'         => SwpmUtils::_( 'PayPal Subscription' ),
 			'pp_buy_now_new'     	  => SwpmUtils::_( 'PayPal Buy Now (New API)' ),
 			'pp_subscription_new'     => SwpmUtils::_( 'PayPal Subscription (New API)' ),
-			'pp_smart_checkout'       => SwpmUtils::_( 'PayPal Smart Checkout (Deprecated)' ),
 			'stripe_buy_now'          => SwpmUtils::_( 'Stripe Legacy Buy Now (Deprecated)' ),
 			'stripe_subscription'     => SwpmUtils::_( 'Stripe Legacy Subscription (Deprecated)' ),
 			'stripe_sca_buy_now'      => SwpmUtils::_( 'Stripe Buy Now' ),
@@ -1360,10 +1355,12 @@ class SwpmMiscUtils {
 	}
 
 	public static function mail( $email, $subject, $email_body, $headers ) {
-		$settings     = SwpmSettings::get_instance();
+		$settings = SwpmSettings::get_instance();
 		$html_enabled = $settings->get_value( 'email-enable-html' );
 		if ( ! empty( $html_enabled ) ) {
-			$headers   .= "Content-Type: text/html; charset=UTF-8\r\n";
+			//HTML email option is enabled, so set content type header and convert new lines to <br> tags.
+			SwpmLog::log_simple_debug( 'HTML email option is enabled. Setting content type header to text/html.', true );
+			$headers .= "Content-Type: text/html; charset=UTF-8\r\n";
 			$email_body = nl2br( $email_body );
 		}
 		wp_mail( $email, $subject, $email_body, $headers );
@@ -1451,9 +1448,9 @@ class SwpmMiscUtils {
 		SwpmLog::log_simple_debug( 'Account activation email for member ID: '.$member_id.' successfully sent to: ' . $to_email . '. From email address value used: ' . $from_address, true );
 	}
 
-
-	public static function get_months_data(int $year = null): array {
-		$year = $year ?? (int) date('Y');
+	public static function get_months_data( $year ) {
+		$year = !empty($year) ? $year : date('Y');
+		$year = (int) $year;
 		$data = array();
 
 		for ($m = 1; $m <= 12; $m++) {
@@ -1544,4 +1541,53 @@ class SwpmMiscUtils {
 
 		return $stripe_webhook_signing_key_config_required;
 	}
+
+    /**
+     * Parse a Stripe API version into [date, suffix] parts.
+     * e.g. '2026-04-22.dahlia' => ['2026-04-22', 'dahlia']
+     *      '2024-06-20'        => ['2024-06-20', '']
+     */
+    public static function parse_stripe_api_version( string $version ): array {
+        $parts = explode( '.', $version, 2 );
+
+        return [ $parts[0], $parts[1] ?? '' ];
+    }
+
+    /**
+     * Compare two Stripe API versions.
+     * Returns -1 if $a is older, 0 if equal, 1 if $a is newer.
+     */
+    public static function compare_stripe_api_versions( string $a, string $b ): int {
+        [ $dateA, $suffixA ] = self::parse_stripe_api_version( $a );
+        [ $dateB, $suffixB ] = self::parse_stripe_api_version( $b );
+
+        if ( $dateA !== $dateB ) {
+            return $dateA <=> $dateB;
+        }
+
+        // Same date: a suffix means newer than no suffix
+        if ( $suffixA === $suffixB ) {
+            return 0;
+        }
+
+        if ( $suffixA === '' ) {
+            return - 1;
+        } // a has no suffix, b does → a is older
+
+        if ( $suffixB === '' ) {
+            return 1;
+        }  // b has no suffix, a does → a is newer
+
+        // Both have suffixes on the same date — compare alphabetically
+        return $suffixA <=> $suffixB;
+    }
+
+    /**
+     * Check if a version is too old to be supported.
+     */
+    public static function check_if_old_stripe_api_version(string $version): bool
+    {
+        return self::compare_stripe_api_versions($version, SIMPLE_WP_MEMBERSHIP_STRIPE_MIN_API_VER) < 0;
+    }
+
 }

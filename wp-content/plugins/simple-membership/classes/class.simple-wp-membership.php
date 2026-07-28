@@ -101,9 +101,11 @@ class SimpleWpMembership {
         add_action('wp_ajax_nopriv_swpm_validate_email', 'SwpmAjax::validate_email_ajax');
         add_action('wp_ajax_swpm_validate_user_name', 'SwpmAjax::validate_user_name_ajax');
         add_action('wp_ajax_nopriv_swpm_validate_user_name', 'SwpmAjax::validate_user_name_ajax');
+	    add_action( 'wp_ajax_swpm_old_stripe_api_notice_dismiss', 'SwpmAjax::old_stripe_api_notice_dismiss');
 
         //init is too early for settings api.
         add_action('admin_init', array(&$this, 'admin_init_hook'));
+        add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts_hook'));
         add_action('plugins_loaded', array(&$this, "plugins_loaded"));
 
         //Filter to exclude the protected posts from the search results.
@@ -327,6 +329,20 @@ class SimpleWpMembership {
             do_action('swpm_addon_settings_save');
         }
     }
+
+	public function admin_enqueue_scripts_hook() {
+		wp_register_script( 'swpm_admin_scripts', SIMPLE_WP_MEMBERSHIP_URL . '/js/swpm-admin-scripts.js', null, SIMPLE_WP_MEMBERSHIP_VER, array(
+			'strategy' => 'defer',
+			'in_footer' => true,
+		) );
+
+		wp_localize_script( 'swpm_admin_scripts', 'swpm_admin_js_vars', apply_filters('swpm_admin_js_vars', array(
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce' => wp_create_nonce('swpm_admin_script_nonce'),
+		)));
+
+		wp_enqueue_script( 'swpm_admin_scripts' );
+	}
 
     public function hide_adminbar() {
 
@@ -697,9 +713,16 @@ class SimpleWpMembership {
 
         if (SwpmMiscUtils::check_if_webhook_signing_key_config_required() == 'yes') {
             echo '<div class="notice notice-error"><p>';
-            esc_html_e("Looks like you are using Stripe subscription payments, but the webhook signing secret is missing from the plugin settings. Please go to the Stripe Settings menu and configure the webhook signing secret.", "simple-membership"); 
+            _e("Looks like you are using Stripe subscription payments, but the webhook signing secret is missing from the plugin settings. Please go to the <a href='admin.php?page=simple_wp_membership_payments&tab=payment_settings&subtab=ps_stripe'>Stripe Settings</a> menu and configure the webhook signing secret.", "simple-membership"); 
             echo '</p></div>';
         }
+
+		$swpm_stripe_received_api_old_version = get_option('swpm_stripe_received_api_old_version', false);
+	    if (!empty($swpm_stripe_received_api_old_version)) {
+		    echo '<div class="notice notice-warning is-dismissible" id="swpm_stripe_api_old_version_notice"><p>';
+			printf(__("This site received a Stripe subscription webhook using an outdated API version '%s'. Upgrade your Stripe API version from your Stripe account dashboard, then dismiss this message.", 'simple-membership'), esc_attr($swpm_stripe_received_api_old_version));
+		    echo '</p></div>';
+	    }
     }
 
     public function meta_box() {
@@ -900,7 +923,6 @@ class SimpleWpMembership {
         wp_register_script('jquery.validationEngine', SIMPLE_WP_MEMBERSHIP_URL . '/js/jquery.validationEngine.js', array('jquery'), SIMPLE_WP_MEMBERSHIP_VER);
         wp_register_script('jquery.validationEngine-en', SIMPLE_WP_MEMBERSHIP_URL . '/js/jquery.validationEngine-en.js', array('jquery'), SIMPLE_WP_MEMBERSHIP_VER);
         wp_register_script('swpm.validationEngine-localization', SIMPLE_WP_MEMBERSHIP_URL . '/js/swpm.validationEngine-localization.js', array('jquery'), SIMPLE_WP_MEMBERSHIP_VER);
-        wp_register_script('swpm.password-toggle', SIMPLE_WP_MEMBERSHIP_URL . '/js/swpm.password-toggle.js', array('jquery'), SIMPLE_WP_MEMBERSHIP_VER);
         wp_register_script('swpm-reg-form-validator', SIMPLE_WP_MEMBERSHIP_URL . '/js/swpm-reg-form-validator.js', null, SIMPLE_WP_MEMBERSHIP_VER, true);
         wp_register_script('swpm-profile-form-validator', SIMPLE_WP_MEMBERSHIP_URL . '/js/swpm-profile-form-validator.js', null, SIMPLE_WP_MEMBERSHIP_VER, true);
 
@@ -1070,6 +1092,39 @@ class SimpleWpMembership {
         wp_localize_script('jquery.validationEngine-en', 'swpmRegForm', array('nonce' => $nonce));
     }
 
+	public static function enqueue_password_toggle_scripts( $handle, $params = array() ) {
+		if ( ! wp_script_is( $handle, 'registered' ) ) {
+			wp_register_script( $handle, SIMPLE_WP_MEMBERSHIP_URL . '/js/swpm.password-toggle.js', null , SIMPLE_WP_MEMBERSHIP_VER);
+		}
+
+		wp_localize_script( $handle, 'swpmPasswordToggleStrings', array(
+			'showPassword' => __('Show Password', 'simple-membership'),
+		));
+
+		wp_enqueue_script( $handle );
+
+		$params = wp_parse_args($params, array(
+			'type' => '',
+			'formId' => '',
+			'passwordInputSelectors' => "input[type='password']",
+			'passwordInputSelectorsToAttach' => "input[type='password']",
+			'checkboxTogglerSelector' => '',
+			'checkboxTogglerStyles' => [],
+		));
+
+		wp_print_inline_script_tag( '
+	        document.addEventListener("DOMContentLoaded", function () {
+	            new SWPM_Password_Visibility_Toggler({
+	                type: "'.esc_js($params['type']).'",
+	                formId: "'.esc_js($params['formId']).'",
+	                passwordInputSelectors: "'.esc_js($params['passwordInputSelectors']).'",
+	                passwordInputSelectorsToAttach: "'.esc_js($params['passwordInputSelectorsToAttach']).'",
+	                checkboxTogglerSelector: "'.esc_js($params['checkboxTogglerSelector']).'",
+	                checkboxTogglerStyles: '.json_encode($params['checkboxTogglerStyles']).',
+	            });
+	        });
+	    ');
+	}
 
     public function menu() {
         $menu_parent_slug = 'simple_wp_membership';

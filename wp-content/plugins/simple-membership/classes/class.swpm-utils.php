@@ -194,6 +194,13 @@ abstract class SwpmUtils {
 		);
 	}
 
+	public static function get_pass_visibility_toggler_options() {
+		return array(
+			'icon'              => __( 'Icon', 'simple-membership' ),
+			'checkbox'            => __( 'Checkbox', 'simple-membership' ),
+		);
+	}
+
 	public static function account_state_dropdown( $selected = 'active' , $option_all = false) {
 		$options = self::get_account_state_options();
 		$html    = '';
@@ -379,9 +386,15 @@ abstract class SwpmUtils {
                         //No existing user. Try to create a brand new WP user entry.
 			$wp_user_id = wp_create_user( $wp_user_data['user_login'], $wp_user_data['password'], $wp_user_data['user_email'] );
 
-                        //Update that newly created user's profile with additional data.
-                        $wp_user_data['ID'] = $wp_user_id;
-                        wp_update_user( $wp_user_data ); //Core WP function. Updates/Syncs the user info and role.
+			if ( is_wp_error( $wp_user_id ) ) {
+				// Error occured when creating wp user, cannot proceed with this request.
+				$error_msg = $wp_user_id->get_error_message();
+				wp_die( $error_msg );
+			}
+
+            //Update that newly created user's profile with additional data.
+            $wp_user_data['ID'] = $wp_user_id;
+            wp_update_user( $wp_user_data ); //Core WP function. Updates/Syncs the user info and role.
 
 		}
 
@@ -647,6 +660,8 @@ abstract class SwpmUtils {
 			$ip_values = explode( ',', $user_ip );
 			$user_ip   = $ip_values['0'];
 		}
+
+		$user_ip = sanitize_text_field( $user_ip );
 
 		return apply_filters( 'swpm_get_user_ip_address', $user_ip );
 	}

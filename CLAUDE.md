@@ -1794,11 +1794,12 @@ TP 只翻前端 HTML，**不翻邮件**。SWPM 注册欢迎、订阅升级 / 取
 #### 65. SWPM 国家下拉 PHP 8.1 Deprecated 兼容修复 ✅
 - **问题**：`simple-membership/classes/class.swpm-utils-misc.php` 的 `get_countries_dropdown()` 在 PHP 8.1+ 环境下可能收到 `null` 的国家值，并将其直接传给 `strtolower()`，导致 `Passing null to parameter #1 ($string) of type string is deprecated` 日志。
 - **修复动作**：
-  - 在 `SwpmMiscUtils::get_countries_dropdown()` 中将传入的 `$country` 统一兜底为字符串。
-  - 在国家列表遍历比较时，也将 `$country_name` 统一兜底为字符串。
-  - 同时覆盖该函数中 `similar_text(strtolower(...))` 的同类潜在 warning。
+  - 在 `SwpmMiscUtils::get_countries_dropdown()` 入口增加 `$country = is_string( $country ) ? $country : '';`，将非字符串国家值统一兜底为空字符串。
+  - 官方国家列表本身全部是固定字符串，因此 `$country_name` 不需要额外兜底；升级后至少必须保留上述 `$country` 入口处理。
 - **影响范围**：仅为兼容性修复，不改变国家下拉的原有显示和匹配逻辑。
-- **注意事项**：此次修复位于第三方插件 `simple-membership` 源码中，后续升级插件时需要留意该补丁是否被覆盖。
+- **线上数据核查**：正式服曾检查到 `ippgi_swpm_members_tbl` 的现有会员 `country` 全部为数据库 `NULL`，因此该补丁不是理论防御；不保留时，相关资料/后台页面会重复触发 `strtolower(null)` Deprecated 日志。
+- **升级结论**：官方 Simple Membership `4.7.9` 仍未包含该处理。升级时必须先在 Git 仓库更新官方插件、重新应用补丁并提交，再发布正式服；不能只在 WordPress 后台原地强制升级。
+- **校验说明**：保留补丁后，官方 checksum 校验允许且只允许 `classes/class.swpm-utils-misc.php` 出现这一处已知差异。
 
 #### 66. Trial(Level 3) 残留清理与删除确认 ✅
 - **结论**：当前项目代码已经不再使用 Trial (Level 3)；赠送访问统一走 bonus 机制，实际使用的 SWPM 等级仅为 Basic (2) 与 Plus (4)。
@@ -1872,6 +1873,30 @@ mysqldump -u root -p wordpress \
 #### 3. 上传文件
 - 上传整个 WordPress 目录到服务器
 - 或使用 Git 部署主题和插件
+
+##### Git 仓库与正式网站目录分离时的插件发布规则
+- Git 仓库：`/home/wlg2008g/deploy/ippgi-src`
+- 正式网站：`/home/html/www/ippgi`
+- `git pull` 只更新 Git 仓库，不会自动修改正式网站目录；拉取后仍需把目标主题或插件单独发布到网站目录。
+- 正式服允许存在未被本地 Git 跟踪的运维插件，例如 Wordfence。不要执行下面这种整目录同步：
+  ```bash
+  sudo rsync -a --delete \
+    wp-content/plugins/ \
+    /home/html/www/ippgi/wp-content/plugins/
+  ```
+  本地缺少 Wordfence 等插件时，整目录的 `--delete` 会把正式服对应目录删除。
+- 必须将 `--delete` 限定在具体插件目录，例如发布 Simple Membership：
+  ```bash
+  sudo rsync -a --delete \
+    --exclude='.DS_Store' \
+    --exclude='log-*.txt' \
+    --chown=root:www-data \
+    wp-content/plugins/simple-membership/ \
+    /home/html/www/ippgi/wp-content/plugins/simple-membership/
+  ```
+  该命令只清理 `simple-membership` 目录内部，不会影响相邻的 Wordfence、Rank Math、WP Data Access 等插件。
+- 发布后恢复代码权限：目录 `0755`、文件 `0644`、所有者 `root:www-data`。PHP-FPM 的 `www-data` 只能读取插件代码；只有 `uploads`、`wflogs` 等明确运行目录可以写入。
+- 对包含本地补丁的第三方插件，必须执行“Git 仓库升级 → 恢复补丁 → 语法/差异检查 → 提交 → 单目录发布”，不得绕过 Git 在后台直接覆盖升级。
 
 #### 4. 导入数据库
 ```bash
