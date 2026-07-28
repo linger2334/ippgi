@@ -821,6 +821,7 @@ class SwpmMiscUtils {
 	}
 
 	public static function get_countries_dropdown( $country = '' ) {
+        $country = is_string( $country ) ? $country : '';
 		//Note: the country names are output using the __() function below so that they can be translated. The POT file just needs to have the country names in it.
 		$countries = array(
 			'Afghanistan',
