@@ -24,9 +24,9 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
             $latest_time = $mtime;
         }
     }
-    define('IPPGI_VERSION', $latest_time ?: '1.8.1');
+    define('IPPGI_VERSION', $latest_time ?: '1.8.2');
 } else {
-    define('IPPGI_VERSION', '1.8.1');
+    define('IPPGI_VERSION', '1.8.2');
 }
 define('IPPGI_THEME_DIR', get_template_directory());
 define('IPPGI_THEME_URI', get_template_directory_uri());

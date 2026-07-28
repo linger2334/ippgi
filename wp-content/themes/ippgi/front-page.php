@@ -7,6 +7,8 @@
  */
 
 get_header();
+
+$prices_fetched_at = ippgi_get_latest_prices_fetched_at();
 ?>
 
 <main id="main-content" class="site-main">
@@ -27,12 +29,16 @@ get_header();
                 <p class="my-prices__disclaimer">
                     <?php esc_html_e('Prices are quoted on an ex works (EXW) basis in China and exclude freight costs.', 'ippgi'); ?>
                 </p>
-                <p class="my-prices__updated" id="prices-updated">
+                <p
+                    class="my-prices__updated"
+                    id="prices-updated"
+                    data-fetched-at="<?php echo esc_attr($prices_fetched_at); ?>"
+                >
                     <?php
                     printf(
                         /* translators: %s: date and time */
                         esc_html__('Updated: %s (UTC+8)', 'ippgi'),
-                        ippgi_format_prices_fetched_at(ippgi_get_latest_prices_fetched_at(), 'Y-m-d H:i:s')
+                        ippgi_format_prices_fetched_at($prices_fetched_at, 'Y-m-d H:i:s')
                     );
                     ?>
                 </p>

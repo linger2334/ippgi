@@ -1688,8 +1688,15 @@
 
             // Update timestamp
             const categoryData = pricesData[displayCategories[currentIndex]];
-            if (updatedLabel && categoryData && categoryData.fetchedAt) {
+            // Avoid retriggering TranslatePress for the unchanged global timestamp on every slide.
+            if (
+                updatedLabel &&
+                categoryData &&
+                categoryData.fetchedAt &&
+                updatedLabel.dataset.fetchedAt !== categoryData.fetchedAt
+            ) {
                 updatedLabel.textContent = t('updatedLabel', 'Updated:') + ' ' + categoryData.fetchedAt + ' ' + t('timezoneSuffix', '(UTC+8)');
+                updatedLabel.dataset.fetchedAt = categoryData.fetchedAt;
             }
 
             // Update dots
